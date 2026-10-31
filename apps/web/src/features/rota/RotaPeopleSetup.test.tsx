@@ -97,6 +97,28 @@ describe("RotaPeopleSetup: an archived khatma", () => {
 });
 
 describe("RotaPeopleSetup: bringing people in", () => {
+  it("renames someone from the list", async () => {
+    const user = userEvent.setup();
+    renderSetup();
+    await user.click(
+      screen.getByRole("button", { name: t.rota.renameOf("سعد") }),
+    );
+    const sheet = screen.getByRole("dialog", { name: t.rota.renameTitle });
+    const field = within(sheet).getByLabelText(t.rota.personName);
+    await user.clear(field);
+    await user.type(field, "أبو سعد");
+    await user.click(
+      within(sheet).getByRole("button", { name: t.rota.renameSave }),
+    );
+    expect(m.fns.renameParticipant).toHaveBeenCalledWith({
+      sessionToken: "tok",
+      inviteCode: expect.any(String),
+      participantId: "p1",
+      name: "أبو سعد",
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
   it("offers a pool khatma's members, by names only, and says how many", () => {
     renderSetup();
     const button = screen.getByRole("button", {

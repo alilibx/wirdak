@@ -647,6 +647,7 @@ export const ar = {
       juz_taken: "هذا الجزء له قارئ الآن. اختر جزءاً آخر.",
       already_added: "هذا الرقم مضاف في الختمة.",
       no_free_juz: "الأجزاء الثلاثون كلها لها قرّاء.",
+      bad_name: "اكتب اسم الشخص.",
     } as Record<string, string>,
     answerNone: "لم يردّ",
     answerNotYet: "ردّ: ليس بعد",
@@ -722,6 +723,10 @@ export const ar = {
     giveMore: "أعطه جزءاً آخر",
     giveMoreHint: (juz: number) =>
       `يقرأ معه الجزء ${toArabicDigits(juz)} كل يوم`,
+    rename: "غيّر الاسم",
+    renameOf: (name: string) => `غيّر اسم ${name}`,
+    renameTitle: "غيّر الاسم",
+    renameSave: "احفظ الاسم",
     remove: "أزله من الختمة",
     stopReading: "لن أقرأ جزءاً",
     stopReadingHint: "تبقى منظّم الختمة، ويصبح جزؤك بلا قارئ.",
@@ -735,6 +740,7 @@ export const ar = {
       is_me: "لا يمكن إزالة منظّم الختمة منها.",
       juz_taken: "هذا الجزء له قارئ الآن.",
       too_many: "لا يمكنه أن يقرأ أكثر من هذا.",
+      bad_name: "اكتب اسم الشخص.",
     } as Record<string, string>,
     // Saved participants and pool members
     savedFrom: "من ختمات سابقة",

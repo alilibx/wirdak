@@ -2,7 +2,7 @@ import { ConvexError } from "convex/values";
 import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
-import { enqueue } from "../../rotaOutbox";
+import { enqueue, takeFreeJuzToday, welcomeGoesNow } from "../../rotaOutbox";
 import { env } from "../../whatsapp";
 import {
   readingDaysKind,
@@ -424,6 +424,59 @@ export async function removeParticipant(
   return { ok: true };
 }
 
+/**
+ * Sets someone's name in this khatma, and in the organizer's saved list unless
+ * they removed that row. Their own account's name stays as it is.
+ */
+async function setParticipantName(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  participant: Doc<"rotaParticipants">,
+  name: string,
+): Promise<void> {
+  await ctx.db.patch(participant._id, { name });
+  const owner = khatma.creatorPersonId;
+  const { personId, phone } = participant;
+  const byPhone = await ctx.db
+    .query("rotaContacts")
+    .withIndex("by_owner_phone", (q) =>
+      q.eq("ownerPersonId", owner).eq("phone", phone),
+    )
+    .first();
+  const byPerson =
+    personId == null
+      ? null
+      : await ctx.db
+          .query("rotaContacts")
+          .withIndex("by_owner_person", (q) =>
+            q.eq("ownerPersonId", owner).eq("personId", personId),
+          )
+          .first();
+  for (const contact of [byPhone, byPerson]) {
+    if (contact && contact.removedAt === undefined) {
+      await ctx.db.patch(contact._id, { name });
+    }
+  }
+}
+
+export async function renameParticipant(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  _rota: RotaConfig,
+  args: { participantId: Id<"rotaParticipants">; name: string },
+): Promise<{ ok: true } | { error: "not_found" | "bad_name" }> {
+  const participant = await activeParticipant(
+    ctx,
+    khatma._id,
+    args.participantId,
+  );
+  if (!participant) return { error: "not_found" };
+  const name = cleanDisplayName(args.name);
+  if (name === null) return { error: "bad_name" };
+  await setParticipantName(ctx, khatma, participant, name);
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // Saved participants
 
@@ -638,6 +691,31 @@ function welcomeRow(
   };
 }
 
+/**
+ * Queues an accepted member's welcome. On a first join, when it will go at
+ * once, it carries today's free juz'; a welcome that can't go leaves it free.
+ */
+async function welcomeAccepted(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  rota: RotaConfig,
+  participant: {
+    id: Id<"rotaParticipants">;
+    phone: string;
+    firstJoin: boolean;
+  },
+  now: number,
+): Promise<void> {
+  const queued = await enqueue(ctx, welcomeRow(khatma._id, participant.id));
+  if (
+    queued !== null &&
+    participant.firstJoin &&
+    (await welcomeGoesNow(ctx, rota, participant.phone, now))
+  ) {
+    await takeFreeJuzToday(ctx, rota, khatma._id, participant.id, now);
+  }
+}
+
 /** An open join request of this khatma, or null. */
 async function openRequest(
   ctx: QueryCtx,
@@ -661,14 +739,17 @@ async function openRequest(
 export async function acceptJoinRequest(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
-  _rota: RotaConfig,
-  args: { requestId: Id<"rotaJoinRequests">; juz: number },
+  rota: RotaConfig,
+  args: { requestId: Id<"rotaJoinRequests">; juz: number; name?: string },
 ): Promise<
   | { ok: true; participantId: Id<"rotaParticipants"> }
-  | { error: "not_found" | "juz_taken" | "already_added" }
+  | { error: "not_found" | "juz_taken" | "already_added" | "bad_name" }
 > {
   const request = await openRequest(ctx, khatma._id, args.requestId);
   if (!request) return { error: "not_found" };
+  const chosenName =
+    args.name === undefined ? undefined : cleanDisplayName(args.name);
+  if (chosenName === null) return { error: "bad_name" };
   const now = Date.now();
   const stoppedSince = (
     await ctx.db
@@ -697,8 +778,21 @@ export async function acceptJoinRequest(
     if (existing.joinedAt == null) {
       await ctx.db.patch(existing._id, { joinedAt: now });
     }
+    if (chosenName !== undefined) {
+      await setParticipantName(ctx, khatma, existing, chosenName);
+    }
     await ctx.db.patch(request._id, { resolvedAt: now, outcome: "accepted" });
-    await enqueue(ctx, welcomeRow(khatma._id, existing._id));
+    await welcomeAccepted(
+      ctx,
+      khatma,
+      rota,
+      {
+        id: existing._id,
+        phone: existing.phone,
+        firstJoin: existing.joinedAt == null,
+      },
+      now,
+    );
     return { error: "already_added" };
   }
 
@@ -710,7 +804,10 @@ export async function acceptJoinRequest(
   const phoneHidden =
     personId !== null &&
     (await numberHiddenFrom(ctx, khatma.creatorPersonId, personId));
-  const name = cleanDisplayName(request.profileName ?? "") ?? NEW_MEMBER_NAME;
+  const name =
+    chosenName ??
+    cleanDisplayName(request.profileName ?? "") ??
+    NEW_MEMBER_NAME;
   const placed = await placeNewParticipant(
     ctx,
     khatma,
@@ -732,7 +829,13 @@ export async function acceptJoinRequest(
     });
   }
   await ctx.db.patch(request._id, { resolvedAt: now, outcome: "accepted" });
-  await enqueue(ctx, welcomeRow(khatma._id, placed.participantId));
+  await welcomeAccepted(
+    ctx,
+    khatma,
+    rota,
+    { id: placed.participantId, phone: request.phone, firstJoin: true },
+    now,
+  );
   return { ok: true, participantId: placed.participantId };
 }
 

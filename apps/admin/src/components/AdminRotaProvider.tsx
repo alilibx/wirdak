@@ -17,6 +17,7 @@ const adminFunctions = {
   giveJuz: api.adminRota.giveJuz,
   moveJuz: api.adminRota.moveJuz,
   freeJuz: api.adminRota.freeJuz,
+  renameParticipant: api.adminRota.renameParticipant,
   removeParticipant: api.adminRota.removeParticipant,
   addSaved: api.adminRota.addSaved,
   ensureJoinLink: api.adminRota.ensureJoinLink,

@@ -8,7 +8,8 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
-import { lastRotaDay, targetDay } from "./lib/rotaPlace";
+import { juzFor } from "./lib/rota";
+import { lastRotaDay, targetDay, type RotaConfig } from "./lib/rotaPlace";
 import { encodePayload } from "./lib/rotaPayload";
 import {
   ROTA_BUTTONS,
@@ -199,6 +200,80 @@ export function titled(
   return `*${khatmaTitle(khatma)}*\n${text}`;
 }
 
+/** The khatma's last day, if it's dated today and still open. */
+async function openDayToday(
+  ctx: QueryCtx,
+  khatmaId: Id<"khatmas">,
+  timeZone: string,
+  now: number,
+): Promise<Doc<"rotaDays"> | null> {
+  const last = await lastRotaDay(ctx, khatmaId);
+  return last &&
+    last.closedAt === null &&
+    last.date === localDate(now, timeZone)
+    ? last
+    : null;
+}
+
+/**
+ * Gives a member joining for the first time during a day the ajza' their slots have that day,
+ * where nobody has them: a day's assignments are fixed when its juz' message
+ * goes out, so someone added since would otherwise wait for the next one. A
+ * juz' given to someone else or already marked read stays as it is.
+ */
+export async function takeFreeJuzToday(
+  ctx: MutationCtx,
+  rota: RotaConfig,
+  khatmaId: Id<"khatmas">,
+  participantId: Id<"rotaParticipants">,
+  now: number,
+): Promise<void> {
+  if (rota.pausedAt !== null) return;
+  const day = await openDayToday(ctx, khatmaId, rota.timeZone, now);
+  if (!day) return;
+  const slots = await ctx.db
+    .query("rotaSlots")
+    .withIndex("by_participant", (q) => q.eq("participantId", participantId))
+    .collect();
+  for (const { slot } of slots) {
+    const juz = juzFor(slot, day.number);
+    const read = await ctx.db
+      .query("rotaReads")
+      .withIndex("by_day_juz", (q) => q.eq("dayId", day._id).eq("juz", juz))
+      .first();
+    if (read && read.readerId === null && read.doneAt === null) {
+      await ctx.db.patch(read._id, {
+        holderId: participantId,
+        readerId: participantId,
+      });
+    }
+  }
+}
+
+/** Whether a welcome queued now would go at once: `plan` holds it in quiet hours, and drops it outside the window. */
+export async function welcomeGoesNow(
+  ctx: QueryCtx,
+  rota: RotaConfig,
+  phone: string,
+  now: number,
+): Promise<boolean> {
+  const awake = nextAwake(now, rota.timeZone, await quietHours(ctx));
+  return awake <= now && (await windowOpen(ctx, phone, now));
+}
+
+/** Whether the phone wrote to Wirdak in the last 24 hours. */
+async function windowOpen(
+  ctx: QueryCtx,
+  phone: string,
+  now: number,
+): Promise<boolean> {
+  const contact = await ctx.db
+    .query("waContacts")
+    .withIndex("by_phone", (q) => q.eq("phone", phone))
+    .unique();
+  return contact !== null && contact.lastInboundAt >= now - WINDOW_MS;
+}
+
 /**
  * The welcome for a member who has just joined: today's juz' with the buttons
  * when a day dated today is open and has unread reads for them, else when their
@@ -219,12 +294,8 @@ export async function welcomeMessage(
       text: titled(khatma, welcomeText(participant.name, title, "notStarted")),
     };
   }
-  const last = await lastRotaDay(ctx, khatma._id);
-  if (
-    last &&
-    last.closedAt === null &&
-    last.date === localDate(now, rota.timeZone)
-  ) {
+  const last = await openDayToday(ctx, khatma._id, rota.timeZone, now);
+  if (last) {
     const juz = (
       await ctx.db
         .query("rotaReads")

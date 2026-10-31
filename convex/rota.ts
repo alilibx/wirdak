@@ -590,6 +590,18 @@ export const freeJuz = sessionMutation({
   },
 });
 
+export const renameParticipant = sessionMutation({
+  args: {
+    inviteCode: v.string(),
+    participantId: v.id("rotaParticipants"),
+    name: v.string(),
+  },
+  handler: async (ctx, args): ReturnType<typeof ops.renameParticipant> => {
+    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
+    return ops.renameParticipant(ctx, khatma, rota, args);
+  },
+});
+
 export const removeParticipant = sessionMutation({
   args: {
     inviteCode: v.string(),
@@ -787,6 +799,7 @@ export const acceptJoinRequest = sessionMutation({
     inviteCode: v.string(),
     requestId: v.id("rotaJoinRequests"),
     juz: v.number(),
+    name: v.optional(v.string()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.acceptJoinRequest> => {
     const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);

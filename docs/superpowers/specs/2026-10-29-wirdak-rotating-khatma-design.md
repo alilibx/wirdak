@@ -99,7 +99,7 @@ The organizer never converts between "their juz' on khatma 1" and "their juz' to
 - Before khatma 1: «جزء كل مشارك في الختمة ١».
 - Once running: the next reading day whose juz' message hasn't gone out yet, for example «الختمة ١٣ يوم الجمعة ٢٢ يناير. هذا جزء كل مشارك فيها». As soon as a day's juz' message goes out, the page moves on to the following reading day **[builder's call]**.
 
-A reading day's assignments are fixed when its juz' message goes out. After that, the day changes only from the Today tab (6.2): an empty or unread juz' is filled by reassigning it.
+A reading day's assignments are fixed when its juz' message goes out. After that, the day changes only from the Today tab (6.2): an empty or unread juz' is filled by reassigning it. The one exception is a member who joins during the day: the juz' their slot has that day becomes theirs if nobody has it and it isn't marked read (3.4).
 
 The list has 30 rows, one per juz' of that khatma. Each row shows the reader's name and whether they've joined. An empty row says «+ أضف قارئاً للجزء ٧». Tapping it opens a sheet that adds a new person (name and WhatsApp number) or picks someone from the saved list. The sheet spells out what follows: «يقرأ الجزء ٧ في الختمة ١٢، ثم ٨ في الختمة ١٣، وهكذا». Wirdak works out the slot from the juz' and khatma number.
 
@@ -119,7 +119,7 @@ All times are in the khatma's time zone, which defaults to the organizer's (`peo
 - The admin panel holds the defaults and the bounds. Each organizer can change the times for their khatma. Every time must fall outside quiet hours (today 22:00 to 07:00, the `quietStartHour` and `quietEndHour` settings), and the four must keep the order above.
 - Times are in 15-minute steps **[builder's call]**.
 - A reading day **closes** at the juz' message time on the next calendar day. That's 08:00 the next morning for a daily khatma, and Saturday 08:00 for a Friday one. Until then, a member's «أتممت» still counts for that day **[builder's call]**.
-- **Late starts** **[builder's call]**. The date of khatma 1 can be today or later. If it's today and the juz' message time has passed, khatma 1 starts as soon as the khatma is created. A member who joins while a reading day is open (their slot is part of it) gets that day's juz' with its buttons in the welcome reply, inside the 24-hour window.
+- **Late starts** **[builder's call]**. The date of khatma 1 can be today or later. If it's today and the juz' message time has passed, khatma 1 starts as soon as the khatma is created. A member who joins while a reading day is open (their slot is part of it) gets that day's juz' with its buttons in the welcome reply, inside the 24-hour window. That includes someone added after the day's message went out, when the juz' their slot has that day is free. Nothing is taken on a paused khatma, and a member accepted from a join request takes it only if the welcome can go at once.
 - **Quiet hours** **[builder's call]**. Every message Wirdak starts (juz' messages, reminders, reassignments, the completion message, organizer messages) waits until quiet hours end. A reply to a member's own message goes out at once, at any hour, because they just wrote to us. That includes the dua for the member whose «أتممت» completed the khatma.
 - When every juz' of the reading day is done, the khatma is **complete** (section 5.5). The day summary still goes to the organizer if it's on.
 - A day that closes incomplete stays incomplete. The rotation moves on as usual.

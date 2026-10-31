@@ -92,6 +92,7 @@ const rotaOps = {
   giveJuz: "أعطى قارئاً جزءاً",
   moveJuz: "نقل جزءاً إلى قارئ آخر",
   freeJuz: "أخلى جزءاً",
+  renameParticipant: "غيّر اسم قارئ",
   removeParticipant: "أزال قارئاً",
   addSaved: "أضاف قارئاً من المحفوظين",
   ensureJoinLink: "أنشأ رابط الانضمام",

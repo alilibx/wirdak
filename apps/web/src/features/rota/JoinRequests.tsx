@@ -6,6 +6,7 @@ import { Button } from "../../components/Button";
 import { t } from "../../i18n/ar";
 import { useRotaBackend } from "./backend";
 import { ErrorLine } from "./ErrorLine";
+import { fieldClass } from "./fieldClass";
 import { useRotaCall } from "./useRotaCall";
 
 type Request = PeopleView["requests"][number];
@@ -24,11 +25,16 @@ function JoinRequestCard({
   const accept = useMutation(backend.acceptJoinRequest);
   const decline = useMutation(backend.declineJoinRequest);
   const { busy, error, run } = useRotaCall(t.rota.joinRequestErrors);
+  const nameId = useId();
   const selectId = useId();
+  const [name, setName] = useState(request.name ?? "");
   const [chosen, setChosen] = useState<number | null>(null);
   // The juz' may be taken while the card is open: fall back to the first free one.
   const juz = chosen !== null && freeJuz.includes(chosen) ? chosen : freeJuz[0];
   const args = backend.authArgs();
+  // Left as it came, the server cleans WhatsApp's name itself, or gives its usual one.
+  const nameArg =
+    name.trim() === (request.name ?? "") ? {} : { name: name.trim() };
 
   return (
     <li className="rounded-ui border-2 border-gold bg-[#FBF1D9] p-4">
@@ -39,6 +45,17 @@ function JoinRequestCard({
         <p className="mt-2 text-ink-soft">{t.rota.addErrors.no_free_juz}</p>
       ) : (
         <>
+          <label htmlFor={nameId} className="mt-3 block font-medium">
+            {t.rota.personName}
+          </label>
+          <input
+            id={nameId}
+            type="text"
+            maxLength={60}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className={fieldClass}
+          />
           <label htmlFor={selectId} className="mt-3 block font-medium">
             {t.rota.requestJuz}
           </label>
@@ -46,7 +63,7 @@ function JoinRequestCard({
             id={selectId}
             value={juz}
             onChange={(event) => setChosen(Number(event.target.value))}
-            className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
+            className={fieldClass}
           >
             {freeJuz.map((n) => (
               <option key={n} value={n}>
@@ -61,7 +78,12 @@ function JoinRequestCard({
           disabled={busy || juz === undefined}
           onClick={() =>
             void run(() =>
-              accept({ ...args, requestId: request.id, juz: juz ?? 0 }),
+              accept({
+                ...args,
+                requestId: request.id,
+                juz: juz ?? 0,
+                ...nameArg,
+              }),
             )
           }
         >

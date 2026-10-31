@@ -4,11 +4,10 @@ import { Button } from "../../components/Button";
 import { t } from "../../i18n/ar";
 import { useRotaBackend } from "./backend";
 import { ErrorLine } from "./ErrorLine";
+import { fieldClass } from "./fieldClass";
 import { useRotaCall } from "./useRotaCall";
 
 const addErrors: Record<string, string> = t.rota.addErrors;
-const fieldClass =
-  "mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink";
 
 /**
  * A name and a number, added as a participant. With `juz` the person takes that juz' of the next

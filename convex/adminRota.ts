@@ -318,6 +318,23 @@ export const freeJuz = adminMutation({
   },
 });
 
+export const renameParticipant = adminMutation({
+  args: {
+    khatmaId: v.id("khatmas"),
+    participantId: v.id("rotaParticipants"),
+    name: v.string(),
+  },
+  handler: async (ctx, args): ReturnType<typeof ops.renameParticipant> => {
+    const { khatma, rota } = await requireLiveRota(ctx, args.khatmaId);
+    return audited(
+      ctx,
+      args,
+      "renameParticipant",
+      await ops.renameParticipant(ctx, khatma, rota, args),
+    );
+  },
+});
+
 export const removeParticipant = adminMutation({
   args: {
     khatmaId: v.id("khatmas"),
@@ -381,6 +398,7 @@ export const acceptJoinRequest = adminMutation({
     khatmaId: v.id("khatmas"),
     requestId: v.id("rotaJoinRequests"),
     juz: v.number(),
+    name: v.optional(v.string()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.acceptJoinRequest> => {
     const { khatma, rota } = await requireLiveRota(ctx, args.khatmaId);

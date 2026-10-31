@@ -9,8 +9,10 @@ import { t } from "../../i18n/ar";
 import { AddPersonForm } from "./AddPersonForm";
 import { useRotaBackend } from "./backend";
 import { ErrorLine } from "./ErrorLine";
+import { fieldClass } from "./fieldClass";
 import { JoinChip, ShareJoinLink, useEnsureJoinLink } from "./JoinStatus";
 import { JoinRequests } from "./JoinRequests";
+import { RenameSheet } from "./RenameSheet";
 import { SavedPicker } from "./SavedPicker";
 import { useRotaCall } from "./useRotaCall";
 import { formatIsoDate } from "./format";
@@ -47,6 +49,7 @@ function PersonSheet({
   const free = others.find((row) => row.participant === null);
   const [target, setTarget] = useState(free?.juz ?? others[0]?.juz ?? juz);
   const [confirming, setConfirming] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const { busy, error, run } = useRotaCall(peopleErrors);
   const args = backend.authArgs();
   const nextFree = view.freeJuz[0];
@@ -93,6 +96,17 @@ function PersonSheet({
     );
   }
 
+  if (renaming) {
+    return (
+      <RenameSheet
+        inviteCode={inviteCode}
+        person={person}
+        onBack={() => setRenaming(false)}
+        onClose={onClose}
+      />
+    );
+  }
+
   return (
     <Sheet title={name} onClose={onClose}>
       <p className="text-ink-soft">{t.rota.juzOf(person.juz)}</p>
@@ -104,7 +118,7 @@ function PersonSheet({
         id="rota-move-to"
         value={target}
         onChange={(event) => setTarget(Number(event.target.value))}
-        className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
+        className={fieldClass}
       >
         {others.map((row) => (
           <option key={row.juz} value={row.juz}>
@@ -141,6 +155,13 @@ function PersonSheet({
       </div>
 
       <div className="mt-5 grid gap-3">
+        <Button
+          variant="ghost"
+          disabled={busy}
+          onClick={() => setRenaming(true)}
+        >
+          {t.rota.rename}
+        </Button>
         {canGive && (
           <Button
             variant="ghost"

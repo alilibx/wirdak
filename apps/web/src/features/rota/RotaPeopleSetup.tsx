@@ -1,3 +1,4 @@
+import type { Id } from "@convex/_generated/dataModel";
 import type { PeopleView as View } from "@convex/lib/rotaOps";
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
@@ -9,6 +10,7 @@ import { t } from "../../i18n/ar";
 import { AddPersonForm } from "./AddPersonForm";
 import { useRotaBackend, type RotaBackend } from "./backend";
 import { ErrorLine } from "./ErrorLine";
+import { RenameSheet } from "./RenameSheet";
 import { JoinChip, ShareJoinLink, useEnsureJoinLink } from "./JoinStatus";
 import { SavedPicker } from "./SavedPicker";
 import { StepBar } from "./StepBar";
@@ -234,6 +236,9 @@ export function RotaPeopleSetupContent({
   const finishSetup = useMutation(backend.finishSetup);
   const finishing = useRotaCall(t.rota.errors);
   const [giving, setGiving] = useState(false);
+  const [renamingId, setRenamingId] = useState<Id<"rotaParticipants"> | null>(
+    null,
+  );
   // What the last import did: it stays until the organizer starts something else.
   const [importResult, setImportResult] = useState<string | null>(null);
   useEnsureJoinLink(inviteCode, view?.archived ? undefined : view?.joinLink);
@@ -243,6 +248,8 @@ export function RotaPeopleSetupContent({
   if (view === null || view.archived) {
     return <Navigate to={khatmaPath} replace />;
   }
+
+  const renaming = view.participants.find((p) => p.id === renamingId);
 
   return (
     <>
@@ -283,7 +290,7 @@ export function RotaPeopleSetupContent({
                 {t.rota.juzOf(person.juz)}
               </span>
             )}
-            <span className="w-full ps-10">
+            <span className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 ps-10">
               <JoinChip
                 person={person}
                 isMe={person.isMe}
@@ -291,6 +298,16 @@ export function RotaPeopleSetupContent({
                 daysKind={view.daysKind}
                 joinLink={view.joinLink}
               />
+              <button
+                type="button"
+                aria-label={t.rota.renameOf(
+                  person.isMe ? t.rota.me : person.name,
+                )}
+                onClick={() => setRenamingId(person.id)}
+                className="inline-flex min-h-11 items-center font-medium text-green underline underline-offset-4"
+              >
+                {t.rota.rename}
+              </button>
             </span>
           </li>
         ))}
@@ -331,6 +348,15 @@ export function RotaPeopleSetupContent({
         </Button>
         <ErrorLine error={finishing.error} />
       </div>
+
+      {renaming && (
+        <RenameSheet
+          inviteCode={inviteCode}
+          person={renaming}
+          onBack={() => setRenamingId(null)}
+          onClose={() => setRenamingId(null)}
+        />
+      )}
 
       {giving && view.freeJuz.length > 0 && (
         <GiveJuzSheet

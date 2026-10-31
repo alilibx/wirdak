@@ -10,7 +10,7 @@ import { isBlocked } from "./lib/blocked";
 import { isArchived } from "./lib/khatma";
 import { notify } from "./notes";
 import { celebrateIfComplete, completeIfDone } from "./rotaDays";
-import { titled, welcomeMessage } from "./rotaOutbox";
+import { takeFreeJuzToday, titled, welcomeMessage } from "./rotaOutbox";
 import { isStaging, MAX_BUTTON_TITLE, MAX_REPLY_BUTTONS } from "./whatsapp";
 import { findJoinCode } from "./lib/rotaJoin";
 import { decodePayload, encodePayload } from "./lib/rotaPayload";
@@ -378,6 +378,9 @@ async function join(
     stoppedAt: null,
     personId: joined.personId,
   });
+  if (participant.joinedAt == null) {
+    await takeFreeJuzToday(ctx, rota, khatma._id, joined._id, args.now);
+  }
   return [await welcome(ctx, khatma, joined, args.now)];
 }
 

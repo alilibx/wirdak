@@ -105,6 +105,38 @@ describe("PeoplePanel", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
+  it("renames a person from their sheet", async () => {
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} />);
+    await user.click(screen.getByRole("button", { name: /سعد/ }));
+    await user.click(screen.getByRole("button", { name: t.rota.rename }));
+    const sheet = screen.getByRole("dialog", { name: t.rota.renameTitle });
+    const field = within(sheet).getByLabelText(t.rota.personName);
+    expect(field).toHaveValue("سعد");
+    await user.clear(field);
+    await user.type(field, "أبو سعد");
+    await user.click(
+      within(sheet).getByRole("button", { name: t.rota.renameSave }),
+    );
+    expect(m.fns.renameParticipant).toHaveBeenCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+      participantId: "p1",
+      name: "أبو سعد",
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("going back from renaming changes nothing", async () => {
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} />);
+    await user.click(screen.getByRole("button", { name: /سعد/ }));
+    await user.click(screen.getByRole("button", { name: t.rota.rename }));
+    await user.click(screen.getByRole("button", { name: t.rota.cancel }));
+    expect(m.fns.renameParticipant).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: t.rota.rename })).toBeVisible();
+  });
+
   it("offers nothing from before when no one is saved", async () => {
     const user = userEvent.setup();
     m.saved = [];

@@ -35,6 +35,7 @@ function dubai(local: string): number {
 const RELAY_URL = "https://staging.example.convex.site/whatsapp/relay";
 const ORGANIZER = "+971500000001";
 const STRANGER = "971509999999";
+const LATE = "971500000199";
 
 type Sent = { to: string; body: string };
 let sent: Sent[];
@@ -243,6 +244,143 @@ test("a join text from a listed phone joins and replies with today's juz' button
   ]);
   // a join never signs anyone in
   expect(await t.run((ctx) => ctx.db.query("sessions").collect())).toEqual([]);
+});
+
+/** Adds someone who hasn't joined to `slot` after the khatma's day started. */
+async function addLate(t: T, s: Setup, slot: number) {
+  return await t.run(async (ctx) => {
+    const participantId = await ctx.db.insert("rotaParticipants", {
+      khatmaId: s.khatmaId,
+      name: "جديد",
+      phone: `+${LATE}`,
+      personId: null,
+      addedAt: Date.now(),
+      removedAt: null,
+      joinedAt: null,
+    });
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: s.khatmaId,
+      slot,
+      participantId,
+    });
+    return participantId;
+  });
+}
+
+test("someone added after the day started takes today's free juz' when they join", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const day = await startDay(t, s);
+  vi.setSystemTime(dubai("2027-01-16T21:00"));
+  const pid = await addLate(t, s, 5);
+
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+
+  const read = (await readsOf(t, day._id)).find((r) => r.juz === 5);
+  expect(read).toMatchObject({ holderId: pid, readerId: pid, doneAt: null });
+  expect(sent).toEqual([
+    {
+      to: LATE,
+      body:
+        "*ختمة*\nأهلاً جديد، انضممت إلى ختمة.\nتحديث على قراءتك اليوم في الختمة ١: المسجَّل لك الجزء ٥ من هذه الختمة." +
+        `\n[أتممت] ${tap("done", day._id, pid)}` +
+        `\n[ليس بعد] ${tap("notYet", day._id, pid)}`,
+    },
+  ]);
+});
+
+test("a late joiner leaves today's juz' with whoever was given it, and waits for the next day", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const day = await startDay(t, s);
+  const other = s.participants[0]!;
+  const juz5 = (await readsOf(t, day._id)).find((r) => r.juz === 5)!;
+  await t.run((ctx) =>
+    ctx.db.patch(juz5._id, { readerId: other, reassignedAt: 1 }),
+  );
+  await addLate(t, s, 5);
+
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+
+  expect((await t.run((ctx) => ctx.db.get(juz5._id)))?.readerId).toBe(other);
+  expect(sent.map((m) => m.body)).toEqual([
+    "*ختمة*\nأهلاً جديد، انضممت إلى ختمة. تصلك رسالة جزئك يوم الأحد الساعة ٨ صباحاً.",
+  ]);
+});
+
+test("a late joiner doesn't take a juz' the organizer already marked read", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const day = await startDay(t, s);
+  const juz5 = (await readsOf(t, day._id)).find((r) => r.juz === 5)!;
+  await t.run((ctx) =>
+    ctx.db.patch(juz5._id, { doneAt: 1, doneByOrganizer: true }),
+  );
+  await addLate(t, s, 5);
+
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+
+  expect((await t.run((ctx) => ctx.db.get(juz5._id)))?.readerId).toBeNull();
+  expect(sent).toHaveLength(1);
+  expect(sent[0]?.body).not.toContain("[أتممت]");
+});
+
+test("a late joiner takes nothing from a paused khatma", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const day = await startDay(t, s);
+  await t.run(async (ctx) => {
+    const khatma = (await ctx.db.get(s.khatmaId))!;
+    await ctx.db.patch(s.khatmaId, {
+      rota: { ...khatma.rota!, pausedAt: Date.now() },
+    });
+  });
+  await addLate(t, s, 5);
+
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+
+  const read = (await readsOf(t, day._id)).find((r) => r.juz === 5);
+  expect(read?.readerId).toBeNull();
+});
+
+test("a late joiner takes nothing from a day dated yesterday, still open before the next one starts", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const day = await startDay(t, s);
+  vi.setSystemTime(dubai("2027-01-17T07:00"));
+  await addLate(t, s, 5);
+
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+
+  const read = (await readsOf(t, day._id)).find((r) => r.juz === 5);
+  expect(read?.readerId).toBeNull();
+});
+
+test("a member who joined before takes nothing by sending the join text again", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const day = await startDay(t, s);
+  const pid = await addLate(t, s, 5);
+  await t.run((ctx) => ctx.db.patch(pid, { joinedAt: 1 }));
+
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+
+  const read = (await readsOf(t, day._id)).find((r) => r.juz === 5);
+  expect(read?.readerId).toBeNull();
+});
+
+test("a late joiner's «أتممت» marks the juz' they took", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const day = await startDay(t, s);
+  const pid = await addLate(t, s, 5);
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+
+  await send(t, LATE, "أتممت", { payload: tap("done", day._id, pid) });
+
+  const read = (await readsOf(t, day._id)).find((r) => r.juz === 5);
+  expect(read).toMatchObject({ readerId: pid, doneByOrganizer: false });
+  expect(read?.doneAt).toBe(Date.now());
 });
 
 test("a join before any open day says when the first juz' comes", async () => {

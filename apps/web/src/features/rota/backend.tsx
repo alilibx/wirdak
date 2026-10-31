@@ -20,6 +20,7 @@ const organizerFunctions = {
   giveJuz: api.rota.giveJuz,
   moveJuz: api.rota.moveJuz,
   freeJuz: api.rota.freeJuz,
+  renameParticipant: api.rota.renameParticipant,
   removeParticipant: api.rota.removeParticipant,
   addSaved: api.rota.addSaved,
   importMembers: api.rota.importMembers,

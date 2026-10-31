@@ -481,6 +481,28 @@ test("the organizer's row is an ordinary row to an admin, who can't remove it", 
   expect(await auditRows(t)).toHaveLength(before);
 });
 
+test("an admin's rename is audited, and a refused one isn't", async () => {
+  const t = convexTest(schema, modules);
+  const { khatmaId, readerId } = await running(t);
+  const args = { adminToken, khatmaId, participantId: readerId };
+  const before = (await auditRows(t)).length;
+
+  expect(
+    await t.mutation(api.adminRota.renameParticipant, { ...args, name: "  " }),
+  ).toEqual({ error: "bad_name" });
+  expect(await auditRows(t)).toHaveLength(before);
+
+  expect(
+    await t.mutation(api.adminRota.renameParticipant, {
+      ...args,
+      name: "أبو خالد",
+    }),
+  ).toEqual({ ok: true });
+  expect(await auditRows(t)).toHaveLength(before + 1);
+  const row = await t.run((ctx) => ctx.db.get(readerId));
+  expect(row?.name).toBe("أبو خالد");
+});
+
 test("an admin works from the organizer's saved list", async () => {
   const t = convexTest(schema, modules);
   const { khatmaId, readerId } = await running(t);
@@ -883,6 +905,12 @@ test("every admin rota mutation refuses anyone but an admin, and is on this list
         adminToken: "nope",
         ...participant,
         juz: 8,
+      }),
+    renameParticipant: () =>
+      t.mutation(api.adminRota.renameParticipant, {
+        adminToken: "nope",
+        ...participant,
+        name: "اسم",
       }),
     removeParticipant: () =>
       t.mutation(api.adminRota.removeParticipant, {
