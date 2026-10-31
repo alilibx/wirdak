@@ -8,9 +8,9 @@ const ORGANIZER = "أم خالد";
 const PERSON = "سارة";
 
 // An admin in a real browser: from the organizers page sets a rotating khatma up on someone's
-// behalf with one person, sees the join link and that it waits for its organizer, opens each tab
-// of the help page, then archives and deletes it. The first date stays the form's default,
-// tomorrow, so no day starts and the machine's time zone doesn't matter.
+// behalf with one person, sees the join link and that it waits for its organizer, finds it in the
+// lists, opens each tab of the help page, then archives and deletes it. The first date stays the
+// form's default, tomorrow, so no day starts and the machine's time zone doesn't matter.
 test("admin: set up a rotating khatma for someone, help it, archive and delete", async ({
   page,
 }) => {
@@ -58,6 +58,32 @@ test("admin: set up a rotating khatma for someone, help it, archive and delete",
   await page.getByRole("link", { name: t.rota.back }).click();
   await expect(page.getByText(t.rota.pending)).toBeVisible();
   await expect(page.getByRole("button", { name: t.rota.copy })).toBeVisible();
+
+  // --- The lists find it, spelled another way, and filters narrow them -------------------------
+  const khatmaUrl = page.url();
+  const search = (path: string, q: string) =>
+    page.goto(`${ADMIN_URL}${path}${encodeURIComponent(q)}`);
+  await search("/khatmas?kind=rota&q=", "ختمه نيابه");
+  await expect(
+    page.getByRole("link", { name: KHATMA_NAME }).first(),
+  ).toBeVisible();
+  await search("/khatmas?kind=pool&q=", "ختمه نيابه");
+  await expect(page.getByText(t.lists.empty)).toBeVisible();
+  await search("/khatmas?status=active&q=", "ختمه نيابه");
+  await expect(
+    page.getByRole("link", { name: KHATMA_NAME }).first(),
+  ).toBeVisible();
+  await search("/people?tab=organizers&q=", "ام خالد");
+  await expect(
+    page.getByRole("link", { name: ORGANIZER }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByText(t.people.statuses.notJoined).first(),
+  ).toBeVisible();
+  await search("/people?tab=readers&q=", "ساره");
+  await expect(page.getByText(PERSON, { exact: true }).first()).toBeVisible();
+
+  await page.goto(khatmaUrl);
   await page.getByRole("link", { name: t.rota.help }).click();
 
   // --- Each tab opens ------------------------------------------------------------------------
