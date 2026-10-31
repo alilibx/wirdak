@@ -1,6 +1,6 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { dayProgress, memberCount } from "./adminLookup";
 import { adminQuery } from "./lib/adminSession";
@@ -88,7 +88,7 @@ async function personRow(ctx: QueryCtx, p: Doc<"people">) {
     phoneMasked: maskPhone(p.phone),
     status: blocked
       ? ("blocked" as const)
-      : p.verifiedAt === 0
+      : p.lastSeenAt === 0
         ? ("notJoined" as const)
         : ("active" as const),
     rotaAllowed: p.rotaAllowed === true,
@@ -277,16 +277,6 @@ function khatmaStatus(k: Doc<"khatmas">) {
   return k.rota?.pausedAt != null ? ("paused" as const) : ("active" as const);
 }
 
-/** Reading days that reached 30 ajza', at most one a day. */
-async function completedDays(ctx: QueryCtx, khatmaId: Id<"khatmas">) {
-  const days = await ctx.db
-    .query("rotaDays")
-    .withIndex("by_khatma_n", (q) => q.eq("khatmaId", khatmaId))
-    .filter((q) => q.neq(q.field("completedAt"), null))
-    .collect();
-  return days.length;
-}
-
 async function khatmaRow(ctx: QueryCtx, k: Doc<"khatmas">) {
   const organizer = await ctx.db.get(k.creatorPersonId);
   const rota = k.kind === "rota";
@@ -300,7 +290,7 @@ async function khatmaRow(ctx: QueryCtx, k: Doc<"khatmas">) {
       : null,
     memberCount: await memberCount(ctx, k),
     today: rota ? await dayProgress(ctx, await lastRotaDay(ctx, k._id)) : null,
-    completed: rota ? await completedDays(ctx, k._id) : k.completedRounds,
+    completed: rota ? (k.completedDays ?? 0) : k.completedRounds,
     createdAt: k.createdAt,
   };
 }

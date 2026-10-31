@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { Link, MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { t } from "../i18n/ar";
 import { PeoplePage } from "./PeoplePage";
@@ -161,6 +161,19 @@ describe("PeoplePage", () => {
     renderPage();
     await userEvent.type(screen.getByLabelText(t.lists.searchLabel), "فايزة");
     await waitFor(() => expect(last().args).toMatchObject({ search: "فايزة" }));
+  });
+
+  it("clears the box when the sidebar link clears the search", async () => {
+    render(
+      <MemoryRouter initialEntries={["/people?q=سارة"]}>
+        <Link to="/people">nav</Link>
+        <PeoplePage />
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByRole("link", { name: "nav" }));
+    expect(screen.getByLabelText(t.lists.searchLabel)).toHaveValue("");
+    await new Promise((done) => setTimeout(done, 350));
+    expect(last().args).not.toHaveProperty("search");
   });
 
   it("loads more, and says when nothing matches", async () => {

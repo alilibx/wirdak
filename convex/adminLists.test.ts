@@ -269,6 +269,8 @@ test("a row says who never signed in and who is blocked", async () => {
   await person(t, "لم ينضمّ", { verifiedAt: 0, lastSeenAt: 0 });
   const blocked = await person(t, "محظور");
   await person(t, "عادي");
+  // Signed in before sign-in started setting `verifiedAt` for them.
+  await person(t, "انضمّ", { verifiedAt: 0, lastSeenAt: NOW });
   const { phone } = await t.run(async (ctx) => (await ctx.db.get(blocked))!);
   await t.run((ctx) =>
     ctx.db.insert("blockedPhones", {
@@ -281,7 +283,12 @@ test("a row says who never signed in and who is blocked", async () => {
   const { page } = await people(t, { sort: "name", order: "asc" });
   expect(
     Object.fromEntries(page.map((p) => [p.displayName, p.status])),
-  ).toEqual({ عادي: "active", "لم ينضمّ": "notJoined", محظور: "blocked" });
+  ).toEqual({
+    انضمّ: "active",
+    عادي: "active",
+    "لم ينضمّ": "notJoined",
+    محظور: "blocked",
+  });
 });
 
 test("the blocked list pages through blocked numbers, with or without an account", async () => {
@@ -463,6 +470,7 @@ test("the khatmas list shows kind, status, organizer, members and completions", 
     kind: "rota",
     rota: ROTA,
     schedule: "none",
+    completedDays: 1,
   });
   await reader(t, rota, "قارئ", "+971507770004");
   const dayId = await t.run((ctx) =>
@@ -481,19 +489,6 @@ test("the khatmas list shows kind, status, organizer, members and completions", 
     }),
   );
   await t.run(async (ctx) => {
-    await ctx.db.insert("rotaDays", {
-      khatmaId: rota,
-      n: 34,
-      number: 4,
-      cycle: 2,
-      date: "2027-01-14",
-      startedAt: NOW - DAY,
-      closesAt: NOW,
-      completedAt: NOW - 1000,
-      closedAt: NOW,
-      unreadSentAt: null,
-      summarySentAt: null,
-    });
     for (const juz of [1, 2, 3]) {
       await ctx.db.insert("rotaReads", {
         dayId,

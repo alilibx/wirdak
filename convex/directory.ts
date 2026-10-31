@@ -7,6 +7,8 @@ import { foldText } from "./lib/searchFold";
 
 /** Rows one `repair` run handles: each costs a few index reads. */
 const REPAIR_PAGE = 100;
+/** A khatma reads a row per reading day, so a run takes fewer of them. */
+const KHATMA_REPAIR_PAGE = 20;
 
 type Page = { continueCursor: string; isDone: boolean };
 
@@ -31,11 +33,20 @@ const STAGES: ((ctx: MutationCtx, cursor: string | null) => Promise<Page>)[] = [
   async (ctx, cursor) => {
     const page = await ctx.db
       .query("khatmas")
-      .paginate({ numItems: REPAIR_PAGE, cursor });
+      .paginate({ numItems: KHATMA_REPAIR_PAGE, cursor });
     for (const k of page.page) {
       const searchName = foldText(k.name ?? "");
       if (k.searchName !== searchName) {
         await ctx.db.patch(k._id, { searchName });
+      }
+      if (k.kind !== "rota") continue;
+      const days = await ctx.db
+        .query("rotaDays")
+        .withIndex("by_khatma_n", (q) => q.eq("khatmaId", k._id))
+        .filter((q) => q.neq(q.field("completedAt"), null))
+        .collect();
+      if (k.completedDays !== days.length) {
+        await ctx.db.patch(k._id, { completedDays: days.length });
       }
     }
     return page;

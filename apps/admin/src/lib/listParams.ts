@@ -72,6 +72,12 @@ export function useListParam(name: string): [string, (value: string) => void] {
 export function useListSearch() {
   const [search, setSearch] = useListParam("q");
   const [text, setText] = useState(search);
+  // A link can change the URL too, and the box follows it.
+  const [seen, setSeen] = useState(search);
+  if (search !== seen) {
+    setSeen(search);
+    setText(search);
+  }
   useEffect(() => {
     if (text === search) return;
     const timer = setTimeout(() => setSearch(text), SEARCH_WAIT_MS);

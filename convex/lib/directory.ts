@@ -20,6 +20,19 @@ export function nameFields(name: string | null) {
   return { name, searchName: foldText(name ?? "") };
 }
 
+/** Keeps a rota khatma's count when a day reaches 30 ajza', or falls back from it. */
+export async function changeCompletedDays(
+  ctx: MutationCtx,
+  khatmaId: Id<"khatmas">,
+  change: 1 | -1,
+): Promise<void> {
+  const khatma = await ctx.db.get(khatmaId);
+  if (!khatma) return;
+  await ctx.db.patch(khatmaId, {
+    completedDays: Math.max(0, (khatma.completedDays ?? 0) + change),
+  });
+}
+
 async function refreshCounts(
   ctx: MutationCtx,
   person: Doc<"people">,

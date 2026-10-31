@@ -122,7 +122,7 @@ A reader's page is read-only apart from deletion: their khatmas, slots, reading,
 
 ### Khatmas
 
-**New on `khatmas`:** `searchName`. Use the default `_creationTime` order, or `by_kind` for the kind filter.
+**New on `khatmas`:** `searchName`, and `completedDays` for a rotating khatma, because counting its reading days on every list row reads too much **[builder's call]**. Use the default `_creationTime` order, or `by_kind` for the kind filter.
 
 Pool khatmas gain edit name, edit schedule and grace, archive, restore, and delete. `archive` and `remove` already exist as `sessionMutation`s in `convex/khatmaLifecycle.ts`, so move their logic to shared functions and add `adminMutation` versions. Admin creation of a pool khatma takes an existing person as organizer. Reset invite and hand over stay as they are.
 

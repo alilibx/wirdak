@@ -18,6 +18,7 @@ import { writeAudit } from "./lib/audit";
 import { isBlocked } from "./lib/blocked";
 import { cheerConfigValidator } from "./lib/cheer";
 import { randomToken } from "./lib/crypto";
+import { refreshPhone } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
 import { readingDaysValidator, rotaMessagesValidator } from "./lib/rota";
 import { randomJoinCode } from "./lib/rotaJoin";
@@ -123,6 +124,7 @@ async function organizerFor(
     timeZone: "Asia/Dubai",
     lastSeenAt: 0,
   });
+  await refreshPhone(ctx, phone);
   return (await ctx.db.get(personId))!;
 }
 

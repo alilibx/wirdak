@@ -5,6 +5,7 @@ import type { DataModel, Id } from "./_generated/dataModel";
 import { ADMIN_SESSION_TTL_MS } from "./lib/adminSession";
 import { sha256Hex } from "./lib/crypto";
 import { refreshPhone } from "./lib/directory";
+import { completeIfDone } from "./rotaDays";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -409,6 +410,148 @@ test("deleting a khatma takes its counts and its readers' rows with it", async (
     memberOf: 0,
     tab: "noKhatma",
   });
+});
+
+test("an organizer an admin set up joins when they sign in with a PIN", async () => {
+  const t = convexTest(schema, modules);
+  const who = await person(t, "خالد");
+  await t.run((ctx) =>
+    ctx.db.patch(who.personId, { verifiedAt: 0, lastSeenAt: 0 }),
+  );
+  const secretHash = await sha256Hex("secret");
+  const verificationId = await t.run((ctx) =>
+    ctx.db.insert("verifications", {
+      codeNormalized: "x",
+      secretHash,
+      displayName: "خالد",
+      status: "needs_pin",
+      phone: who.phone,
+      pinHash: "pin",
+      pinAttempts: 0,
+      createdAt: NOW,
+      expiresAt: NOW + 60_000,
+    }),
+  );
+  await t.mutation(internal.verification.confirmPinInternal, {
+    verificationId,
+    secretHash,
+    pinHash: "pin",
+    tokenHash: "tok",
+    alertTokenHash: "alert",
+    deviceLabel: "phone",
+    timeZone: "Asia/Dubai",
+  });
+  const after = await t.run(async (ctx) => (await ctx.db.get(who.personId))!);
+  expect(after.verifiedAt).toBeGreaterThanOrEqual(NOW);
+  expect(after.lastSeenAt).toBeGreaterThanOrEqual(NOW);
+});
+
+test("a signing-in member keeps the date they first joined", async () => {
+  const t = convexTest(schema, modules);
+  const who = await person(t);
+  await t.run((ctx) => ctx.db.patch(who.personId, { verifiedAt: 5 }));
+  const secretHash = await sha256Hex("secret");
+  const verificationId = await t.run((ctx) =>
+    ctx.db.insert("verifications", {
+      codeNormalized: "x",
+      secretHash,
+      displayName: "x",
+      status: "needs_pin",
+      phone: who.phone,
+      pinHash: "pin",
+      pinAttempts: 0,
+      createdAt: NOW,
+      expiresAt: NOW + 60_000,
+    }),
+  );
+  await t.mutation(internal.verification.confirmPinInternal, {
+    verificationId,
+    secretHash,
+    pinHash: "pin",
+    tokenHash: "tok",
+    alertTokenHash: "alert",
+    deviceLabel: "phone",
+    timeZone: "Asia/Dubai",
+  });
+  const after = await t.run(async (ctx) => (await ctx.db.get(who.personId))!);
+  expect(after.verifiedAt).toBe(5);
+});
+
+async function openDay(t: T, inviteCode: string, n: number) {
+  const id = await khatmaId(t, inviteCode);
+  return await t.run(async (ctx) => {
+    const dayId = await ctx.db.insert("rotaDays", {
+      khatmaId: id,
+      n,
+      number: n,
+      cycle: 1,
+      date: `2027-02-${String(n).padStart(2, "0")}`,
+      startedAt: NOW,
+      closesAt: NOW + 86_400_000,
+      completedAt: null,
+      closedAt: null,
+      unreadSentAt: null,
+      summarySentAt: null,
+    });
+    const reads = [];
+    for (let juz = 1; juz <= 30; juz++) {
+      reads.push(
+        await ctx.db.insert("rotaReads", {
+          dayId,
+          khatmaId: id,
+          juz,
+          slot: juz,
+          holderId: null,
+          readerId: null,
+          doneAt: NOW,
+          doneByOrganizer: false,
+          reassignedAt: null,
+        }),
+      );
+    }
+    return { dayId, reads };
+  });
+}
+
+const completedDays = (t: T, inviteCode: string) =>
+  t.run(
+    async (ctx) =>
+      (await ctx.db
+        .query("khatmas")
+        .withIndex("by_inviteCode", (q) => q.eq("inviteCode", inviteCode))
+        .first())!.completedDays,
+  );
+
+test("a rota khatma counts its completed days as they finish and unfinish", async () => {
+  const t = convexTest(schema, modules);
+  const who = await person(t);
+  const { inviteCode } = await rotaKhatma(t, who);
+  const { dayId, reads } = await openDay(t, inviteCode, 40);
+
+  await t.run((ctx) => completeIfDone(ctx, dayId));
+  expect(await completedDays(t, inviteCode)).toBe(1);
+  await t.run((ctx) => completeIfDone(ctx, dayId));
+  expect(await completedDays(t, inviteCode)).toBe(1);
+
+  await t.mutation(api.rota.markNotDone, {
+    sessionToken: who.token,
+    inviteCode,
+    readId: reads[0]!,
+  });
+  expect(await completedDays(t, inviteCode)).toBe(0);
+});
+
+test("the repair counts the completed days of a khatma from before the count", async () => {
+  const t = convexTest(schema, modules);
+  const who = await person(t);
+  const { inviteCode } = await rotaKhatma(t, who);
+  const first = await openDay(t, inviteCode, 41);
+  await openDay(t, inviteCode, 42);
+  await t.run((ctx) => ctx.db.patch(first.dayId, { completedAt: NOW }));
+
+  await t.mutation(internal.directory.repair, {});
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(await completedDays(t, inviteCode)).toBe(1);
 });
 
 test("the repair fills in rows from before the counts, and removes stale ones", async () => {

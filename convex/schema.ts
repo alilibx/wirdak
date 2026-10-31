@@ -110,6 +110,8 @@ export default defineSchema({
     cheer: v.optional(cheerConfigValidator),
     /** `name`, folded, for the admin list; missing means not yet. */
     searchName: v.optional(v.string()),
+    /** A rota khatma's reading days that reached 30 ajza'; missing means not yet counted. */
+    completedDays: v.optional(v.number()),
   })
     .index("by_inviteCode", ["inviteCode"])
     .index("by_joinCode", ["joinCode"])

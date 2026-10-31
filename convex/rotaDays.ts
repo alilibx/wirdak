@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
 import { archiveKhatma } from "./khatmaLifecycle";
+import { changeCompletedDays } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
 import { clearNotes, notify } from "./notes";
 import { enqueue } from "./rotaOutbox";
@@ -35,6 +36,7 @@ export async function completeIfDone(
     return false;
   }
   await ctx.db.patch(dayId, { completedAt: Date.now() });
+  await changeCompletedDays(ctx, day.khatmaId, 1);
   return true;
 }
 
