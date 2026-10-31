@@ -59,7 +59,7 @@ export const reminderDue = internalMutation({
   },
 });
 
-function offCooldown(
+export function offCooldown(
   member: Doc<"members">,
   now: number,
   cooldownMs: number,

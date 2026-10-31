@@ -40,6 +40,16 @@ export const SETTING_DEFAULTS = {
   /** one nudge (reminder or behind invite) per member per this window */
   nudgeCooldownMs: DAY,
   openForHelpBatchMs: HOUR,
+  /** a new khatma's cheers when someone finishes a juz'; each khatma can choose its own */
+  cheerOn: true,
+  /** every member, not only those still reading */
+  cheerEveryone: false,
+  /** the least time between two cheers to one person; 0 is every finish */
+  cheerGapMs: DAY,
+  /** cheers say who finished */
+  cheerShowName: false,
+  /** cheers say which juz' */
+  cheerShowJuz: false,
   organizerInactiveMs: 30 * DAY,
   successorActiveMs: 7 * DAY,
   /** how long a cleared note is kept after it was cleared */

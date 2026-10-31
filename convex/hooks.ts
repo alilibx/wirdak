@@ -5,8 +5,8 @@ import { notify } from "./notes";
 /**
  * Called inside the completing mutation right after a round is completed and
  * the next one has started. Tells every active member the khatma is complete
- * (a message to all, never a nudge), and clears the round's "behind" invites,
- * which no longer apply.
+ * (a message to all, never a nudge), and clears the round's "behind" invites
+ * and cheers, which no longer apply.
  */
 export async function onRoundCompleted(
   ctx: MutationCtx,
@@ -25,6 +25,14 @@ export async function onRoundCompleted(
       await ctx.db.patch(note._id, { clearedAt: now });
     }
   }
+
+  const cheers = await ctx.db
+    .query("notes")
+    .withIndex("by_khatma_kind", (q) =>
+      q.eq("khatmaId", khatmaId).eq("kind", "cheer").eq("clearedAt", null),
+    )
+    .collect();
+  for (const note of cheers) await ctx.db.patch(note._id, { clearedAt: now });
 
   const members = await ctx.db
     .query("members")

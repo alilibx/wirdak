@@ -175,6 +175,16 @@ test("settings shows the organizer everything, and nothing to anyone else", asyn
       "2027-03-05",
     ],
     quiet: { startHour: 22, endHour: 7 },
+    cheer: {
+      override: null,
+      defaults: {
+        on: true,
+        everyone: false,
+        gapMs: 86_400_000,
+        showName: false,
+        showJuz: false,
+      },
+    },
     archived: false,
   });
 

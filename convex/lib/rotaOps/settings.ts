@@ -1,5 +1,11 @@
 import type { Doc } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
+import {
+  cheerSetting,
+  isValidCheer,
+  type CheerConfig,
+  type CheerSetting,
+} from "../cheer";
 import { isArchived } from "../khatma";
 import {
   addDays,
@@ -32,6 +38,7 @@ export type SettingsView = {
   /** The next reading dates that can still be paused or un-paused. */
   upcoming: string[];
   quiet: { startHour: number; endHour: number };
+  cheer: CheerSetting;
   /** An archived khatma can no longer be changed. */
   archived: boolean;
 };
@@ -79,6 +86,7 @@ export async function settings(
       new Set(),
     ).filter((date) => rota.endDate === null || date <= rota.endDate),
     quiet: { startHour: quiet.startHour, endHour: quiet.endHour },
+    cheer: await cheerSetting(ctx, khatma),
     archived: isArchived(khatma),
   };
 }
@@ -94,6 +102,8 @@ export async function update(
     endDate?: string | null;
     timeZone?: string;
     messages?: RotaMessages;
+    /** The khatma's own cheer settings; null goes back to the admin's defaults. */
+    cheer?: CheerConfig | null;
   },
 ): Promise<
   | { ok: true }
@@ -104,12 +114,16 @@ export async function update(
         | "first_date_passed"
         | "invalid_times"
         | "invalid_zone"
-        | "invalid_name";
+        | "invalid_name"
+        | "invalid_cheer";
     }
 > {
   // A rota khatma always has a name, as at creation.
   const name = args.name === undefined ? undefined : cleanKhatmaName(args.name);
   if (name === null) return { error: "invalid_name" };
+  if (args.cheer && !isValidCheer(args.cheer)) {
+    return { error: "invalid_cheer" };
+  }
   if (args.days !== undefined && !isValidReadingDays(args.days)) {
     return { error: "invalid_days" };
   }
@@ -175,6 +189,7 @@ export async function update(
 
   await ctx.db.patch(khatma._id, {
     ...(name !== undefined ? { name } : {}),
+    ...(args.cheer !== undefined ? { cheer: args.cheer ?? undefined } : {}),
     rota: {
       ...rota,
       days,

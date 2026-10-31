@@ -16,6 +16,7 @@ import {
 } from "./lib/adminSession";
 import { writeAudit } from "./lib/audit";
 import { isBlocked } from "./lib/blocked";
+import { cheerConfigValidator } from "./lib/cheer";
 import { randomToken } from "./lib/crypto";
 import { isArchived } from "./lib/khatma";
 import { readingDaysValidator, rotaMessagesValidator } from "./lib/rota";
@@ -503,6 +504,7 @@ export const update = adminMutation({
     endDate: v.optional(v.union(v.string(), v.null())),
     timeZone: v.optional(v.string()),
     messages: v.optional(rotaMessagesValidator),
+    cheer: v.optional(v.union(cheerConfigValidator, v.null())),
   },
   handler: async (ctx, args): ReturnType<typeof ops.update> => {
     const { khatma, rota } = await requireLiveRota(ctx, args.khatmaId);

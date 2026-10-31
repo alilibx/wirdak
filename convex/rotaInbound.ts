@@ -5,6 +5,7 @@ import {
   internalQuery,
   type MutationCtx,
 } from "./_generated/server";
+import { scheduleRotaCheer } from "./cheers";
 import { isBlocked } from "./lib/blocked";
 import { isArchived } from "./lib/khatma";
 import { notify } from "./notes";
@@ -200,6 +201,8 @@ async function answerDay(
   for (const r of marked) {
     await ctx.db.patch(r._id, { doneAt: now, doneByOrganizer: false });
   }
+  const [first] = marked;
+  if (first) await scheduleRotaCheer(ctx, first._id, now, participant._id);
   const done = all.filter((r) => r.doneAt !== null).length + marked.length;
   const replies = [about(khatma, thanksText(done))];
   if (await completeIfDone(ctx, day._id)) {

@@ -66,6 +66,16 @@ const organizerView = {
     { memberId: "m3", displayName: "خالد", isOrganizer: false },
   ],
   blocked: [{ memberId: "m9", displayName: "ليلى" }],
+  cheer: {
+    override: null,
+    defaults: {
+      on: true,
+      everyone: false,
+      gapMs: 86_400_000,
+      showName: false,
+      showJuz: false,
+    },
+  },
   archived: false,
 };
 
@@ -131,6 +141,16 @@ describe("OrganizerPage", () => {
       pauseDates: [],
       upcoming: [],
       quiet: { startHour: 22, endHour: 7 },
+      cheer: {
+        override: null,
+        defaults: {
+          on: true,
+          everyone: false,
+          gapMs: 86_400_000,
+          showName: false,
+          showJuz: false,
+        },
+      },
     };
     renderPage();
     expect(screen.getByLabelText(t.rota.nameLabel)).toHaveValue("ختمة الجمعة");
@@ -243,6 +263,33 @@ describe("OrganizerPage", () => {
         within(section(name)).getByRole("button", { name: t.organizer.save }),
       ).toBeDisabled();
     }
+  });
+
+  it("saves the khatma's own cheer settings", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const cheerSection = section(t.cheer.heading);
+    await user.selectOptions(
+      within(cheerSection).getByLabelText(t.cheer.gapLabel),
+      "0",
+    );
+    await user.click(
+      within(cheerSection).getByRole("button", { name: t.organizer.save }),
+    );
+    expect(m.fns.update).toHaveBeenCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+      cheer: {
+        on: true,
+        everyone: false,
+        gapMs: 0,
+        showName: false,
+        showJuz: false,
+      },
+    });
+    expect(await within(cheerSection).findByRole("status")).toHaveTextContent(
+      t.organizer.saved,
+    );
   });
 
   it("saves the grace, and shows the suggestion only when it differs", async () => {

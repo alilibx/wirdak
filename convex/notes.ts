@@ -86,7 +86,7 @@ export async function notify(
  * kinds), or, for a batched organizer alert, by taking one juz' out of every
  * uncleared "open for help" alert in the khatma and clearing the alerts that
  * end up empty. Or one person's notes of a kind in a khatma: a member's
- * "behind" invites, or a rota organizer's unread lists or summaries.
+ * "behind" invites or cheers, or a rota organizer's unread lists or summaries.
  */
 export async function clearNotes(
   ctx: MutationCtx,
@@ -96,7 +96,7 @@ export async function clearNotes(
     | {
         khatmaId: Id<"khatmas">;
         personId: Id<"people">;
-        kind: "behind" | "rotaUnread" | "rotaSummary";
+        kind: "behind" | "cheer" | "rotaUnread" | "rotaSummary";
       },
 ): Promise<void> {
   const now = Date.now();
