@@ -57,6 +57,16 @@ const baseSettings = {
   pauseDates: ["2026-11-27"],
   upcoming: ["2026-11-27", "2026-11-28", "2026-11-29"],
   quiet: { startHour: 22, endHour: 7 },
+  cheer: {
+    override: null,
+    defaults: {
+      on: true,
+      everyone: false,
+      gapMs: 86_400_000,
+      showName: false,
+      showJuz: false,
+    },
+  },
   archived: false,
 };
 
@@ -224,6 +234,31 @@ describe("RotaSettingsPage", () => {
       within(section(t.rota.messagesHeading)).getAllByLabelText(
         t.rota.timeLabel,
       ) as HTMLSelectElement[];
+    it("saves the khatma's own cheer settings beside the messages", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const cheerSection = section(t.cheer.heading);
+      expect(cheerSection).toHaveTextContent(t.cheer.rotaHint);
+      await user.click(
+        within(cheerSection).getByRole("switch", {
+          name: t.cheer.switchLabel,
+        }),
+      );
+      await user.click(
+        within(cheerSection).getByRole("button", { name: t.organizer.save }),
+      );
+      expect(m.fns.update).toHaveBeenCalledWith({
+        ...args,
+        cheer: {
+          on: false,
+          everyone: false,
+          gapMs: 86_400_000,
+          showName: false,
+          showJuz: false,
+        },
+      });
+    });
+
     const saveTimes = () =>
       within(section(t.rota.messagesHeading)).getByRole("button", {
         name: t.rota.saveTimes,

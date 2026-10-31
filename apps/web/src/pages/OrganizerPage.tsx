@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import type { CheerConfig } from "@convex/lib/cheer";
 import { isValidGrace, type Grace } from "@convex/lib/grace";
 import { SCHEDULES, type Schedule } from "@convex/lib/schedule";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -13,6 +14,7 @@ import {
   ArchivedSection,
   ArchiveSection,
 } from "../features/khatma/ArchivedActions";
+import { CheerField } from "../features/khatma/CheerField";
 import { DeletingPage, useDeleting } from "../features/khatma/deleting";
 import { t } from "../i18n/ar";
 import { errorCode } from "../lib/errors";
@@ -37,7 +39,7 @@ type Confirm =
   | { kind: "reset" };
 
 type SectionId =
-  "name" | "schedule" | "grace" | "members" | "blocked" | "reset";
+  "name" | "schedule" | "grace" | "cheer" | "members" | "blocked" | "reset";
 
 /** The one line of feedback on the page, shown under the section that caused it. */
 type Feedback = { section: SectionId; kind: "saved" | "error"; text: string };
@@ -173,13 +175,20 @@ function OrganizerContent({
   const save = (
     section: SectionId,
     changes:
-      { name: string | null } | { schedule: Schedule } | { grace: Grace },
+      | { name: string | null }
+      | { schedule: Schedule }
+      | { grace: Grace }
+      | { cheer: CheerConfig | null },
   ) =>
     run(
       section,
       async () => {
         const result = await update({ sessionToken, inviteCode, ...changes });
-        if (!result.ok) return t.grace.range;
+        if (!result.ok) {
+          return result.reason === "invalid_grace"
+            ? t.grace.range
+            : t.organizer.errors.generic;
+        }
         posthog.capture("organizer_settings_updated", { setting: section });
         return null;
       },
@@ -331,6 +340,14 @@ function OrganizerContent({
               <SaveButton
                 disabled={busy || !graceChanged || !graceValid}
                 onClick={() => void save("grace", { grace })}
+              />
+            </Section>
+
+            <Section id="cheer" heading={t.cheer.heading} feedback={feedback}>
+              <CheerField
+                setting={settings.cheer}
+                disabled={busy}
+                onSave={(cheer) => void save("cheer", { cheer })}
               />
             </Section>
           </>

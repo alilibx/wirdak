@@ -240,10 +240,10 @@ test("30th finish completes the round 10s later and starts the next", async () =
   expect(view.me.holding).toBeNull();
 });
 
-test("finishing a non-final juz schedules nothing", async () => {
+test("finishing a non-final juz schedules no completion", async () => {
   const { t, bob, code } = await almostDone(range(1, 28));
   await take(t, code, bob, 29);
-  // taking schedules the hold's grace and reminder jobs; finishing must add nothing
+  // taking schedules the hold's grace and reminder jobs; finishing adds only its cheer
   const before = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").collect(),
   );
@@ -256,7 +256,10 @@ test("finishing a non-final juz schedules nothing", async () => {
   const scheduled = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").collect(),
   );
-  expect(scheduled).toEqual(before);
+  expect(scheduled.filter((j) => !j.name.startsWith("cheers:"))).toEqual(
+    before,
+  );
+  expect(scheduled.map((j) => j.name)).toContain("cheers:afterFinish");
 });
 
 test("undo of an earlier finish cancels a pending completion", async () => {

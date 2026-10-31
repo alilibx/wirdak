@@ -8,6 +8,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { membersByJoin, organizerOf, requireOrganizer } from "./organizer";
+import { cheerConfigValidator } from "./lib/cheer";
 import { randomToken } from "./lib/crypto";
 import { DEFAULT_GRACE } from "./lib/grace";
 import { isArchived } from "./lib/khatma";
@@ -883,6 +884,7 @@ export const update = sessionMutation({
     endDate: v.optional(v.union(v.string(), v.null())),
     timeZone: v.optional(v.string()),
     messages: v.optional(rotaMessagesValidator),
+    cheer: v.optional(v.union(cheerConfigValidator, v.null())),
   },
   handler: async (ctx, args): ReturnType<typeof ops.update> => {
     const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);

@@ -138,3 +138,32 @@ test("release: the organizer's note reads the same as for a timeout", async ({
     await context.close();
   }
 });
+
+// A finish that stands reaches the reader still on a juz', in words that name nobody.
+test("a finish cheers the reader still reading", async ({ page, browser }) => {
+  const inviteUrl = await startKhatma(page);
+  const { b, context } = await joinAndTake(browser, inviteUrl, "٥");
+  try {
+    await page.getByRole("button", { name: t.card.take }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: t.take.confirm })
+      .click();
+    await expect(page.getByText(t.card.held)).toBeVisible();
+    await dismissPushPrompt(page);
+    await page.getByRole("button", { name: t.card.finish }).click();
+    await expect(page.getByText(t.toast.finished)).toBeVisible();
+
+    // The cheer waits out the undo window, then arrives on the open page.
+    const cheer = t.notes.text({
+      kind: "cheer",
+      juz: [],
+      count: 1,
+      until: null,
+    });
+    await expect(b.getByText(cheer)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(cheer)).toBeHidden();
+  } finally {
+    await context.close();
+  }
+});

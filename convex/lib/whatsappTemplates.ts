@@ -43,6 +43,9 @@ export const NOTE_TEMPLATES: Record<NoteKind, string | null> = {
   // An invitation to members who hold nothing, which Meta counts as
   // marketing however it's worded: in-app and push only.
   behind: null,
+  // Encouragement with nothing for the member to act on, which Meta counts as
+  // marketing too.
+  cheer: null,
   completed: "wirdak_completed_v2",
   nowOrganizer: "wirdak_now_organizer_v2",
   organizerMoved: "wirdak_organizer_moved_v2",
@@ -127,8 +130,9 @@ function noteParams(note: NoteTextInput, now: number): string[] {
       return [toArabicDigits(note.count ?? 0)];
     case "rotaJoinRequest":
       return [note.name ?? ""];
-    // no body values (`rotaSilent`, `rotaSilenced`, `rotaStopped` and `rotaEnabled` never
-    // reach WhatsApp: `NOTE_TEMPLATES` is null for them)
+    // no body values (`cheer`, `rotaSilent`, `rotaSilenced`, `rotaStopped` and `rotaEnabled`
+    // never reach WhatsApp: `NOTE_TEMPLATES` is null for them)
+    case "cheer":
     case "completed":
     case "nowOrganizer":
     case "organizerMoved":

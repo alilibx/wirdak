@@ -15,6 +15,7 @@ import {
   ArchivedSection,
   ArchiveSection,
 } from "../features/khatma/ArchivedActions";
+import { CheerField } from "../features/khatma/CheerField";
 import { DeletingPage, useDeleting } from "../features/khatma/deleting";
 import { useRotaBackend } from "../features/rota/backend";
 import { DateLine } from "../features/rota/DateLine";
@@ -25,7 +26,7 @@ import { TimeField } from "../features/rota/TimeField";
 import { useRotaCall } from "../features/rota/useRotaCall";
 import { t } from "../i18n/ar";
 
-type SectionId = "pause" | "messages" | "details";
+type SectionId = "pause" | "messages" | "cheer" | "details";
 type Feedback = { section: SectionId; kind: "saved" | "error"; text: string };
 type Message = "reminder" | "unread" | "summary";
 
@@ -330,6 +331,21 @@ export function RotaSettingsContent({
               {t.rota.saveTimes}
             </Button>
           </div>
+        </Section>
+
+        <Section id="cheer" heading={t.cheer.heading} feedback={feedback}>
+          <CheerField
+            setting={settings.cheer}
+            disabled={busy}
+            hint={t.cheer.rotaHint}
+            onSave={(cheer) =>
+              void run(
+                "cheer",
+                () => update({ ...args, cheer }),
+                t.organizer.saved,
+              )
+            }
+          />
         </Section>
 
         <Section

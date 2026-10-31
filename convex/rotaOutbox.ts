@@ -15,6 +15,7 @@ import {
   ROTA_BUTTONS,
   assignedText,
   assignedTemplate,
+  cheerText,
   clockText,
   completeTemplate,
   completeText,
@@ -50,7 +51,7 @@ type FreeForm = { text: string; buttons?: { id: string; title: string }[] };
 const WINDOW_MS = 24 * 3_600_000;
 
 /** Whether a participant may be sent messages Wirdak starts: on the list, joined, not stopped or silenced. */
-function reachable(p: Participant | null): p is Participant {
+export function reachable(p: Participant | null): p is Participant {
   return (
     p !== null &&
     p.removedAt == null &&
@@ -58,6 +59,19 @@ function reachable(p: Participant | null): p is Participant {
     p.stoppedAt == null &&
     p.silencedAt == null
   );
+}
+
+/** Whether a phone wrote to us in the last 24 hours, so free-form messages reach it. */
+export async function windowOpen(
+  ctx: QueryCtx,
+  phone: string,
+  now: number,
+): Promise<boolean> {
+  const contact = await ctx.db
+    .query("waContacts")
+    .withIndex("by_phone", (q) => q.eq("phone", phone))
+    .unique();
+  return contact !== null && contact.lastInboundAt >= now - WINDOW_MS;
 }
 
 /** Kinds that name the ajza' of a reassignment: several on one day make one message. */
@@ -82,6 +96,7 @@ export async function enqueue(
     kind: Kind;
     juz: number[];
     number: number | null;
+    name?: string | null;
   },
 ): Promise<Id<"rotaOutbox"> | null> {
   const participant = await ctx.db.get(row.participantId);
@@ -277,19 +292,6 @@ export async function welcomeGoesNow(
   return awake <= now && (await windowOpen(ctx, phone, now));
 }
 
-/** Whether the phone wrote to Wirdak in the last 24 hours. */
-async function windowOpen(
-  ctx: QueryCtx,
-  phone: string,
-  now: number,
-): Promise<boolean> {
-  const contact = await ctx.db
-    .query("waContacts")
-    .withIndex("by_phone", (q) => q.eq("phone", phone))
-    .unique();
-  return contact !== null && contact.lastInboundAt >= now - WINDOW_MS;
-}
-
 /**
  * The welcome for a member who has just joined: today's juz' with the buttons
  * when a day dated today is open and has unread reads for them, else when their
@@ -353,7 +355,7 @@ export async function welcomeMessage(
 function compose(
   row: Doc<"rotaOutbox">,
   khatma: { name: string | null; createdAt: number },
-  windowOpen: boolean,
+  inWindow: boolean,
   staging: boolean,
 ): TemplateMessage | FreeForm | null {
   const number = row.number ?? 0;
@@ -363,7 +365,7 @@ function compose(
     case "assigned": {
       if (row.dayId === null || row.number === null) return null;
       const payloads = donePayloads(row, staging);
-      if (!windowOpen) {
+      if (!inWindow) {
         if (row.kind === "juz") {
           return juzTemplate(khatma, row.juz, number, payloads);
         }
@@ -387,12 +389,12 @@ function compose(
       };
     }
     case "covered":
-      return windowOpen
+      return inWindow
         ? { text: titled(khatma, coveredText(row.juz)) }
         : coveredTemplate(khatma, row.juz);
     case "complete": {
       if (row.dayId === null || row.number === null) return null;
-      if (windowOpen) {
+      if (inWindow) {
         return {
           text: titled(khatma, `${completeText(number)}\n\n${duaText()}`),
         };
@@ -408,9 +410,14 @@ function compose(
       return completeTemplate(khatma, number, dua);
     }
     case "cycle":
-      return windowOpen
+      return inWindow
         ? { text: titled(khatma, cycleText) }
         : cycleTemplate(khatma);
+    case "cheer":
+      // No template, as Meta would count it as marketing.
+      return inWindow
+        ? { text: titled(khatma, cheerText(number, row.name ?? null, row.juz)) }
+        : null;
     case "welcome":
       // Needs the database; `plan` builds it (there is no template for it).
       return null;

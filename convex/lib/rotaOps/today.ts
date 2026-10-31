@@ -1,5 +1,6 @@
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
+import { scheduleRotaCheer } from "../../cheers";
 import { celebrateIfComplete, completeIfDone } from "../../rotaDays";
 import { enqueue } from "../../rotaOutbox";
 import { isArchived } from "../khatma";
@@ -214,6 +215,7 @@ export async function markDone(
       doneAt: now,
       doneByOrganizer: true,
     });
+    await scheduleRotaCheer(ctx, found.read._id, now, null);
   }
   // The organizer marking their own juz' is their reply: they never go silent.
   for (const id of new Set([found.read.readerId, found.read.holderId])) {

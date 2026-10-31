@@ -27,6 +27,27 @@ function counted(
     : `${digits} ${forms.many}`;
 }
 
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+/** How often a cheer reaches one person, for a gap in milliseconds. */
+function cheerGap(gapMs: number): string {
+  if (gapMs === 0) return "مع كل جزء يتمّ";
+  if (gapMs === DAY_MS) return "مرة في اليوم";
+  if (gapMs === 7 * DAY_MS) return "مرة في الأسبوع";
+  if (gapMs % DAY_MS === 0) {
+    const forms = { one: "يوم", two: "يومين", few: "أيام", many: "يوماً" };
+    return `مرة كل ${counted(gapMs / DAY_MS, forms)}`;
+  }
+  if (gapMs % HOUR_MS === 0) {
+    const forms = { one: "ساعة", two: "ساعتين", few: "ساعات", many: "ساعة" };
+    return `مرة كل ${counted(gapMs / HOUR_MS, forms)}`;
+  }
+  const forms = { one: "دقيقة", two: "دقيقتين", few: "دقائق", many: "دقيقة" };
+  return `مرة كل ${counted(Math.ceil(gapMs / MINUTE_MS), forms)}`;
+}
+
 /** A rota khatma as the share message names it, by how often it is read. */
 const rotaKindText: Record<ReadingDaysKind, string> = {
   daily: "ختمة يومية بالتناوب",
@@ -214,6 +235,21 @@ export const ar = {
       days: (n: number) =>
         counted(n, { one: "يوم", two: "يومان", few: "أيام", many: "يوماً" }),
     },
+  },
+  cheer: {
+    heading: "رسائل التشجيع",
+    explain:
+      "حين يتمّ أحد القرّاء جزءاً، تصل غيره رسالة تشجيع. لا تذكر اسمه ولا رقم جزئه إلا إن اخترت ذلك.",
+    rotaHint: "تصل على واتساب، لمن راسلنا خلال آخر ٢٤ ساعة فقط.",
+    switchLabel: "أرسل رسائل التشجيع",
+    showNameLabel: "اذكر اسم القارئ",
+    showJuzLabel: "اذكر رقم الجزء",
+    audienceLabel: "من تصله",
+    audience: { reading: "من ما زال يقرأ", everyone: "الجميع" },
+    gapLabel: "كم مرة تصل الشخص الواحد",
+    gapEvery: cheerGap,
+    followsDefault: "هذه هي الإعدادات العامة، ويمكنك تغييرها لهذه الختمة.",
+    useDefault: "ارجع إلى الإعدادات العامة",
   },
   khatmaSettings: {
     link: "إعدادات الختمة",
@@ -540,6 +576,7 @@ export const ar = {
       invalid_times:
         "رتّب الأوقات: رسالة الجزء أولاً، ثم التذكير، ثم الأجزاء غير المقروءة، ثم الملخّص.",
       invalid_zone: "التوقيت غير صحيح.",
+      invalid_cheer: "المدة بين رسائل التشجيع غير صحيحة.",
       not_reading_date: "هذا اليوم ليس يوم قراءة.",
       past: "هذا اليوم مضى.",
       archived: "هذه الختمة مؤرشفة، فلا يمكن تغييرها.",

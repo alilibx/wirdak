@@ -145,12 +145,19 @@ describe("privacy policy: rotating khatma disclosures", () => {
   it("lists the rotating khatma messages Meta delivers", () => {
     const ar = flat("مزوّدو الخدمة");
     expect(ar).toContain(
-      "ورسائل الختمة بالتناوب: الجزء والتذكير وإعادة الإسناد والختم والدعاء وردودنا",
+      "ورسائل الختمة بالتناوب: الجزء والتذكير وإعادة الإسناد والتشجيع والختم والدعاء وردودنا",
     );
     const en = flat("Service providers");
     expect(en).toContain(
-      "delivering the rotating khatma messages: the juz', reminders, reassignment and completion messages, the dua, and our replies",
+      "delivering the rotating khatma messages: the juz', reminders, reassignment, cheer and completion messages, the dua, and our replies",
     );
+  });
+
+  it("says a rota cheer can carry another reader's name", () => {
+    expect(flat("واتساب")).toContain(
+      "ومعها اسم القارئ ورقم جزئه إن اختار المنظّم ذلك",
+    );
+    expect(flat("WhatsApp")).toContain("that reader's name and juz' number");
   });
 
   it("says who the last-message record covers and how long it is kept", () => {

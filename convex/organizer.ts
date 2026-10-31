@@ -9,6 +9,12 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { activeMembership } from "./khatmas";
+import {
+  cheerConfigValidator,
+  cheerSetting,
+  isValidCheer,
+  type CheerSetting,
+} from "./lib/cheer";
 import { randomToken } from "./lib/crypto";
 import { graceValidator, isValidGrace, type Grace } from "./lib/grace";
 import { isArchived, khatmaByInviteCode } from "./lib/khatma";
@@ -36,6 +42,7 @@ export type OrganizerSettings = {
     isOrganizer: boolean;
   }[];
   blocked: { memberId: Id<"members">; displayName: string }[];
+  cheer: CheerSetting;
   /** An archived khatma can only be read, and deleted. */
   archived: boolean;
 };
@@ -155,6 +162,7 @@ export const settings = sessionQuery({
       suggestedGrace: (await getSetting(ctx, "graceDefaults"))[khatma.schedule],
       members,
       blocked,
+      cheer: await cheerSetting(ctx, khatma),
       archived: isArchived(khatma),
     };
   },
@@ -171,19 +179,27 @@ export const update = sessionMutation({
     name: v.optional(v.union(v.string(), v.null())),
     schedule: v.optional(scheduleValidator),
     grace: v.optional(graceValidator),
+    /** The khatma's own cheer settings; null goes back to the admin's defaults. */
+    cheer: v.optional(v.union(cheerConfigValidator, v.null())),
   },
   handler: async (
     ctx,
     args,
-  ): Promise<{ ok: true } | { ok: false; reason: "invalid_grace" }> => {
+  ): Promise<
+    { ok: true } | { ok: false; reason: "invalid_grace" | "invalid_cheer" }
+  > => {
     const { khatma } = await requirePoolOrganizer(ctx, args.inviteCode);
     if (args.grace && !isValidGrace(args.grace)) {
       return { ok: false, reason: "invalid_grace" };
+    }
+    if (args.cheer && !isValidCheer(args.cheer)) {
+      return { ok: false, reason: "invalid_cheer" };
     }
     await ctx.db.patch(khatma._id, {
       ...(args.name !== undefined ? { name: cleanKhatmaName(args.name) } : {}),
       ...(args.schedule !== undefined ? { schedule: args.schedule } : {}),
       ...(args.grace !== undefined ? { grace: args.grace } : {}),
+      ...(args.cheer !== undefined ? { cheer: args.cheer ?? undefined } : {}),
     });
     return { ok: true };
   },

@@ -101,6 +101,16 @@ const settings = {
   pauseDates: [],
   upcoming: [],
   quiet: { startHour: 22, endHour: 7 },
+  cheer: {
+    override: null,
+    defaults: {
+      on: true,
+      everyone: false,
+      gapMs: 86_400_000,
+      showName: false,
+      showJuz: false,
+    },
+  },
 };
 
 const people = [

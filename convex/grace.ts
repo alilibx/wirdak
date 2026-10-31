@@ -75,7 +75,7 @@ export async function alertOrganizer(
 
 /**
  * Opens a held juz' for help now: everyone but its reader sees it as open,
- * the reader's "almost up" and reminder notes go, and the organizer is told.
+ * the reader's "almost up", reminder and cheer notes go, and the organizer is told.
  * The reader keeps holding it until they finish or someone else takes it.
  */
 export async function openForHelpNow(
@@ -86,6 +86,11 @@ export async function openForHelpNow(
   await clearNotes(ctx, {
     assignmentId: assignment._id,
     kinds: ["almostUp", "reminder"],
+  });
+  await clearNotes(ctx, {
+    khatmaId: assignment.khatmaId,
+    personId: assignment.personId,
+    kind: "cheer",
   });
   const khatma = await ctx.db.get(assignment.khatmaId);
   if (khatma) {

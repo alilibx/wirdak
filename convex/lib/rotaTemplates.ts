@@ -1,6 +1,6 @@
 import { DUAS } from "./duas";
 import { toArabicDigits } from "./digits";
-import { juzPhrase, juzPhraseGenitive } from "./noteText";
+import { cheerLead, juzPhrase, juzPhraseGenitive } from "./noteText";
 import { khatmaTitle, type TemplateMessage } from "./whatsappTemplates";
 
 /**
@@ -188,6 +188,15 @@ export function juzText(number: number, juz: number[]): string {
 
 export function thanksText(doneCount: number): string {
   return `تقبّل الله منك. ${toArabicDigits(doneCount)} من ٣٠ جزءاً تمّت اليوم.`;
+}
+
+/** A cheer to the other readers: `name` and `juz` are only what the khatma chose to show. */
+export function cheerText(
+  doneCount: number,
+  name: string | null,
+  juz: number[],
+): string {
+  return `${cheerLead(juz, name)}، وأصبح المقروء ${toArabicDigits(doneCount)} من ٣٠ جزءاً اليوم. بارك الله في قراءتكم.`;
 }
 
 /** `reminderTime` is the already formatted time of the day's reminder, or null with none. */

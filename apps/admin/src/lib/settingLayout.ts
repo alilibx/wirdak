@@ -9,6 +9,7 @@ export type SettingSection =
   | "reading"
   | "quiet"
   | "readers"
+  | "cheers"
   | "admins"
   | "khatmaUse"
   | "signInAbuse"
@@ -64,6 +65,16 @@ export const SETTING_LAYOUT: Record<
     {
       section: "readers",
       keys: ["reminderPaceMultiple", "nudgeCooldownMs", "openForHelpBatchMs"],
+    },
+    {
+      section: "cheers",
+      keys: [
+        "cheerOn",
+        "cheerEveryone",
+        "cheerGapMs",
+        "cheerShowName",
+        "cheerShowJuz",
+      ],
     },
     { section: "admins", keys: ["summaryHour", "milestonePushSpacingMs"] },
   ],

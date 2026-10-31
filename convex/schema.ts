@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { auditActionValidator, auditTargetKindValidator } from "./lib/audit";
+import { cheerConfigValidator } from "./lib/cheer";
 import { graceValidator } from "./lib/grace";
 import { rotaConfigValidator } from "./lib/rota";
 import { scheduleValidator } from "./lib/schedule";
@@ -83,6 +84,8 @@ export default defineSchema({
     joinCode: v.optional(v.string()),
     /** When a pool khatma was archived. A rota khatma keeps `rota.archivedAt`. */
     archivedAt: v.optional(nullableNumber),
+    /** The organizer's own cheer settings; missing means the admin's defaults. */
+    cheer: v.optional(cheerConfigValidator),
   })
     .index("by_inviteCode", ["inviteCode"])
     .index("by_joinCode", ["joinCode"])
@@ -103,6 +106,8 @@ export default defineSchema({
     notificationsOn: v.boolean(),
     lastNudgeAt: nullableNumber,
     lastCelebratedRound: v.number(),
+    /** When they were last cheered; missing means never. */
+    lastCheerAt: v.optional(nullableNumber),
   })
     .index("by_khatma", ["khatmaId"])
     .index("by_person", ["personId"])
@@ -158,6 +163,7 @@ export default defineSchema({
       v.literal("thanks"),
       v.literal("reminder"),
       v.literal("behind"),
+      v.literal("cheer"),
       v.literal("completed"),
       v.literal("nowOrganizer"),
       v.literal("organizerMoved"),
@@ -216,6 +222,8 @@ export default defineSchema({
      * the day and said not today. Missing means they can read from the day they join.
      */
     readsFrom: v.optional(v.string()),
+    /** When they were last cheered; missing means never. */
+    lastCheerAt: v.optional(nullableNumber),
   })
     .index("by_khatma", ["khatmaId"])
     .index("by_khatma_phone", ["khatmaId", "phone"])
@@ -331,9 +339,12 @@ export default defineSchema({
       v.literal("complete"),
       v.literal("cycle"),
       v.literal("welcome"),
+      v.literal("cheer"),
     ),
     juz: v.array(v.number()),
     number: nullableNumber,
+    /** Who finished, in a cheer that shows it. */
+    name: v.optional(v.union(v.string(), v.null())),
     createdAt: v.number(),
     sentAt: nullableNumber,
     skippedAt: nullableNumber,

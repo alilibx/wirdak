@@ -139,8 +139,9 @@ export const deliveryPlan = internalQuery({
         title: "وِردك" as const,
         body: noteText(note),
         url: `/j/${khatma.inviteCode}`,
-        // the note id tags the notification, so a repeat push replaces the earlier one
-        tag: note._id as string,
+        // the note id tags the notification, so a repeat push replaces the earlier one;
+        // a khatma's cheers share one tag, as a new cheer replaces the last
+        tag: note.kind === "cheer" ? `cheer-${note.khatmaId}` : note._id,
       },
     };
   },
