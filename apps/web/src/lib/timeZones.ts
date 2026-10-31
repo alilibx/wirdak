@@ -5,7 +5,7 @@ export type TimeZoneOption = { value: string; label: string };
 function zoneName(zone: string, style: "longGeneric" | "shortOffset"): string {
   return (
     new Intl.DateTimeFormat("ar", { timeZone: zone, timeZoneName: style })
-      .formatToParts(0)
+      .formatToParts(Date.now())
       .find((part) => part.type === "timeZoneName")?.value ?? zone
   );
 }

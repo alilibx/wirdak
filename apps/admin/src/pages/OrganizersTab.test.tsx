@@ -94,16 +94,38 @@ describe("OrganizersTab", () => {
     ).toBeInTheDocument();
   });
 
-  it("sorts on the server, and passes the search on", async () => {
-    renderPage("سارة");
+  it("sorts on the server", async () => {
+    renderPage();
     await userEvent.selectOptions(
       screen.getByLabelText(t.lists.sortBy),
       "lastSeen",
     );
     expect(m.paginatedArgs.at(-1)).toEqual([
-      { adminToken: "tok", sort: "lastSeen", order: "desc", search: "سارة" },
+      { adminToken: "tok", sort: "lastSeen", order: "desc" },
       { initialNumItems: 50 },
     ]);
+  });
+
+  it("passes the search on", () => {
+    renderPage("سارة");
+    expect(m.paginatedArgs.at(-1)).toMatchObject([{ search: "سارة" }, {}]);
+  });
+
+  it("turns the order round, with no way to sort during a search", async () => {
+    const { unmount } = renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: t.lists.reverse }),
+    );
+    expect(m.paginatedArgs.at(-1)).toMatchObject([
+      { sort: "created", order: "asc" },
+      { initialNumItems: 50 },
+    ]);
+    unmount();
+
+    m.results = [];
+    renderPage("سارة");
+    expect(screen.queryByLabelText(t.lists.sortBy)).not.toBeInTheDocument();
+    expect(screen.getByText(t.lists.empty)).toBeInTheDocument();
   });
 
   it("lists a page of 50 organizers, with a masked phone, their khatmas and the switch", () => {

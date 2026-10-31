@@ -5,6 +5,10 @@ describe("timeZoneLabel", () => {
   it("names a zone in Arabic, with its offset in Arabic digits", () => {
     expect(timeZoneLabel("Asia/Dubai")).toBe("توقيت الخليج (غرينتش+٤)");
   });
+
+  it("gives today's offset, not an old one", () => {
+    expect(timeZoneLabel("Europe/Istanbul")).toContain("(غرينتش+٣)");
+  });
 });
 
 describe("timeZoneOptions", () => {

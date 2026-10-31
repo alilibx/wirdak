@@ -129,15 +129,15 @@ describe("PeoplePage", () => {
     await userEvent.click(screen.getByRole("button", { name: t.lists.name }));
     expect(last().args).toMatchObject({ sort: "name", order: "desc" });
     await userEvent.click(
-      screen.getByRole("button", { name: t.people.lastSeen }),
+      screen.getByRole("button", { name: t.lookup.lastSeen }),
     );
     expect(last().args).toMatchObject({ sort: "lastSeen", order: "desc" });
     await userEvent.click(
-      screen.getByRole("button", { name: t.people.joined }),
+      screen.getByRole("button", { name: t.lookup.joined }),
     );
     expect(last().args).toMatchObject({ sort: "joined", order: "desc" });
     expect(
-      screen.getByRole("columnheader", { name: t.people.joined }),
+      screen.getByRole("columnheader", { name: t.lookup.joined }),
     ).toHaveAttribute("aria-sort", "descending");
   });
 
@@ -148,6 +148,13 @@ describe("PeoplePage", () => {
       const header = headers.find((h) => h.textContent === name)!;
       expect(within(header).queryByRole("button")).not.toBeInTheDocument();
     }
+  });
+
+  it("has no sort controls during a search, which comes back by relevance", () => {
+    renderPage("/people?q=سارة");
+    expect(
+      screen.queryByRole("button", { name: t.lists.name }),
+    ).not.toBeInTheDocument();
   });
 
   it("searches names a moment after typing", async () => {

@@ -10,31 +10,24 @@ const REPAIR_PAGE = 100;
 
 type Page = { continueCursor: string; isDone: boolean };
 
+/** Repairs the phone on each row of a page of one table. */
+const phones =
+  (table: "people" | "rotaParticipants" | "readerDirectory") =>
+  async (ctx: MutationCtx, cursor: string | null): Promise<Page> => {
+    const page = await ctx.db
+      .query(table)
+      .paginate({ numItems: REPAIR_PAGE, cursor });
+    for (const row of page.page) await refreshPhone(ctx, row.phone);
+    return page;
+  };
+
 /** Each stage repairs a page of one table. */
 const STAGES: ((ctx: MutationCtx, cursor: string | null) => Promise<Page>)[] = [
-  async (ctx, cursor) => {
-    const page = await ctx.db
-      .query("people")
-      .paginate({ numItems: REPAIR_PAGE, cursor });
-    for (const p of page.page) await refreshPhone(ctx, p.phone);
-    return page;
-  },
+  phones("people"),
   // Readers with no account.
-  async (ctx, cursor) => {
-    const page = await ctx.db
-      .query("rotaParticipants")
-      .paginate({ numItems: REPAIR_PAGE, cursor });
-    for (const p of page.page) await refreshPhone(ctx, p.phone);
-    return page;
-  },
+  phones("rotaParticipants"),
   // Rows whose phone has no reader left.
-  async (ctx, cursor) => {
-    const page = await ctx.db
-      .query("readerDirectory")
-      .paginate({ numItems: REPAIR_PAGE, cursor });
-    for (const r of page.page) await refreshPhone(ctx, r.phone);
-    return page;
-  },
+  phones("readerDirectory"),
   async (ctx, cursor) => {
     const page = await ctx.db
       .query("khatmas")

@@ -35,9 +35,8 @@ export async function memberCount(ctx: QueryCtx, k: Doc<"khatmas">) {
   return readers.filter((p) => p.removedAt === null).length;
 }
 
-/** How far a rota khatma's open day has come, or null with no day open. */
-export async function rotaToday(ctx: QueryCtx, k: Doc<"khatmas">) {
-  const day = await lastRotaDay(ctx, k._id);
+/** How far a reading day has come, or null unless it's open. */
+export async function dayProgress(ctx: QueryCtx, day: Doc<"rotaDays"> | null) {
   if (day === null || day.closedAt !== null) return null;
   const reads = await ctx.db
     .query("rotaReads")
@@ -53,7 +52,7 @@ export async function rotaToday(ctx: QueryCtx, k: Doc<"khatmas">) {
 async function rotaFacts(ctx: QueryCtx, k: Doc<"khatmas">) {
   if (k.kind !== "rota" || !k.rota) return null;
   const day = await lastRotaDay(ctx, k._id);
-  const today = await rotaToday(ctx, k);
+  const today = await dayProgress(ctx, day);
   return {
     days: k.rota.days,
     firstDate: k.rota.firstDate,

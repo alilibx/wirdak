@@ -81,6 +81,7 @@ async function refreshReader(
   }
   const same =
     entry.name === fields.name &&
+    entry.searchName === fields.searchName &&
     entry.khatmaCount === fields.khatmaCount &&
     entry.lastReplyAt === fields.lastReplyAt &&
     entry.phoneHidden === fields.phoneHidden;

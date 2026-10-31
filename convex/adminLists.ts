@@ -2,11 +2,12 @@ import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { memberCount, rotaToday } from "./adminLookup";
+import { dayProgress, memberCount } from "./adminLookup";
 import { adminQuery } from "./lib/adminSession";
 import { isBlocked } from "./lib/blocked";
 import { peopleTabValidator, type PeopleTab } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
+import { lastRotaDay } from "./lib/rotaPlace";
 import { foldText } from "./lib/searchFold";
 import { getSetting } from "./lib/settings";
 import { maskPhone } from "./lib/text";
@@ -298,7 +299,7 @@ async function khatmaRow(ctx: QueryCtx, k: Doc<"khatmas">) {
       ? { personId: organizer._id, displayName: organizer.displayName }
       : null,
     memberCount: await memberCount(ctx, k),
-    today: rota ? await rotaToday(ctx, k) : null,
+    today: rota ? await dayProgress(ctx, await lastRotaDay(ctx, k._id)) : null,
     completed: rota ? await completedDays(ctx, k._id) : k.completedRounds,
     createdAt: k.createdAt,
   };

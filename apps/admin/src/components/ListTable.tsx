@@ -62,7 +62,7 @@ export function ListSearch({
   );
 }
 
-/** The sort order as a menu, for a list with no column headers. */
+/** The sort order as a menu and a turn-round button, for a list with no column headers. */
 export function SortSelect<K extends string>({
   options,
   sorting,
@@ -71,8 +71,9 @@ export function SortSelect<K extends string>({
   sorting: Sorting<K>;
 }) {
   const id = useId();
+  const Icon = sorting.order === "asc" ? ArrowUp : ArrowDown;
   return (
-    <div>
+    <div className="flex items-center gap-1">
       <label htmlFor={id} className="sr-only">
         {t.lists.sortBy}
       </label>
@@ -88,6 +89,14 @@ export function SortSelect<K extends string>({
           </option>
         ))}
       </select>
+      <Button
+        variant="outline"
+        size="icon"
+        aria-label={t.lists.reverse}
+        onClick={() => sorting.setSort(sorting.sort)}
+      >
+        <Icon aria-hidden />
+      </Button>
     </div>
   );
 }

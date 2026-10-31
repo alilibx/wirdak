@@ -88,13 +88,13 @@ const PERSON_COLUMNS: Column<PersonRow, PeopleSort>[] = [
   },
   {
     key: "lastSeen",
-    header: t.people.lastSeen,
+    header: t.lookup.lastSeen,
     sort: "lastSeen",
     cell: (row) => dateOr(row.lastSeenAt, t.lookup.neverSeen),
   },
   {
     key: "joined",
-    header: t.people.joined,
+    header: t.lookup.joined,
     sort: "joined",
     cell: (row) => dateOr(row.verifiedAt, "—"),
   },
@@ -131,7 +131,7 @@ function PeopleList({
       rows={results}
       rowKey={(row) => row.personId}
       columns={PERSON_COLUMNS}
-      sorting={sorting}
+      sorting={search === "" ? sorting : undefined}
       status={status}
       onMore={() => loadMore(LIST_PAGE)}
       card={(row) => (
@@ -139,7 +139,7 @@ function PeopleList({
           <PersonName row={row} />
           <Phone value={row.phoneMasked} />
           <span className="text-muted-foreground">
-            {t.people.lastSeen}: {dateOr(row.lastSeenAt, t.lookup.neverSeen)}
+            {t.lookup.lastSeen}: {dateOr(row.lastSeenAt, t.lookup.neverSeen)}
           </span>
         </>
       )}
@@ -258,7 +258,7 @@ function ReadersList({ search }: { search: string }) {
       rows={results}
       rowKey={(row) => row.readerId}
       columns={columns}
-      sorting={sorting}
+      sorting={search === "" ? sorting : undefined}
       status={status}
       onMore={() => loadMore(LIST_PAGE)}
       card={(row) => (

@@ -169,7 +169,7 @@ export function KhatmasPage() {
         rows={results}
         rowKey={(row) => row.khatmaId}
         columns={columns}
-        sorting={sorting}
+        sorting={search === "" ? sorting : undefined}
         status={pageStatus}
         onMore={() => loadMore(LIST_PAGE)}
         card={(row) => (

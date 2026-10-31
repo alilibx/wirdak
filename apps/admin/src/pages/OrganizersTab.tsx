@@ -29,8 +29,8 @@ import { opsError, withNote } from "../lib/opsError";
 const SORT_OPTIONS: { key: PeopleSort; label: string }[] = [
   { key: "created", label: t.lists.created },
   { key: "name", label: t.lists.name },
-  { key: "lastSeen", label: t.people.lastSeen },
-  { key: "joined", label: t.people.joined },
+  { key: "lastSeen", label: t.lookup.lastSeen },
+  { key: "joined", label: t.lookup.joined },
 ];
 
 type Khatma = {
@@ -254,9 +254,11 @@ export function OrganizersTab({ search }: { search: string }) {
 
       {message && <p role="status">{message}</p>}
 
-      <SortSelect options={SORT_OPTIONS} sorting={sorting} />
+      {search === "" && <SortSelect options={SORT_OPTIONS} sorting={sorting} />}
       {status === "Exhausted" && results.length === 0 && (
-        <p className="text-muted-foreground">{t.organizers.empty}</p>
+        <p className="text-muted-foreground">
+          {search === "" ? t.organizers.empty : t.lists.empty}
+        </p>
       )}
       <ul className="flex flex-col gap-2">
         {results.map((o) => (

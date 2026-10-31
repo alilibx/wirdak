@@ -461,6 +461,7 @@ export const ar = {
   lists: {
     more: "المزيد",
     sortBy: "الترتيب",
+    reverse: "اعكس الترتيب",
     searchLabel: "ابحث بالاسم",
     created: "أُنشئ",
     name: "الاسم",
@@ -482,8 +483,6 @@ export const ar = {
       notJoined: "لم ينضمّ بعد",
       blocked: "محظور",
     },
-    lastSeen: "آخر ظهور",
-    joined: "انضم",
     organizes: "ينظّم",
     memberOf: "عضو في",
     blockedOnly: "المحظورون فقط",
