@@ -55,6 +55,7 @@ function JoinRequestCard({
             type="text"
             maxLength={60}
             value={name}
+            readOnly={question !== null}
             onChange={(event) => setName(event.target.value)}
             className={fieldClass}
           />
@@ -64,6 +65,7 @@ function JoinRequestCard({
           <select
             id={selectId}
             value={juz}
+            disabled={question !== null}
             onChange={(event) => setChosen(Number(event.target.value))}
             className={fieldClass}
           >

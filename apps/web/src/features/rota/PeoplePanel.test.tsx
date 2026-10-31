@@ -151,6 +151,36 @@ describe("PeoplePanel", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
+  it("asks the same for a saved person, and adds them with the answer", async () => {
+    m.fns.addSaved = vi
+      .fn()
+      .mockResolvedValueOnce({ error: "ask_today" })
+      .mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} />);
+    await user.click(
+      screen.getByRole("button", { name: /أضف قارئاً للجزء ٥/ }),
+    );
+    await user.click(screen.getByRole("button", { name: t.rota.savedFrom }));
+    const picker = screen.getByRole("dialog", { name: t.rota.savedTitle });
+    await user.click(within(picker).getByRole("button", { name: /أم خالد/ }));
+    const question = await within(picker).findByRole("group", {
+      name: t.rota.todayQuestion,
+    });
+    await user.click(
+      within(question).getByRole("button", { name: t.rota.readsToday }),
+    );
+
+    expect(m.fns.addSaved).toHaveBeenLastCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+      contactId: "c1",
+      juz: 5,
+      readsToday: true,
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
   it("going back from the question adds nobody", async () => {
     m.fns.addParticipant = vi.fn().mockResolvedValue({ error: "ask_today" });
     const user = userEvent.setup();

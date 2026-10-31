@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { t } from "../../i18n/ar";
@@ -51,6 +51,36 @@ describe("JoinRequests", () => {
       requestId: "r1",
       juz: 4,
       name: "خالد",
+    });
+  });
+
+  it("late in the day, holds the card still and accepts with the organizer's answer", async () => {
+    m.fns.acceptJoinRequest = vi
+      .fn()
+      .mockResolvedValueOnce({ error: "ask_today" })
+      .mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    render(<JoinRequests inviteCode="CODE" view={view("خالد")} />);
+    await user.click(
+      screen.getByRole("button", { name: t.rota.acceptRequest }),
+    );
+    const question = await screen.findByRole("group", {
+      name: t.rota.todayQuestion,
+    });
+    expect(screen.getByLabelText(t.rota.personName)).toHaveAttribute(
+      "readonly",
+    );
+    expect(screen.getByLabelText(t.rota.requestJuz)).toBeDisabled();
+
+    await user.click(
+      within(question).getByRole("button", { name: t.rota.readsNextDay }),
+    );
+    expect(m.fns.acceptJoinRequest).toHaveBeenLastCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+      requestId: "r1",
+      juz: 4,
+      readsToday: false,
     });
   });
 

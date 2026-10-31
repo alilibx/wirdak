@@ -267,7 +267,7 @@ export async function placeNewParticipant(
     target.date !== null &&
     (await lateInTheDay(ctx, khatma, who.phone, slot, joinedAt !== undefined));
   if (asks && late.readsToday === undefined) return { error: "ask_today" };
-  const startsLater = asks && !late.readsToday;
+  const readsFrom = asks && !late.readsToday ? target.date : null;
 
   const participantId = await ctx.db.insert("rotaParticipants", {
     khatmaId: khatma._id,
@@ -278,7 +278,7 @@ export async function placeNewParticipant(
     removedAt: null,
     ...(who.phoneHidden === true ? { phoneHidden: true } : {}),
     ...(joinedAt !== undefined ? { joinedAt } : {}),
-    ...(startsLater && target.date !== null ? { readsFrom: target.date } : {}),
+    ...(readsFrom !== null ? { readsFrom } : {}),
   });
   await ctx.db.insert("rotaSlots", {
     khatmaId: khatma._id,

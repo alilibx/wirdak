@@ -97,6 +97,23 @@ describe("RotaPeopleSetup: an archived khatma", () => {
 });
 
 describe("RotaPeopleSetup: bringing people in", () => {
+  it("shows a number under the name, and none for a hidden one", () => {
+    const view = makeView();
+    const [hidden] = view.participants;
+    m.view = {
+      ...view,
+      participants: [
+        hidden,
+        { ...hidden, id: "p2", name: "منى", phone: "+971501234567" },
+      ],
+    };
+    renderSetup();
+    const list = screen.getByRole("list", { name: t.rota.peopleList });
+    const rows = within(list).getAllByRole("listitem");
+    expect(rows[0]).not.toHaveTextContent("+");
+    expect(rows[1]).toHaveTextContent("+971501234567");
+  });
+
   it("renames someone from the list", async () => {
     const user = userEvent.setup();
     renderSetup();
