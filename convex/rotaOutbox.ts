@@ -261,19 +261,6 @@ export async function welcomeGoesNow(
   return awake <= now && (await windowOpen(ctx, phone, now));
 }
 
-/** Whether the phone wrote to Wirdak in the last 24 hours. */
-async function windowOpen(
-  ctx: QueryCtx,
-  phone: string,
-  now: number,
-): Promise<boolean> {
-  const contact = await ctx.db
-    .query("waContacts")
-    .withIndex("by_phone", (q) => q.eq("phone", phone))
-    .unique();
-  return contact !== null && contact.lastInboundAt >= now - WINDOW_MS;
-}
-
 /**
  * The welcome for a member who has just joined: today's juz' with the buttons
  * when a day dated today is open and has unread reads for them, else when their
