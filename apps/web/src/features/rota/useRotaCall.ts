@@ -3,7 +3,7 @@ import { t } from "../../i18n/ar";
 import { thrownMessage } from "./errors";
 
 /** What a rota call answers: `{ ok }`, a refusal as `{ error }`, or nothing. */
-type Outcome = { ok: true } | { error: string } | void;
+export type Outcome = { ok: true } | { error: string } | void;
 
 /**
  * Runs one call at a time for a screen of the rota page. A refusal (`{ error }`, mapped through

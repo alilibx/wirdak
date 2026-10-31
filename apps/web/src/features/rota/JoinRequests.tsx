@@ -7,7 +7,7 @@ import { t } from "../../i18n/ar";
 import { useRotaBackend } from "./backend";
 import { ErrorLine } from "./ErrorLine";
 import { fieldClass } from "./fieldClass";
-import { useRotaCall } from "./useRotaCall";
+import { useAddCall } from "./useAddCall";
 
 type Request = PeopleView["requests"][number];
 
@@ -24,7 +24,9 @@ function JoinRequestCard({
   const backend = useRotaBackend(inviteCode);
   const accept = useMutation(backend.acceptJoinRequest);
   const decline = useMutation(backend.declineJoinRequest);
-  const { busy, error, run } = useRotaCall(t.rota.joinRequestErrors);
+  const { busy, error, add, run, question } = useAddCall(
+    t.rota.joinRequestErrors,
+  );
   const nameId = useId();
   const selectId = useId();
   const [name, setName] = useState(request.name ?? "");
@@ -73,32 +75,35 @@ function JoinRequestCard({
           </select>
         </>
       )}
-      <div className="mt-3 grid gap-3">
-        <Button
-          disabled={busy || juz === undefined}
-          onClick={() =>
-            void run(() =>
-              accept({
-                ...args,
-                requestId: request.id,
-                juz: juz ?? 0,
-                ...nameArg,
-              }),
-            )
-          }
-        >
-          {t.rota.acceptRequest}
-        </Button>
-        <Button
-          variant="ghost"
-          disabled={busy}
-          onClick={() =>
-            void run(() => decline({ ...args, requestId: request.id }))
-          }
-        >
-          {t.rota.declineRequest}
-        </Button>
-      </div>
+      {question ?? (
+        <div className="mt-3 grid gap-3">
+          <Button
+            disabled={busy || juz === undefined}
+            onClick={() =>
+              void add((today) =>
+                accept({
+                  ...args,
+                  requestId: request.id,
+                  juz: juz ?? 0,
+                  ...nameArg,
+                  ...today,
+                }),
+              )
+            }
+          >
+            {t.rota.acceptRequest}
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() =>
+              void run(() => decline({ ...args, requestId: request.id }))
+            }
+          >
+            {t.rota.declineRequest}
+          </Button>
+        </div>
+      )}
       <ErrorLine error={error} />
     </li>
   );

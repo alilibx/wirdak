@@ -5,7 +5,7 @@ import { t } from "../../i18n/ar";
 import { useRotaBackend } from "./backend";
 import { ErrorLine } from "./ErrorLine";
 import { fieldClass } from "./fieldClass";
-import { useRotaCall } from "./useRotaCall";
+import { useAddCall } from "./useAddCall";
 
 const addErrors: Record<string, string> = t.rota.addErrors;
 
@@ -33,19 +33,20 @@ export function AddPersonForm({
   const ids = useId();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const { busy: adding, error, run } = useRotaCall(addErrors);
+  const { busy: adding, error, add, question } = useAddCall(addErrors);
   const nameField = useRef<HTMLInputElement>(null);
 
   function onAdd(event: FormEvent) {
     event.preventDefault();
     onStart?.();
-    void run(
-      () =>
+    void add(
+      (today) =>
         addParticipant({
           ...backend.authArgs(),
           name: name.trim(),
           phone: phone.trim(),
           ...(juz === undefined ? {} : { juz }),
+          ...today,
         }),
       () => {
         setName("");
@@ -67,6 +68,7 @@ export function AddPersonForm({
         type="text"
         maxLength={60}
         value={name}
+        readOnly={question !== null}
         onChange={(event) => setName(event.target.value)}
         className={fieldClass}
       />
@@ -80,6 +82,7 @@ export function AddPersonForm({
         autoComplete="off"
         dir="ltr"
         value={phone}
+        readOnly={question !== null}
         onChange={(event) => setPhone(event.target.value)}
         aria-describedby={`${ids}-hint`}
         className={`${fieldClass} text-right`}
@@ -88,11 +91,13 @@ export function AddPersonForm({
         {t.rota.phoneHint}
       </p>
       <ErrorLine error={error} />
-      <div className="mt-4">
-        <Button type="submit" variant={variant} disabled={adding}>
-          {adding ? t.rota.adding : t.rota.add}
-        </Button>
-      </div>
+      {question ?? (
+        <div className="mt-4">
+          <Button type="submit" variant={variant} disabled={adding}>
+            {adding ? t.rota.adding : t.rota.add}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

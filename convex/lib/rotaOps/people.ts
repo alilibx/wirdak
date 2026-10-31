@@ -2,7 +2,12 @@ import { ConvexError } from "convex/values";
 import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
-import { enqueue, takeFreeJuzToday, welcomeGoesNow } from "../../rotaOutbox";
+import {
+  enqueue,
+  slotFreeToday,
+  takeFreeJuzToday,
+  welcomeGoesNow,
+} from "../../rotaOutbox";
 import { env } from "../../whatsapp";
 import {
   readingDaysKind,
@@ -16,7 +21,11 @@ import { slotRowsByJuz, targetDay, type RotaConfig } from "../rotaPlace";
 import { NEW_MEMBER_NAME } from "../rotaTemplates";
 import { getSetting } from "../settings";
 import { cleanDisplayName, maskPhone, normalizePhone } from "../text";
+import { localMinutes } from "../wakingTime";
 import { khatmaTitle } from "../whatsappTemplates";
+
+/** From 18:00, six hours before the day ends, the organizer says when someone they add starts. */
+const LATE_ADD_FROM = 18 * 60;
 
 /** Whoever is running the khatma. An admin helping out has no `personId`: nobody is "me" to them. */
 export type Actor = { personId: Id<"people"> | null };
@@ -233,9 +242,11 @@ export async function placeNewParticipant(
   },
   juz: number | undefined,
   joinedAt?: number,
+  /** The organizer's add screens: late in the day, they say when the person starts. */
+  late?: { readsToday: boolean | undefined },
 ): Promise<
   | { participantId: Id<"rotaParticipants">; juz: number }
-  | { error: "no_free_juz" | "juz_taken" }
+  | { error: "no_free_juz" | "juz_taken" | "ask_today" }
 > {
   const target = await targetDay(ctx, khatma);
   const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
@@ -250,6 +261,14 @@ export async function placeNewParticipant(
     return { error: "juz_taken" };
   }
 
+  const slot = slotFor(juz, target.number);
+  const asks =
+    late !== undefined &&
+    target.date !== null &&
+    (await lateInTheDay(ctx, khatma, who.phone, slot, joinedAt !== undefined));
+  if (asks && late.readsToday === undefined) return { error: "ask_today" };
+  const startsLater = asks && !late.readsToday;
+
   const participantId = await ctx.db.insert("rotaParticipants", {
     khatmaId: khatma._id,
     name: who.name,
@@ -259,20 +278,40 @@ export async function placeNewParticipant(
     removedAt: null,
     ...(who.phoneHidden === true ? { phoneHidden: true } : {}),
     ...(joinedAt !== undefined ? { joinedAt } : {}),
+    ...(startsLater && target.date !== null ? { readsFrom: target.date } : {}),
   });
   await ctx.db.insert("rotaSlots", {
     khatmaId: khatma._id,
-    slot: slotFor(juz, target.number),
+    slot,
     participantId,
   });
   return { participantId, juz };
+}
+
+/**
+ * Whether someone added now, in the day's last six hours, could still take
+ * today's juz', so the organizer should say if they do. Someone already joined
+ * takes it only with a welcome that goes at once.
+ */
+async function lateInTheDay(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  phone: string,
+  slot: number,
+  joined: boolean,
+): Promise<boolean> {
+  const rota = khatma.rota;
+  const now = Date.now();
+  if (!rota || localMinutes(now, rota.timeZone) < LATE_ADD_FROM) return false;
+  if (!(await slotFreeToday(ctx, rota, khatma._id, slot, now))) return false;
+  return !joined || (await welcomeGoesNow(ctx, rota, phone, now));
 }
 
 export async function addParticipant(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
   _rota: RotaConfig,
-  args: { name: string; phone: string; juz?: number },
+  args: { name: string; phone: string; juz?: number; readsToday?: boolean },
 ): Promise<
   | { ok: true; participantId: Id<"rotaParticipants">; juz: number }
   | {
@@ -281,7 +320,8 @@ export async function addParticipant(
         | "bad_phone"
         | "no_free_juz"
         | "juz_taken"
-        | "already_added";
+        | "already_added"
+        | "ask_today";
     }
 > {
   const name = cleanDisplayName(args.name);
@@ -303,6 +343,8 @@ export async function addParticipant(
     khatma,
     { name, phone, personId: null },
     args.juz,
+    undefined,
+    { readsToday: args.readsToday },
   );
   if ("error" in placed) return placed;
   const organizer = await ctx.db.get(khatma.creatorPersonId);
@@ -597,10 +639,17 @@ export async function addSaved(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
   _rota: RotaConfig,
-  args: { contactId: Id<"rotaContacts">; juz?: number },
+  args: { contactId: Id<"rotaContacts">; juz?: number; readsToday?: boolean },
 ): Promise<
   | { ok: true; participantId: Id<"rotaParticipants">; juz: number }
-  | { error: "not_found" | "no_free_juz" | "juz_taken" | "already_added" }
+  | {
+      error:
+        | "not_found"
+        | "no_free_juz"
+        | "juz_taken"
+        | "already_added"
+        | "ask_today";
+    }
 > {
   const contact = await ctx.db.get(args.contactId);
   if (
@@ -635,6 +684,8 @@ export async function addSaved(
       phoneHidden: contact.phone === null,
     },
     args.juz,
+    undefined,
+    { readsToday: args.readsToday },
   );
   if ("error" in placed) return placed;
   return { ok: true, ...placed };
@@ -740,10 +791,18 @@ export async function acceptJoinRequest(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
   rota: RotaConfig,
-  args: { requestId: Id<"rotaJoinRequests">; juz: number; name?: string },
+  args: {
+    requestId: Id<"rotaJoinRequests">;
+    juz: number;
+    name?: string;
+    readsToday?: boolean;
+  },
 ): Promise<
   | { ok: true; participantId: Id<"rotaParticipants"> }
-  | { error: "not_found" | "juz_taken" | "already_added" | "bad_name" }
+  | {
+      error:
+        "not_found" | "juz_taken" | "already_added" | "bad_name" | "ask_today";
+    }
 > {
   const request = await openRequest(ctx, khatma._id, args.requestId);
   if (!request) return { error: "not_found" };
@@ -814,10 +873,11 @@ export async function acceptJoinRequest(
     { name, phone: request.phone, personId, phoneHidden },
     args.juz,
     now,
+    { readsToday: args.readsToday },
   );
   if ("error" in placed) {
     // `juz` was given, so a juz' is always chosen.
-    return { error: "juz_taken" };
+    return { error: placed.error === "ask_today" ? "ask_today" : "juz_taken" };
   }
   const organizer = await ctx.db.get(khatma.creatorPersonId);
   if (organizer) {

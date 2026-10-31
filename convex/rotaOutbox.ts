@@ -200,11 +200,39 @@ async function openDayToday(
     : null;
 }
 
+/** The unread read a slot has on a day, if nobody has it. */
+async function freeRead(
+  ctx: QueryCtx,
+  day: Doc<"rotaDays">,
+  slot: number,
+): Promise<Doc<"rotaReads"> | null> {
+  const juz = juzFor(slot, day.number);
+  const read = await ctx.db
+    .query("rotaReads")
+    .withIndex("by_day_juz", (q) => q.eq("dayId", day._id).eq("juz", juz))
+    .first();
+  return read && read.readerId === null && read.doneAt === null ? read : null;
+}
+
+/** Whether someone given this slot now could still take today's juz'. */
+export async function slotFreeToday(
+  ctx: QueryCtx,
+  rota: RotaConfig,
+  khatmaId: Id<"khatmas">,
+  slot: number,
+  now: number,
+): Promise<boolean> {
+  if (rota.pausedAt !== null) return false;
+  const day = await openDayToday(ctx, khatmaId, rota.timeZone, now);
+  return day !== null && (await freeRead(ctx, day, slot)) !== null;
+}
+
 /**
  * Gives a member joining for the first time during a day the ajza' their slots have that day,
  * where nobody has them: a day's assignments are fixed when its juz' message
  * goes out, so someone added since would otherwise wait for the next one. A
- * juz' given to someone else or already marked read stays as it is.
+ * juz' given to someone else or already marked read stays as it is, and so
+ * does today's when the organizer said they start on a later day.
  */
 export async function takeFreeJuzToday(
   ctx: MutationCtx,
@@ -216,17 +244,20 @@ export async function takeFreeJuzToday(
   if (rota.pausedAt !== null) return;
   const day = await openDayToday(ctx, khatmaId, rota.timeZone, now);
   if (!day) return;
+  const participant = await ctx.db.get(participantId);
+  if (
+    participant?.readsFrom !== undefined &&
+    day.date < participant.readsFrom
+  ) {
+    return;
+  }
   const slots = await ctx.db
     .query("rotaSlots")
     .withIndex("by_participant", (q) => q.eq("participantId", participantId))
     .collect();
   for (const { slot } of slots) {
-    const juz = juzFor(slot, day.number);
-    const read = await ctx.db
-      .query("rotaReads")
-      .withIndex("by_day_juz", (q) => q.eq("dayId", day._id).eq("juz", juz))
-      .first();
-    if (read && read.readerId === null && read.doneAt === null) {
+    const read = await freeRead(ctx, day, slot);
+    if (read) {
       await ctx.db.patch(read._id, {
         holderId: participantId,
         readerId: participantId,

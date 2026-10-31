@@ -545,6 +545,7 @@ export const addParticipant = sessionMutation({
     name: v.string(),
     phone: v.string(),
     juz: v.optional(v.number()),
+    readsToday: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.addParticipant> => {
     const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
@@ -629,6 +630,7 @@ export const addSaved = sessionMutation({
     inviteCode: v.string(),
     contactId: v.id("rotaContacts"),
     juz: v.optional(v.number()),
+    readsToday: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.addSaved> => {
     const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
@@ -799,6 +801,7 @@ export const acceptJoinRequest = sessionMutation({
     requestId: v.id("rotaJoinRequests"),
     juz: v.number(),
     name: v.optional(v.string()),
+    readsToday: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.acceptJoinRequest> => {
     const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);

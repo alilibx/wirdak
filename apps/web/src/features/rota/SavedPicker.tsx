@@ -3,7 +3,7 @@ import { Sheet } from "../../components/Sheet";
 import { t } from "../../i18n/ar";
 import { useRotaBackend } from "./backend";
 import { ErrorLine } from "./ErrorLine";
-import { useRotaCall } from "./useRotaCall";
+import { useAddCall } from "./useAddCall";
 
 const savedErrors: Record<string, string> = t.rota.savedErrors;
 
@@ -32,16 +32,17 @@ export function SavedPicker({
   const backend = useRotaBackend(inviteCode);
   const saved = useQuery(backend.saved, backend.scope);
   const addSaved = useMutation(backend.addSaved);
-  const { busy, error, run } = useRotaCall(savedErrors);
+  const { busy, error, add: addCall, question } = useAddCall(savedErrors);
 
   const add = (contactId: NonNullable<typeof saved>[number]["id"]) => {
     onStart?.();
-    return run(
-      () =>
+    return addCall(
+      (today) =>
         addSaved({
           ...backend.authArgs(),
           contactId,
           ...(juz === undefined ? {} : { juz }),
+          ...today,
         }),
       () => {
         if (juz !== undefined) onClose();
@@ -58,7 +59,7 @@ export function SavedPicker({
           <li key={contact.id}>
             <button
               type="button"
-              disabled={busy || contact.inKhatma}
+              disabled={busy || contact.inKhatma || question !== null}
               onClick={() => void add(contact.id)}
               className="flex min-h-14 w-full items-center justify-between gap-3 rounded-ui border-2 border-line bg-card px-4 py-2 text-start disabled:opacity-50"
             >
@@ -79,6 +80,7 @@ export function SavedPicker({
         ))}
       </ul>
       <ErrorLine error={error} />
+      {question}
     </Sheet>
   );
 }
