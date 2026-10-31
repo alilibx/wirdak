@@ -217,6 +217,11 @@ export default defineSchema({
      * nothing returns it to a client (the join link is the only way in).
      */
     phoneHidden: v.optional(v.boolean()),
+    /**
+     * The reading day they start on, when the organizer added them late in
+     * the day and said not today. Missing means they can read from the day they join.
+     */
+    readsFrom: v.optional(v.string()),
     /** When they were last cheered; missing means never. */
     lastCheerAt: v.optional(nullableNumber),
   })

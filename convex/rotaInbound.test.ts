@@ -356,6 +356,165 @@ test("a late joiner takes nothing from a day dated yesterday, still open before 
   expect(read?.readerId).toBeNull();
 });
 
+// ---------------------------------------------------------------------------
+// Adding someone in the day's last six hours
+
+/** A running day with one reader, and a session for the organizer. */
+async function runningKhatma(t: T, over: { endDate?: string } = {}) {
+  const s = await setup(t, [{ slot: 1 }]);
+  const sessionToken = "running-session";
+  const inviteCode = "runningCode1";
+  const tokenHash = await sha256Hex(sessionToken);
+  await t.run(async (ctx) => {
+    const khatma = await ctx.db.get(s.khatmaId);
+    await ctx.db.patch(s.khatmaId, {
+      inviteCode,
+      rota: { ...khatma!.rota!, endDate: over.endDate ?? null },
+    });
+    await ctx.db.insert("members", {
+      khatmaId: s.khatmaId,
+      personId: s.personId,
+      joinedAt: 0,
+      status: "active",
+      notificationsOn: true,
+      lastNudgeAt: null,
+      lastCelebratedRound: 0,
+    });
+    await ctx.db.insert("sessions", {
+      personId: s.personId,
+      tokenHash,
+      alertTokenHash: "alert",
+      deviceLabel: "test",
+      createdAt: Date.now(),
+      lastUsedAt: Date.now(),
+    });
+  });
+  const day = await startDay(t, s);
+  const auth = { sessionToken, inviteCode };
+  // Slot 5, which reads juz' 5 today and juz' 6 on the next day.
+  const add = (readsToday?: boolean) =>
+    t.mutation(api.rota.addParticipant, {
+      ...auth,
+      name: "جديد",
+      phone: `+${LATE}`,
+      juz: 6,
+      ...(readsToday === undefined ? {} : { readsToday }),
+    });
+  return { ...s, day, auth, add };
+}
+
+const juzFive = async (t: T, dayId: Id<"rotaDays">) =>
+  (await readsOf(t, dayId)).find((r) => r.juz === 5);
+
+test("nobody is asked before 18:00", async () => {
+  const t = convexTest(schema, modules);
+  const s = await runningKhatma(t);
+  vi.setSystemTime(dubai("2027-01-16T17:59"));
+
+  expect(await s.add()).toMatchObject({ ok: true });
+});
+
+test("from 18:00 the organizer says if someone reads today, and nobody is added until they do", async () => {
+  const t = convexTest(schema, modules);
+  const s = await runningKhatma(t);
+  vi.setSystemTime(dubai("2027-01-16T18:00"));
+
+  expect(await s.add()).toEqual({ error: "ask_today" });
+
+  const people = await t.query(api.rota.people, s.auth);
+  expect(people?.participants).toHaveLength(1);
+});
+
+test("someone who reads today takes the free juz' when they join", async () => {
+  const t = convexTest(schema, modules);
+  const s = await runningKhatma(t);
+  vi.setSystemTime(dubai("2027-01-16T21:00"));
+  const added = await s.add(true);
+  expect(added).toMatchObject({ ok: true });
+
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+
+  expect((await juzFive(t, s.day._id))?.readerId).not.toBeNull();
+});
+
+test("someone who starts tomorrow takes nothing today, and hears when their juz' comes", async () => {
+  const t = convexTest(schema, modules);
+  const s = await runningKhatma(t);
+  vi.setSystemTime(dubai("2027-01-16T21:00"));
+  await s.add(false);
+
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+
+  expect((await juzFive(t, s.day._id))?.readerId).toBeNull();
+  expect(sent.at(-1)?.body).toContain("تصلك رسالة جزئك يوم الأحد الساعة");
+});
+
+test("nobody is asked when the slot's juz' today has a reader", async () => {
+  const t = convexTest(schema, modules);
+  const s = await runningKhatma(t);
+  const read = await juzFive(t, s.day._id);
+  await t.run((ctx) =>
+    ctx.db.patch(read!._id, { readerId: s.participants[0]! }),
+  );
+  vi.setSystemTime(dubai("2027-01-16T21:00"));
+
+  expect(await s.add()).toMatchObject({ ok: true });
+});
+
+test("nobody is asked on a paused khatma", async () => {
+  const t = convexTest(schema, modules);
+  const s = await runningKhatma(t);
+  await t.run(async (ctx) => {
+    const khatma = await ctx.db.get(s.khatmaId);
+    await ctx.db.patch(s.khatmaId, {
+      rota: { ...khatma!.rota!, pausedAt: Date.now() },
+    });
+  });
+  vi.setSystemTime(dubai("2027-01-16T21:00"));
+
+  expect(await s.add()).toMatchObject({ ok: true });
+});
+
+test("nobody is asked on the khatma's last day: there's no tomorrow to start on", async () => {
+  const t = convexTest(schema, modules);
+  const s = await runningKhatma(t, { endDate: "2027-01-16" });
+  vi.setSystemTime(dubai("2027-01-16T21:00"));
+
+  expect(await s.add()).toMatchObject({ ok: true });
+});
+
+test("accepting a request late in the day asks too, and tomorrow leaves today's juz' free", async () => {
+  const t = convexTest(schema, modules);
+  const s = await runningKhatma(t);
+  vi.setSystemTime(dubai("2027-01-16T19:00"));
+  await send(t, STRANGER, joinText("ختمة", "JNC234"));
+  const [request] = (await t.query(api.rota.people, s.auth))!.requests;
+  const accept = (readsToday?: boolean) =>
+    t.mutation(api.rota.acceptJoinRequest, {
+      ...s.auth,
+      requestId: request!.id,
+      juz: 6,
+      ...(readsToday === undefined ? {} : { readsToday }),
+    });
+
+  expect(await accept()).toEqual({ error: "ask_today" });
+  expect(await accept(false)).toMatchObject({ ok: true });
+
+  expect((await juzFive(t, s.day._id))?.readerId).toBeNull();
+});
+
+test("a tap after midnight still counts for the day before", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1, phone: `+${LATE}` }]);
+  const day = await startDay(t, s);
+  vi.setSystemTime(dubai("2027-01-17T00:30"));
+
+  await send(t, LATE, "تم");
+
+  const read = (await readsOf(t, day._id)).find((r) => r.juz === 1);
+  expect(read?.doneAt).toBe(Date.now());
+});
+
 test("a member who joined before takes nothing by sending the join text again", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t, [{ slot: 1 }]);

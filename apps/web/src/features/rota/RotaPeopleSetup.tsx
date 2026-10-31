@@ -10,6 +10,7 @@ import { t } from "../../i18n/ar";
 import { AddPersonForm } from "./AddPersonForm";
 import { useRotaBackend, type RotaBackend } from "./backend";
 import { ErrorLine } from "./ErrorLine";
+import { PersonPhone } from "./PersonPhone";
 import { RenameSheet } from "./RenameSheet";
 import { JoinChip, ShareJoinLink, useEnsureJoinLink } from "./JoinStatus";
 import { SavedPicker } from "./SavedPicker";
@@ -282,8 +283,11 @@ export function RotaPeopleSetupContent({
             <span className="w-7 shrink-0 text-center font-semibold text-green-deep">
               {toArabicDigits(index + 1)}
             </span>
-            <span className="font-medium">
-              {person.isMe ? t.rota.me : person.name}
+            <span className="min-w-0">
+              <span className="block font-medium">
+                {person.isMe ? t.rota.me : person.name}
+              </span>
+              <PersonPhone phone={person.phone} />
             </span>
             {person.juz.length > 0 && (
               <span className="ms-auto text-base text-ink-soft">

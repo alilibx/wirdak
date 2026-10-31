@@ -83,6 +83,16 @@ beforeEach(() => {
 });
 
 describe("PeoplePanel", () => {
+  it("shows each person's number under their name, unless it's hidden", () => {
+    render(<PeoplePanel inviteCode="CODE" archived={false} />);
+    expect(screen.getByRole("button", { name: /منى/ })).toHaveTextContent(
+      "+971501234567",
+    );
+    expect(screen.getByRole("button", { name: /سعد/ })).not.toHaveTextContent(
+      "+",
+    );
+  });
+
   it("an empty juz' also offers the saved people, and adds the one picked to that juz'", async () => {
     const user = userEvent.setup();
     render(<PeoplePanel inviteCode="CODE" archived={false} />);
@@ -103,6 +113,95 @@ describe("PeoplePanel", () => {
     });
     // Added: the whole sheet is gone.
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("asks when someone added late in the day starts, then adds them with the answer", async () => {
+    m.fns.addParticipant = vi
+      .fn()
+      .mockResolvedValueOnce({ error: "ask_today" })
+      .mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} />);
+    await user.click(
+      screen.getByRole("button", { name: /أضف قارئاً للجزء ٥/ }),
+    );
+    const sheet = screen.getByRole("dialog", { name: t.rota.readerTitle(5) });
+    await user.type(within(sheet).getByLabelText(t.rota.personName), "ليلى");
+    await user.type(
+      within(sheet).getByLabelText(t.rota.personPhone),
+      "+971507654321",
+    );
+    await user.click(within(sheet).getByRole("button", { name: t.rota.add }));
+
+    const question = await within(sheet).findByRole("group", {
+      name: t.rota.todayQuestion,
+    });
+    await user.click(
+      within(question).getByRole("button", { name: t.rota.readsNextDay }),
+    );
+
+    expect(m.fns.addParticipant).toHaveBeenLastCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+      name: "ليلى",
+      phone: "+971507654321",
+      juz: 5,
+      readsToday: false,
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("asks the same for a saved person, and adds them with the answer", async () => {
+    m.fns.addSaved = vi
+      .fn()
+      .mockResolvedValueOnce({ error: "ask_today" })
+      .mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} />);
+    await user.click(
+      screen.getByRole("button", { name: /أضف قارئاً للجزء ٥/ }),
+    );
+    await user.click(screen.getByRole("button", { name: t.rota.savedFrom }));
+    const picker = screen.getByRole("dialog", { name: t.rota.savedTitle });
+    await user.click(within(picker).getByRole("button", { name: /أم خالد/ }));
+    const question = await within(picker).findByRole("group", {
+      name: t.rota.todayQuestion,
+    });
+    await user.click(
+      within(question).getByRole("button", { name: t.rota.readsToday }),
+    );
+
+    expect(m.fns.addSaved).toHaveBeenLastCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+      contactId: "c1",
+      juz: 5,
+      readsToday: true,
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("going back from the question adds nobody", async () => {
+    m.fns.addParticipant = vi.fn().mockResolvedValue({ error: "ask_today" });
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} />);
+    await user.click(
+      screen.getByRole("button", { name: /أضف قارئاً للجزء ٥/ }),
+    );
+    const sheet = screen.getByRole("dialog", { name: t.rota.readerTitle(5) });
+    await user.click(within(sheet).getByRole("button", { name: t.rota.add }));
+    const question = await within(sheet).findByRole("group", {
+      name: t.rota.todayQuestion,
+    });
+    await user.click(
+      within(question).getByRole("button", { name: t.rota.cancel }),
+    );
+
+    expect(m.fns.addParticipant).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("group")).toBeNull();
+    expect(
+      within(sheet).getByRole("button", { name: t.rota.add }),
+    ).toBeInTheDocument();
   });
 
   it("renames a person from their sheet", async () => {

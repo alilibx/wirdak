@@ -12,6 +12,7 @@ import { ErrorLine } from "./ErrorLine";
 import { fieldClass } from "./fieldClass";
 import { JoinChip, ShareJoinLink, useEnsureJoinLink } from "./JoinStatus";
 import { JoinRequests } from "./JoinRequests";
+import { PersonPhone } from "./PersonPhone";
 import { RenameSheet } from "./RenameSheet";
 import { SavedPicker } from "./SavedPicker";
 import { useRotaCall } from "./useRotaCall";
@@ -369,8 +370,11 @@ export function PeoplePanel({
               </span>
               {holder ? (
                 <>
-                  <span className="font-medium">
-                    {holder.isMe ? t.rota.me : holder.name}
+                  <span className="min-w-0">
+                    <span className="block font-medium">
+                      {holder.isMe ? t.rota.me : holder.name}
+                    </span>
+                    <PersonPhone phone={holder.phone} />
                   </span>
                   {second && (
                     <span className="ms-auto rounded-full bg-saffron-soft px-3 py-0.5 text-base font-semibold text-saffron-ink">
