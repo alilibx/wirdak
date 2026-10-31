@@ -102,6 +102,27 @@ describe("KhatmaAdminPage", () => {
     expect(screen.getByText(t.lookup.rotaArchived)).toBeInTheDocument();
   });
 
+  it("shows a pool khatma's schedule, and none for a rota khatma", () => {
+    const { unmount } = renderPage();
+    expect(screen.getByText(t.lookup.schedule)).toBeInTheDocument();
+    unmount();
+
+    m.rota = {
+      days: { kind: "daily" },
+      firstDate: "2026-10-01",
+      endDate: null,
+      pausedAt: null,
+      archivedAt: null,
+      number: 1,
+      cycle: 1,
+      dayOpen: false,
+      doneToday: 0,
+      total: 30,
+    };
+    renderPage();
+    expect(screen.queryByText(t.lookup.schedule)).not.toBeInTheDocument();
+  });
+
   it("shows nothing about rotation for a pool khatma", () => {
     renderPage();
     expect(screen.queryByText(t.lookup.kindRota)).not.toBeInTheDocument();

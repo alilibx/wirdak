@@ -26,6 +26,7 @@ import {
   type RateLimitBucket,
 } from "./lib/rateLimit";
 import { isBlocked } from "./lib/blocked";
+import { refreshPhone } from "./lib/directory";
 import { getSetting } from "./lib/settings";
 import { bumpCounter, dubaiDay, signInKey } from "./lib/stats";
 import { insertSession } from "./sessions";
@@ -166,19 +167,21 @@ async function toAdminNeedsPin(
   });
 }
 
-function insertPerson(
+async function insertPerson(
   ctx: MutationCtx,
   doc: Doc<"verifications">,
   phone: string,
   timeZone: string,
 ): Promise<Id<"people">> {
-  return ctx.db.insert("people", {
+  const personId = await ctx.db.insert("people", {
     phone,
     displayName: doc.displayName,
     verifiedAt: Date.now(),
     timeZone,
     lastSeenAt: Date.now(),
   });
+  await refreshPhone(ctx, phone);
+  return personId;
 }
 
 /** Opens a session for `personId` and marks the verification claimed. */

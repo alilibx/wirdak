@@ -64,7 +64,8 @@ describe("App", () => {
     renderAt("/");
     for (const name of [
       t.nav.home,
-      t.nav.organizers,
+      t.nav.people,
+      t.nav.khatmas,
       t.nav.settings,
       t.nav.audit,
       t.nav.admins,

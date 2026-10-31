@@ -9,6 +9,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { randomToken } from "./lib/crypto";
+import { nameFields, refreshPerson } from "./lib/directory";
 import { isValidGrace, graceValidator, type Grace } from "./lib/grace";
 import { JUZ, JUZ_COUNT } from "./lib/juz";
 import { paceDays, personPace } from "./lib/pace";
@@ -198,7 +199,7 @@ export const insertKhatma = internalMutation({
 
     const now = Date.now();
     const khatmaId = await ctx.db.insert("khatmas", {
-      name: args.name,
+      ...nameFields(args.name),
       schedule: args.schedule,
       grace:
         args.grace ?? (await getSetting(ctx, "graceDefaults"))[args.schedule],
@@ -218,6 +219,7 @@ export const insertKhatma = internalMutation({
       lastNudgeAt: null,
       lastCelebratedRound: 0,
     });
+    await refreshPerson(ctx, args.personId);
     return { inviteCode: args.inviteCode };
   },
 });

@@ -15,6 +15,7 @@ import {
   slotFor,
   type ReadingDaysKind,
 } from "../rota";
+import { refreshPhone } from "../directory";
 import { isArchived } from "../khatma";
 import { khatmaJoinLink } from "../rotaJoin";
 import { slotRowsByJuz, targetDay, type RotaConfig } from "../rotaPlace";
@@ -280,6 +281,7 @@ export async function placeNewParticipant(
     ...(joinedAt !== undefined ? { joinedAt } : {}),
     ...(readsFrom !== null ? { readsFrom } : {}),
   });
+  await refreshPhone(ctx, who.phone);
   await ctx.db.insert("rotaSlots", {
     khatmaId: khatma._id,
     slot,
@@ -463,6 +465,7 @@ export async function removeParticipant(
   for (const slot of slots) await ctx.db.delete(slot._id);
   // Today's reads keep their reader: only the slots go.
   await ctx.db.patch(participant._id, { removedAt: Date.now() });
+  await refreshPhone(ctx, participant.phone);
   return { ok: true };
 }
 
@@ -477,6 +480,7 @@ async function setParticipantName(
   name: string,
 ): Promise<void> {
   await ctx.db.patch(participant._id, { name });
+  await refreshPhone(ctx, participant.phone);
   const owner = khatma.creatorPersonId;
   const { personId, phone } = participant;
   const byPhone = await ctx.db

@@ -19,7 +19,7 @@ test("admin: set up a rotating khatma for someone, help it, archive and delete",
   // --- The organizers page leads to setting one up -------------------------------------------
   await page.goto(`${ADMIN_URL}/organizers`);
   await expect(
-    page.getByRole("heading", { level: 1, name: t.organizers.title }),
+    page.getByRole("heading", { level: 1, name: t.people.title }),
   ).toBeVisible();
   await page.getByRole("link", { name: t.organizers.createFor }).click();
   await expect(page).toHaveURL(`${ADMIN_URL}/rota/new`);

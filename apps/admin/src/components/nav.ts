@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   ClipboardList,
   Home,
   LifeBuoy,
@@ -23,8 +24,9 @@ export const NAV: { label: string; items: NavItem[] }[] = [
   {
     label: t.shell.groups.people,
     items: [
+      { to: "/people", label: t.nav.people, icon: Users },
+      { to: "/khatmas", label: t.nav.khatmas, icon: BookOpen },
       { to: "/search", label: t.nav.search, icon: Search },
-      { to: "/organizers", label: t.nav.organizers, icon: Users },
     ],
   },
   {
@@ -38,14 +40,10 @@ export const NAV: { label: string; items: NavItem[] }[] = [
 ];
 
 /** The bar on a phone; the other pages sit behind "المزيد". */
-export const PHONE_TABS = ["/", "/help", "/search", "/organizers"];
+export const PHONE_TABS = ["/", "/help", "/people", "/khatmas"];
 
 /** Pages with no tab of their own belong to the page you reach them from. */
-const PARENT: [string, string][] = [
-  ["/people", "/search"],
-  ["/khatmas", "/search"],
-  ["/rota", "/organizers"],
-];
+const PARENT: [string, string][] = [["/rota", "/people"]];
 
 /** The nav entry a path belongs to, or undefined for an unknown path. */
 export function navPath(pathname: string): string | undefined {

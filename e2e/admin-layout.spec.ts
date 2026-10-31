@@ -6,8 +6,10 @@ import { ADMIN_URL, randomPhone, signInAsAdmin, test } from "./support";
 const PAGES = [
   "/",
   "/help",
+  "/people",
+  "/people?tab=organizers",
+  "/khatmas",
   "/search",
-  "/organizers",
   "/settings",
   "/audit",
   "/admins",
@@ -61,7 +63,7 @@ test("a very long name stays inside its row on a phone", async ({ page }) => {
     page.getByRole("heading", { level: 1, name: webT.rota.setupTitle }),
   ).toBeVisible();
 
-  await page.goto(`${ADMIN_URL}/organizers`);
+  await page.goto(`${ADMIN_URL}/people?tab=organizers`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   // The backend trims a long name, so this can't match the whole of it.
   await expect(

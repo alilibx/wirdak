@@ -9,6 +9,7 @@ import {
   sessionMutation,
   sessionQuery,
 } from "./lib/session";
+import { refreshPhone } from "./lib/directory";
 import { getSetting } from "./lib/settings";
 import { cleanDisplayName } from "./lib/text";
 import { cleanTimeZone } from "./verification";
@@ -33,6 +34,7 @@ export const updateDisplayName = sessionMutation({
     );
     if (!allowed) throw new ConvexError({ code: "rate_limited" });
     await ctx.db.patch(person._id, { displayName });
+    await refreshPhone(ctx, person.phone);
   },
 });
 

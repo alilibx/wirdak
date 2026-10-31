@@ -2,7 +2,7 @@ import { api } from "@convex/_generated/api";
 import { ConvexError } from "convex/values";
 import { useMutation, useQuery } from "convex/react";
 import { Component, useEffect, type ReactNode } from "react";
-import { Route, Routes } from "react-router";
+import { Navigate, Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
 import { t } from "./i18n/ar";
 import { clearAdminToken, useAdminToken } from "./lib/adminSession";
@@ -13,7 +13,8 @@ import { HelpInboxPage } from "./pages/HelpInboxPage";
 import { HelpRequestPage } from "./pages/HelpRequestPage";
 import { HomePage } from "./pages/HomePage";
 import { KhatmaAdminPage } from "./pages/KhatmaAdminPage";
-import { OrganizersPage } from "./pages/OrganizersPage";
+import { KhatmasPage } from "./pages/KhatmasPage";
+import { PeoplePage } from "./pages/PeoplePage";
 import { PersonAdminPage } from "./pages/PersonAdminPage";
 import { RotaCreatePage, RotaSetupPage } from "./pages/RotaCreatePage";
 import { RotaHelpPage } from "./pages/RotaHelpPage";
@@ -102,14 +103,19 @@ function SignedIn({
           <Route path="/help" element={<HelpInboxPage />} />
           <Route path="/help/:requestId" element={<HelpRequestPage />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/khatmas" element={<KhatmasPage />} />
           <Route path="/khatmas/:khatmaId" element={<KhatmaAdminPage />} />
           <Route path="/khatmas/:khatmaId/rota" element={<RotaHelpPage />} />
           <Route
             path="/khatmas/:khatmaId/rota/setup"
             element={<RotaSetupPage />}
           />
-          <Route path="/organizers" element={<OrganizersPage />} />
+          <Route
+            path="/organizers"
+            element={<Navigate to="/people?tab=organizers" replace />}
+          />
           <Route path="/rota/new" element={<RotaCreatePage />} />
+          <Route path="/people" element={<PeoplePage />} />
           <Route path="/people/:personId" element={<PersonAdminPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/audit" element={<AuditPage />} />

@@ -1,4 +1,4 @@
-import { PageHeader } from "../components/PageHeader";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -12,12 +12,26 @@ import {
 import { useId, useState } from "react";
 import { Link } from "react-router";
 import { ConfirmSheet } from "../components/ConfirmSheet";
+import { MoreButton, SortSelect } from "../components/ListTable";
 import { RotaSwitch } from "../components/RotaSwitch";
+import { StatusBadge, type PersonStatus } from "../components/StatusBadge";
 import { t } from "../i18n/ar";
 import { useAdminToken } from "../lib/adminSession";
+import { formatCount } from "../lib/formatNumber";
+import {
+  LIST_PAGE,
+  PEOPLE_SORTS,
+  useListSort,
+  type PeopleSort,
+} from "../lib/listParams";
 import { opsError, withNote } from "../lib/opsError";
 
-const PAGE = 50;
+const SORT_OPTIONS: { key: PeopleSort; label: string }[] = [
+  { key: "created", label: t.lists.created },
+  { key: "name", label: t.lists.name },
+  { key: "lastSeen", label: t.people.lastSeen },
+  { key: "joined", label: t.people.joined },
+];
 
 type Khatma = {
   khatmaId: Id<"khatmas">;
@@ -32,6 +46,9 @@ function PersonRow({
   phone,
   rotaAllowed,
   khatmas,
+  status = "active",
+  away = false,
+  totalMembers,
   onToggle,
 }: {
   personId: Id<"people">;
@@ -39,18 +56,25 @@ function PersonRow({
   phone: string;
   rotaAllowed: boolean;
   khatmas?: Khatma[];
+  status?: PersonStatus;
+  away?: boolean;
+  totalMembers?: number;
   onToggle: () => void;
 }) {
   return (
     <li className="flex flex-col gap-2 rounded-lg border bg-card px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <Link
-            to={`/people/${personId}`}
-            className="block font-medium text-primary underline"
-          >
-            {displayName}
-          </Link>
+          <span className="flex flex-wrap items-center gap-2">
+            <Link
+              to={`/people/${personId}`}
+              className="font-medium text-primary underline"
+            >
+              {displayName}
+            </Link>
+            <StatusBadge status={status} />
+            {away && <Badge variant="secondary">{t.organizers.away}</Badge>}
+          </span>
           <span
             dir="ltr"
             className="block text-start text-sm text-muted-foreground"
@@ -64,6 +88,11 @@ function PersonRow({
           onToggle={onToggle}
         />
       </div>
+      {totalMembers !== undefined && (
+        <p className="text-sm text-muted-foreground">
+          {t.organizers.totalMembers(formatCount(totalMembers))}
+        </p>
+      )}
       {khatmas && (
         <ul className="flex flex-col gap-1 text-sm">
           {khatmas.map((k) => (
@@ -109,18 +138,24 @@ function FoundRow({
 }
 
 /**
- * The people who organize khatmas, newest first, and the switch that lets each
- * create rotating khatmas (spec 10.2). Search finds anyone else by phone.
+ * The people who organize khatmas, and the switch that lets each create
+ * rotating khatmas (spec 6). The number box finds anyone else.
  */
-export function OrganizersPage() {
+export function OrganizersTab({ search }: { search: string }) {
   const adminToken = useAdminToken() ?? "";
+  const sorting = useListSort(PEOPLE_SORTS, "created");
   const convex = useConvex();
   const setRotaAllowed = useMutation(api.adminOps.setRotaAllowed);
   const phoneId = useId();
   const { results, status, loadMore } = usePaginatedQuery(
-    api.adminLookup.organizers,
-    { adminToken },
-    { initialNumItems: PAGE },
+    api.adminLists.organizers,
+    {
+      adminToken,
+      sort: sorting.sort,
+      order: sorting.order,
+      ...(search !== "" ? { search } : {}),
+    },
+    { initialNumItems: LIST_PAGE },
   );
   const [phone, setPhone] = useState("");
   const [found, setFound] = useState<
@@ -171,7 +206,6 @@ export function OrganizersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={t.organizers.title} />
       <Link
         to="/rota/new"
         className={`${buttonVariants({ variant: "outline" })} sm:self-start`}
@@ -220,31 +254,27 @@ export function OrganizersPage() {
 
       {message && <p role="status">{message}</p>}
 
+      <SortSelect options={SORT_OPTIONS} sorting={sorting} />
       {status === "Exhausted" && results.length === 0 && (
         <p className="text-muted-foreground">{t.organizers.empty}</p>
       )}
       <ul className="flex flex-col gap-2">
-        {results.map((o, i) => (
+        {results.map((o) => (
           <PersonRow
-            key={`${o.personId}-${i}`}
+            key={o.personId}
             personId={o.personId}
             displayName={o.displayName}
             phone={o.phoneMasked}
             rotaAllowed={o.rotaAllowed}
             khatmas={o.khatmas}
+            status={o.status}
+            away={o.away}
+            totalMembers={o.totalMembers}
             onToggle={() => ask(o.personId, o.displayName, o.rotaAllowed)}
           />
         ))}
       </ul>
-      {status === "CanLoadMore" && (
-        <button
-          type="button"
-          className="font-medium text-primary underline underline-offset-4"
-          onClick={() => loadMore(PAGE)}
-        >
-          {t.organizers.more}
-        </button>
-      )}
+      <MoreButton status={status} onMore={() => loadMore(LIST_PAGE)} />
 
       {asking && (
         <ConfirmSheet

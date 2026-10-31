@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { auditActionValidator, auditTargetKindValidator } from "./lib/audit";
 import { cheerConfigValidator } from "./lib/cheer";
+import { peopleTabValidator } from "./lib/directory";
 import { graceValidator } from "./lib/grace";
 import { rotaConfigValidator } from "./lib/rota";
 import { scheduleValidator } from "./lib/schedule";
@@ -19,7 +20,28 @@ export default defineSchema({
     whatsappNotes: v.optional(v.boolean()),
     // An admin allowed this person to create rotating khatmas (missing means no).
     rotaAllowed: v.optional(v.boolean()),
-  }).index("by_phone", ["phone"]),
+    // What the admin lists read; `refreshPhone` keeps them, missing means not yet.
+    /** Khatmas they organize. Shown and filtered on, never sorted by. */
+    organizesCount: v.optional(v.number()),
+    /** Pool memberships plus rota participations, by phone. Same rule. */
+    memberOfCount: v.optional(v.number()),
+    /** Their tab, from the two counts: a tab pages in any sort order on an equality. */
+    listTab: v.optional(peopleTabValidator),
+    /** `displayName`, folded. */
+    searchName: v.optional(v.string()),
+  })
+    .index("by_phone", ["phone"])
+    .index("by_lastSeenAt", ["lastSeenAt"])
+    .index("by_verifiedAt", ["verifiedAt"])
+    .index("by_searchName", ["searchName"])
+    .index("by_tab", ["listTab"])
+    .index("by_tab_lastSeenAt", ["listTab", "lastSeenAt"])
+    .index("by_tab_verifiedAt", ["listTab", "verifiedAt"])
+    .index("by_tab_searchName", ["listTab", "searchName"])
+    .searchIndex("search_searchName", {
+      searchField: "searchName",
+      filterFields: ["listTab"],
+    }),
 
   sessions: defineTable({
     personId: v.id("people"),
@@ -86,11 +108,20 @@ export default defineSchema({
     archivedAt: v.optional(nullableNumber),
     /** The organizer's own cheer settings; missing means the admin's defaults. */
     cheer: v.optional(cheerConfigValidator),
+    /** `name`, folded, for the admin list; missing means not yet. */
+    searchName: v.optional(v.string()),
   })
     .index("by_inviteCode", ["inviteCode"])
     .index("by_joinCode", ["joinCode"])
     .index("by_kind", ["kind"])
-    .searchIndex("search_name", { searchField: "name" }),
+    .index("by_creator", ["creatorPersonId"])
+    .index("by_searchName", ["searchName"])
+    .index("by_kind_searchName", ["kind", "searchName"])
+    .searchIndex("search_name", { searchField: "name" })
+    .searchIndex("search_searchName", {
+      searchField: "searchName",
+      filterFields: ["kind"],
+    }),
 
   members: defineTable({
     khatmaId: v.id("khatmas"),
@@ -313,7 +344,28 @@ export default defineSchema({
   })
     .index("by_khatma_open", ["khatmaId", "resolvedAt"])
     .index("by_khatma_phone", ["khatmaId", "phone"])
-    .index("by_phone", ["phone"]),
+    .index("by_phone", ["phone"])
+    // Every open request, for the admin list's filter.
+    .index("by_open", ["resolvedAt"]),
+
+  /**
+   * One row per phone that reads in a rota khatma and has no account, so the
+   * admin list can page by distinct phone. `refreshPhone` keeps it.
+   */
+  readerDirectory: defineTable({
+    phone: v.string(), // E.164
+    /** The name on their newest rota row. */
+    name: v.string(),
+    searchName: v.string(),
+    khatmaCount: v.number(),
+    lastReplyAt: nullableNumber,
+    /** Any of their rows has `phoneHidden`: no part of the number leaves the server. */
+    phoneHidden: v.optional(v.boolean()),
+  })
+    .index("by_phone", ["phone"])
+    .index("by_searchName", ["searchName"])
+    .index("by_lastReplyAt", ["lastReplyAt"])
+    .searchIndex("search_searchName", { searchField: "searchName" }),
 
   /**
    * The last message each rota phone sent us: its 24-hour WhatsApp window.
