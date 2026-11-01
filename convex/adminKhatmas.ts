@@ -43,7 +43,10 @@ export const update = adminMutation({
     args,
   ): Promise<
     | { ok: true }
-    | { error: "not_found" | "archived" | "rota" | "invalid_grace" }
+    | {
+        error:
+          "not_found" | "archived" | "rota" | "invalid_grace" | "invalid_name";
+      }
   > => {
     const khatma = await livePool(ctx, args.khatmaId);
     if (typeof khatma === "string") return { error: khatma };
@@ -52,6 +55,8 @@ export const update = adminMutation({
     }
     const name =
       args.name === undefined ? khatma.name : cleanKhatmaName(args.name);
+    // Blank means no name; anything else that cleans away to nothing is a mistake.
+    if (name === null && args.name?.trim()) return { error: "invalid_name" };
     const schedule = args.schedule ?? khatma.schedule;
     const grace = args.grace ?? khatma.grace;
     await ctx.db.patch(khatma._id, { ...nameFields(name), schedule, grace });

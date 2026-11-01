@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id, TableNames } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
-import { catchUpHold, isHeld } from "./grace";
+import { alertOrganizer, isHeld, scheduleGrace } from "./grace";
 import { refreshPerson, refreshPhone } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
 import { lastRotaDay } from "./lib/rotaPlace";
@@ -69,10 +69,11 @@ export async function archiveKhatma(
 
 /**
  * Reopens an archived pool khatma: the one exception to "an archived khatma can
- * only be read, and deleted" (admin spec 6). Jobs that came due while it was
- * archived did nothing and won't run again, so its holds catch up here, and a
- * round that reached 30 ajza' gets its completion back. Notes cleared by the
- * archive stay cleared, apart from the alert for a juz' still open for help.
+ * only be read, and deleted" (admin spec 6). Nobody could finish or extend a
+ * juz' while it was archived, so a hold's grace paused too: it gets the time it
+ * had left, on new jobs. A round that reached 30 ajza' gets its completion back.
+ * Notes the archive cleared stay cleared, apart from the alert for a juz' still
+ * open for help.
  */
 export async function restoreKhatma(
   ctx: MutationCtx,
@@ -81,9 +82,16 @@ export async function restoreKhatma(
   await ctx.db.patch(khatma._id, { archivedAt: null });
   const roundId = khatma.currentRoundId;
   if (!roundId) return;
-  const now = Date.now();
+  const paused = Date.now() - (khatma.archivedAt ?? Date.now());
   for (const hold of (await roundAssignments(ctx, roundId)).filter(isHeld)) {
-    await catchUpHold(ctx, khatma, hold, now);
+    if (hold.openedForHelpAt !== null) {
+      await alertOrganizer(ctx, khatma, hold.juz, hold.personId);
+      continue;
+    }
+    const noticeAt = hold.noticeAt + paused;
+    const graceEndsAt = hold.graceEndsAt + paused;
+    await ctx.db.patch(hold._id, { noticeAt, graceEndsAt });
+    await scheduleGrace(ctx, hold._id, noticeAt, graceEndsAt);
   }
   await ctx.scheduler.runAfter(0, internal.rounds.completeIfReady, { roundId });
 }

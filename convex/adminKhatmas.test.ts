@@ -231,6 +231,37 @@ test("update refuses a bad grace and changes nothing", async () => {
   expect(await audit(t)).toEqual([]);
 });
 
+test("update refuses a name with no letters and keeps the old one", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  const { khatmaId } = await pool(t);
+  expect(
+    await t.mutation(api.adminKhatmas.update, {
+      ...auth,
+      khatmaId,
+      name: " ... ",
+    }),
+  ).toEqual({ error: "invalid_name" });
+  expect((await t.run((ctx) => ctx.db.get(khatmaId)))!.name).toBe(
+    "ختمة العائلة",
+  );
+  expect(await audit(t)).toEqual([]);
+});
+
+test("update clears the name when it's blank or null", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  const { khatmaId } = await pool(t);
+  expect(
+    await t.mutation(api.adminKhatmas.update, {
+      ...auth,
+      khatmaId,
+      name: null,
+    }),
+  ).toEqual({ ok: true });
+  expect((await t.run((ctx) => ctx.db.get(khatmaId)))!.name).toBeNull();
+});
+
 test("update leaves an archived khatma read-only and a rota khatma to its own tools", async () => {
   const t = convexTest(schema, modules);
   await admin(t);
@@ -339,7 +370,7 @@ test("archive and remove work on a rota khatma too", async () => {
   ).toEqual({ ok: true });
 });
 
-test("restore reopens a pool khatma and leaves a hold's future jobs to run", async () => {
+test("restore reopens a pool khatma", async () => {
   const t = convexTest(schema, modules);
   await admin(t);
   const { khatmaId } = await pool(t, {}, { archivedAt: NOW - HOUR });
@@ -351,41 +382,76 @@ test("restore reopens a pool khatma and leaves a hold's future jobs to run", asy
     }),
   ).toEqual({ ok: true });
   expect(isArchived((await t.run((ctx) => ctx.db.get(khatmaId)))!)).toBe(false);
-  expect(await pending(t, "grace")).toEqual([]);
   expect(await audit(t)).toMatchObject([
     { action: "khatma.restore", targetId: khatmaId, note: "بالخطأ" },
   ]);
 });
 
-test("restore opens a juz' whose grace ended during the archive", async () => {
+test("restore gives a hold the time it had left when the archive began", async () => {
   const t = convexTest(schema, modules);
   await admin(t);
+  // Archived with 1 hour to the notice and 2 to the end; both passed since.
   const { khatmaId, assignmentId } = await pool(
     t,
     { noticeAt: NOW - 2 * HOUR, graceEndsAt: NOW - HOUR },
     { archivedAt: NOW - 3 * HOUR },
   );
   await t.mutation(api.adminKhatmas.restore, { ...auth, khatmaId });
-  await t.finishAllScheduledFunctions(() => vi.runAllTimers());
   const a = (await t.run((ctx) => ctx.db.get(assignmentId)))!;
-  expect(a.openedForHelpAt).not.toBeNull();
+  expect(a.openedForHelpAt).toBeNull();
+  expect(a.noticeAt).toBeGreaterThanOrEqual(NOW + HOUR);
+  expect(a.graceEndsAt).toBeGreaterThanOrEqual(NOW + 2 * HOUR);
+  expect(a.graceEndsAt).toBeLessThan(NOW + 2 * HOUR + 60_000);
+  expect(await pending(t, "noticeDue")).toHaveLength(1);
+  expect(await pending(t, "endDue")).toHaveLength(1);
 });
 
-test("restore sends an almost-up notice that came due during the archive", async () => {
+test("a restored hold opens for help only when the time it had left runs out", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  const oldEnd = NOW + HOUR;
+  const { khatmaId, assignmentId } = await pool(
+    t,
+    { noticeAt: NOW, graceEndsAt: oldEnd },
+    { archivedAt: NOW - HOUR },
+  );
+  await t.mutation(api.adminKhatmas.restore, { ...auth, khatmaId });
+  const moved = (await t.run((ctx) => ctx.db.get(assignmentId)))!;
+
+  // The job queued before the archive is stale now.
+  await t.mutation(internal.grace.endDue, { assignmentId, endsAt: oldEnd });
+  expect(
+    (await t.run((ctx) => ctx.db.get(assignmentId)))!.openedForHelpAt,
+  ).toBeNull();
+
+  vi.setSystemTime(moved.graceEndsAt);
+  await t.mutation(internal.grace.endDue, {
+    assignmentId,
+    endsAt: moved.graceEndsAt,
+  });
+  expect(
+    (await t.run((ctx) => ctx.db.get(assignmentId)))!.openedForHelpAt,
+  ).not.toBeNull();
+});
+
+test("a notice job queued before the archive waits for the hold's new time", async () => {
   const t = convexTest(schema, modules);
   await admin(t);
   const { khatmaId, assignmentId } = await pool(
     t,
-    { noticeAt: NOW - HOUR, graceEndsAt: NOW + HOUR },
-    { archivedAt: NOW - 2 * HOUR },
+    { noticeAt: NOW + HOUR, graceEndsAt: NOW + 2 * HOUR },
+    { archivedAt: NOW - HOUR },
   );
   await t.mutation(api.adminKhatmas.restore, { ...auth, khatmaId });
-  expect(await pending(t, "noticeDue")).toHaveLength(1);
-  await t.finishInProgressScheduledFunctions();
-  vi.advanceTimersByTime(1);
-  await t.finishInProgressScheduledFunctions();
-  const a = (await t.run((ctx) => ctx.db.get(assignmentId)))!;
-  expect(a.noticeSentAt).not.toBeNull();
+  await t.mutation(internal.grace.noticeDue, { assignmentId });
+  const before = (await t.run((ctx) => ctx.db.get(assignmentId)))!;
+  expect(before.noticeSentAt).toBeNull();
+
+  vi.setSystemTime(before.noticeAt);
+  await t.mutation(internal.grace.noticeDue, { assignmentId });
+  expect(
+    (await t.run((ctx) => ctx.db.get(assignmentId)))!.noticeSentAt,
+  ).not.toBeNull();
 });
 
 test("restore tells the organizer again about a juz' already open for help", async () => {

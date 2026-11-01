@@ -7,7 +7,7 @@ import { SwitchLine } from "./SwitchLine";
 
 type Fields = { displayName: string; whatsappNotes: boolean };
 
-/** A person's name and WhatsApp notes. Their number moves only through a code they send. */
+/** A person's name and WhatsApp notes. */
 export function PersonEditSheet({
   person,
   onSave,
