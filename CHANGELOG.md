@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/alilibx/wirdak/compare/v0.7.0...v0.8.0) (2026-11-01)
+
+
+### Features
+
+* **admin:** let admins edit, archive, restore, and delete khatmas ([#54](https://github.com/alilibx/wirdak/issues/54)) ([85bcd0d](https://github.com/alilibx/wirdak/commit/85bcd0d29bec5cccea60ef7ece23cd5e290caa89))
+* **admin:** let admins turn off the member sign-in alert ([#55](https://github.com/alilibx/wirdak/issues/55)) ([97224dd](https://github.com/alilibx/wirdak/commit/97224dd59f01de31da73e9b174d415cc42f438a5))
+
 ## [0.7.0](https://github.com/alilibx/wirdak/compare/v0.6.0...v0.7.0) (2026-11-01)
 
 
