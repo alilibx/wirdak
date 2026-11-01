@@ -60,16 +60,17 @@ test("admin: set up a rotating khatma for someone, help it, archive and delete",
   await expect(page.getByRole("button", { name: t.rota.copy })).toBeVisible();
 
   // --- The lists find it, spelled another way, and filters narrow them -------------------------
+  // Search matches any word, and other specs' khatmas are «ختمة» too, so it looks for this one's.
   const khatmaUrl = page.url();
   const search = (path: string, q: string) =>
     page.goto(`${ADMIN_URL}${path}${encodeURIComponent(q)}`);
-  await search("/khatmas?kind=rota&q=", "ختمه نيابه");
+  await search("/khatmas?kind=rota&q=", "نيابه");
   await expect(
     page.getByRole("link", { name: KHATMA_NAME }).first(),
   ).toBeVisible();
-  await search("/khatmas?kind=pool&q=", "ختمه نيابه");
+  await search("/khatmas?kind=pool&q=", "نيابه");
   await expect(page.getByText(t.lists.empty)).toBeVisible();
-  await search("/khatmas?status=active&q=", "ختمه نيابه");
+  await search("/khatmas?status=active&q=", "نيابه");
   await expect(
     page.getByRole("link", { name: KHATMA_NAME }).first(),
   ).toBeVisible();
