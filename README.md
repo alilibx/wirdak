@@ -183,7 +183,8 @@ shipped in each version.
 After WhatsApp verification the backend issues a random session token, and the website keeps it in `localStorage` (key
 `wirdak.session`), falling back to memory when storage is blocked. An HttpOnly cookie is impractical because the website
 (Vercel) and the backend (Convex) are on different domains. Only the token's SHA-256 hash is stored on the server, and
-every device can be signed out from the settings page or from the WhatsApp sign-in alert.
+every device can be signed out from the settings page or, when the admin setting leaves it on, from the WhatsApp
+sign-in alert.
 
 ## Contributing, conduct and security
 

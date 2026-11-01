@@ -50,6 +50,8 @@ export const SETTING_DEFAULTS = {
   cheerShowName: false,
   /** cheers say which juz' */
   cheerShowJuz: false,
+  /** the WhatsApp alert to a member on each sign-in; the admin panel's alert stays on */
+  signInAlertOn: true,
   organizerInactiveMs: 30 * DAY,
   successorActiveMs: 7 * DAY,
   /** how long a cleared note is kept after it was cleared */

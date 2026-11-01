@@ -121,7 +121,12 @@ export const SETTING_LAYOUT: Record<
   sessions: [
     {
       section: "signInCodes",
-      keys: ["verificationTtlMs", "pinMaxAttempts", "handoffTtlMs"],
+      keys: [
+        "verificationTtlMs",
+        "pinMaxAttempts",
+        "signInAlertOn",
+        "handoffTtlMs",
+      ],
     },
     {
       section: "organizer",

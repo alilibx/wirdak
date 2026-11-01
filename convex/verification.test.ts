@@ -585,6 +585,41 @@ test("existing number needs the PIN from the WhatsApp reply", async () => {
   expect(await confirmPin(t, v, pin)).toEqual({ error: "expired" });
 });
 
+async function switchSignInAlertOff(t: T) {
+  await t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "signInAlertOn",
+      value: false,
+      updatedAt: NOW,
+    }),
+  );
+}
+
+const alertsSent = () => sent.filter((m) => m.body.includes("لستُ أنا"));
+
+test("switched off in the admin settings, a new account gets no alert", async () => {
+  const t = convexTest(schema, modules);
+  await switchSignInAlertOff(t);
+  const v = await start(t);
+  await send(t, v.message);
+
+  expect(await claim(t, v)).toHaveProperty("sessionToken");
+
+  expect(alertsSent()).toEqual([]);
+});
+
+test("switched off in the admin settings, a PIN sign-in gets no alert", async () => {
+  const t = convexTest(schema, modules);
+  await switchSignInAlertOff(t);
+  await addPerson(t);
+  const v = await start(t);
+  await send(t, v.message);
+
+  expect(await confirmPin(t, v, pinsSent()[0]!)).toHaveProperty("sessionToken");
+
+  expect(alertsSent()).toEqual([]);
+});
+
 test("PIN accepts Arabic-Indic digits and surrounding spaces", async () => {
   const t = convexTest(schema, modules);
   await addPerson(t);
