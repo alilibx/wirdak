@@ -19,7 +19,7 @@ import { deleteSession } from "./sessions";
 const MAX_NOTE = 500;
 const INVITE_CODE_ATTEMPTS = 3;
 
-function cleanNote(note: string | undefined): string | undefined {
+export function cleanNote(note: string | undefined): string | undefined {
   const trimmed = note?.trim().slice(0, MAX_NOTE);
   return trimmed ? trimmed : undefined;
 }

@@ -7,14 +7,22 @@ import { formatIsoDate } from "@web/features/rota/format";
 import { formatDate } from "@web/lib/format";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useId, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { ConfirmSheet } from "../components/ConfirmSheet";
 import { DetailList } from "../components/DetailList";
+import { KhatmaEditSheet } from "../components/KhatmaEditSheet";
 import { t } from "../i18n/ar";
 import { useAdminToken } from "../lib/adminSession";
 import { formatCount } from "../lib/formatNumber";
 import { formatReadingDays } from "../lib/formatReadingDays";
 import { opsError, withNote } from "../lib/opsError";
+
+type Sheet = "reset" | "handOver" | "edit" | "archive" | "restore" | "delete";
+
+type MemberOp = {
+  op: "removeMember" | "unblockMember";
+  memberId: Id<"members">;
+};
 
 /** A khatma for an admin who's helping it: counts, never who reads what (spec 8). */
 export function KhatmaAdminPage() {
@@ -23,12 +31,22 @@ export function KhatmaAdminPage() {
   const k = useQuery(api.adminLookup.khatma, { adminToken, khatmaId });
   const reset = useAction(api.adminOps.resetInvite);
   const handOver = useMutation(api.adminOps.handOver);
+  const update = useMutation(api.adminKhatmas.update);
+  const archive = useMutation(api.adminKhatmas.archive);
+  const restore = useMutation(api.adminKhatmas.restore);
+  const remove = useMutation(api.adminKhatmas.remove);
+  const removeMember = useMutation(api.adminKhatmas.removeMember);
+  const unblockMember = useMutation(api.adminKhatmas.unblockMember);
+  const navigate = useNavigate();
   const pickId = useId();
-  const [sheet, setSheet] = useState<"reset" | "handOver" | null>(null);
+  const [sheet, setSheet] = useState<Sheet | null>(null);
+  const [memberOp, setMemberOp] = useState<MemberOp | null>(null);
   const [pick, setPick] = useState<string>("");
   const [message, setMessage] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  if (k === undefined) return null;
+  // Deleted from here: the query is about to turn null, and that isn't "not found".
+  if (deleting || k === undefined) return null;
   if (k === null) return <p>{t.lookup.notFound}</p>;
 
   const candidates = k.members.filter(
@@ -48,10 +66,28 @@ export function KhatmaAdminPage() {
 
   async function run(call: () => Promise<object>) {
     setSheet(null);
+    setMemberOp(null);
     try {
       const res = await call();
       setMessage("error" in res ? opsError(String(res.error)) : t.ops.done);
     } catch {
+      setMessage(opsError("generic"));
+    }
+  }
+
+  async function deleteKhatma(note: string | undefined) {
+    setSheet(null);
+    setDeleting(true);
+    try {
+      const res = await remove(withNote({ adminToken, khatmaId }, note));
+      if ("error" in res) {
+        setDeleting(false);
+        setMessage(opsError(res.error));
+      } else {
+        void navigate("/khatmas");
+      }
+    } catch {
+      setDeleting(false);
       setMessage(opsError("generic"));
     }
   }
@@ -179,7 +215,10 @@ export function KhatmaAdminPage() {
         <h2 className="mb-2 font-semibold">{t.lookup.membersTitle}</h2>
         <ul className="flex flex-col gap-1">
           {k.members.map((m) => (
-            <li key={m.memberId} className="flex justify-between text-sm">
+            <li
+              key={m.memberId}
+              className="flex flex-wrap items-center justify-between gap-x-3 text-sm"
+            >
               <Link
                 to={`/people/${m.personId}`}
                 className="text-primary underline"
@@ -189,12 +228,42 @@ export function KhatmaAdminPage() {
               <span className="text-muted-foreground">
                 {t.lookup.statuses[m.status]} · {formatDate(m.joinedAt)}
               </span>
+              {!k.rota &&
+                !k.archived &&
+                m.personId !== k.organizer?.personId &&
+                m.status === "active" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setMemberOp({ op: "removeMember", memberId: m.memberId })
+                    }
+                  >
+                    {t.ops.removeMemberOf(m.displayName)}
+                  </Button>
+                )}
+              {!k.rota && !k.archived && m.status === "blocked" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setMemberOp({ op: "unblockMember", memberId: m.memberId })
+                  }
+                >
+                  {t.ops.unblockMemberOf(m.displayName)}
+                </Button>
+              )}
             </li>
           ))}
         </ul>
       </section>
 
       {message && <p role="status">{message}</p>}
+      {!k.rota && !k.archived && (
+        <Button variant="outline" onClick={() => setSheet("edit")}>
+          {t.ops.editKhatma}
+        </Button>
+      )}
       <Button variant="outline" onClick={() => setSheet("reset")}>
         {t.ops.resetInvite}
       </Button>
@@ -203,7 +272,77 @@ export function KhatmaAdminPage() {
           {t.ops.handOver}
         </Button>
       )}
+      {!k.archived && (
+        <Button variant="outline" onClick={() => setSheet("archive")}>
+          {t.ops.archive}
+        </Button>
+      )}
+      {k.archived && !k.rota && (
+        <Button variant="outline" onClick={() => setSheet("restore")}>
+          {t.ops.restore}
+        </Button>
+      )}
+      {k.archived && (
+        <Button variant="destructive" onClick={() => setSheet("delete")}>
+          {t.ops.deleteKhatma}
+        </Button>
+      )}
 
+      {sheet === "edit" && (
+        <KhatmaEditSheet
+          khatma={k}
+          onSave={({ name, schedule, grace }, note) =>
+            void run(() =>
+              update(
+                withNote({ adminToken, khatmaId, name, schedule, grace }, note),
+              ),
+            )
+          }
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {(sheet === "archive" || sheet === "restore") && (
+        <ConfirmSheet
+          title={t.ops[sheet]}
+          body={t.ops[`${sheet}Body`]}
+          confirmLabel={t.ops[sheet]}
+          onConfirm={(note) =>
+            void run(() =>
+              (sheet === "archive" ? archive : restore)(
+                withNote({ adminToken, khatmaId }, note),
+              ),
+            )
+          }
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet === "delete" && (
+        <ConfirmSheet
+          title={t.ops.deleteKhatma}
+          body={t.ops.deleteKhatmaBody}
+          confirmLabel={t.ops.deleteKhatma}
+          onConfirm={(note) => void deleteKhatma(note)}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {memberOp && (
+        <ConfirmSheet
+          title={t.ops[memberOp.op]}
+          body={t.ops[`${memberOp.op}Body`]}
+          confirmLabel={t.ops[memberOp.op]}
+          onConfirm={(note) =>
+            void run(() =>
+              (memberOp.op === "removeMember" ? removeMember : unblockMember)(
+                withNote(
+                  { adminToken, khatmaId, memberId: memberOp.memberId },
+                  note,
+                ),
+              ),
+            )
+          }
+          onClose={() => setMemberOp(null)}
+        />
+      )}
       {sheet === "reset" && (
         <ConfirmSheet
           title={t.ops.resetInvite}

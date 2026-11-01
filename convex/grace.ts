@@ -133,7 +133,9 @@ export const noticeDue = internalMutation({
       !isHeld(a) ||
       a.extended ||
       a.openedForHelpAt !== null ||
-      a.noticeSentAt !== null
+      a.noticeSentAt !== null ||
+      // A job from before an archive: `restoreKhatma` queued one for the new time.
+      a.noticeAt > Date.now()
     ) {
       return;
     }

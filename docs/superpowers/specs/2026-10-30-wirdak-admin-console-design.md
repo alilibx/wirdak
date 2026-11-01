@@ -114,7 +114,7 @@ The Organizers tab shows their khatmas, total members, the rotating khatma switc
 | Update | Name, time zone, WhatsApp notes, rotating khatma permission, an internal note |
 | Move to a new number | Section 6.2 |
 | Delete | Section 6.3 |
-| Bulk | End sessions, block, and CSV export. Export is owner-only, needs a reason, and is audited. |
+| Bulk | End sessions, block, and CSV export. Export needs a reason and is audited. |
 
 Admin notes live in a new `adminNotes` table, keyed by person, so they never travel to member queries **[builder's call]**.
 
@@ -126,7 +126,7 @@ A reader's page is read-only apart from deletion: their khatmas, slots, reading,
 
 Pool khatmas gain edit name, edit schedule and grace, archive, restore, and delete. `archive` and `remove` already exist as `sessionMutation`s in `convex/khatmaLifecycle.ts`, so move their logic to shared functions and add `adminMutation` versions. Admin creation of a pool khatma takes an existing person as organizer. Reset invite and hand over stay as they are.
 
-**Restore is pool only.** Archiving a pool khatma clears its notes and sets `archivedAt`, so restoring clears `archivedAt`, a deliberate exception to "An archived khatma can only be read, and deleted". The builder must test holds whose grace ended during the archive. Archiving a rotating khatma closes its day, skips its messages, and declines its join requests, so that stays final, and the prototype's restore on those is dropped.
+**Restore is pool only.** Archiving a pool khatma clears its notes and sets `archivedAt`, so restoring clears `archivedAt`, a deliberate exception to "An archived khatma can only be read, and deleted". A hold's grace pauses during the archive, because nobody can finish or extend a juz' then: on restore it gets the time it had left when the archive began. Archiving a rotating khatma closes its day, skips its messages, and declines its join requests, so that stays final, and the prototype's restore on those is dropped.
 
 The list shows kind («بالحجز» or «بالتناوب»), status, organizer, members, today's progress for rotating khatmas, and completed count, none of them sortable except name and created date, with a filter for pending join requests.
 
@@ -145,7 +145,7 @@ The same flow works for a reader with no account.
 
 No delete exists today, and the privacy policy promises one: "When we delete your account, we delete your name, number, devices, and notification subscriptions."
 
-Add `adminPeople.deleteAccount`, owner-only, with a typed confirmation and a reason. The same function handles a reader with no account.
+Add `adminPeople.deleteAccount`, open to any admin (see the decision in section 9), with a typed confirmation and a reason. The same function handles a reader with no account.
 
 - **Blocked until resolved:** it's refused while the person organizes an active rotating khatma. Rotating khatmas have no successor ("a rota khatma keeps its organizer"), and archiving one stops messages to every reader, so an admin must archive or delete it as a deliberate step. It lists those khatmas. A rotating handover is a later feature **[builder's call]**.
 - **Their pool khatmas:** hand over with the existing successor rules. With no successor, archive.
@@ -203,7 +203,9 @@ Add `role` to `admins`: `owner`, `support`, or `viewer`. Existing admins become 
 | --- | --- | --- | --- |
 | Reply to help, full phone numbers, see reading | yes | yes | no |
 | Edit people, block, edit khatmas, rotating khatma tools | yes | yes | no |
-| Delete an account or khatma, export, change settings, manage team | yes | no | no |
+| Change settings, manage team | yes | no | no |
+
+**Decision, 2026-11-01:** Ali decided that an admin can edit, delete, and do anything on all records. Delete and export aren't owner-only, so `adminKhatmas.remove` and the planned `adminPeople.deleteAccount` take any admin. ARQ-297 must not narrow this without asking him. Every change stays in the audit log.
 | Use the assistant | yes | yes | yes, read only |
 | Connect Claude | yes | yes | no |
 

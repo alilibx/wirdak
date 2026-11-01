@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useId, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ConfirmSheet } from "../components/ConfirmSheet";
+import { PersonEditSheet } from "../components/PersonEditSheet";
 import { RotaSwitch } from "../components/RotaSwitch";
 import { t } from "../i18n/ar";
 import { useAdminToken } from "../lib/adminSession";
@@ -23,8 +24,10 @@ export function PersonAdminPage() {
   const block = useMutation(api.adminOps.blockPhone);
   const unblock = useMutation(api.adminOps.unblockPhone);
   const setRotaAllowed = useMutation(api.adminOps.setRotaAllowed);
+  const update = useMutation(api.adminPeople.update);
   const rotaLabelId = useId();
   const [op, setOp] = useState<Op | null>(null);
+  const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   if (p === undefined) return null;
@@ -50,6 +53,21 @@ export function PersonAdminPage() {
                   ),
                 );
       setMessage("error" in res ? opsError(String(res.error)) : t.ops.done);
+    } catch {
+      setMessage(opsError("generic"));
+    }
+  }
+
+  async function save(
+    fields: { displayName: string; whatsappNotes: boolean },
+    note: string | undefined,
+  ) {
+    setEditing(false);
+    try {
+      const res = await update(
+        withNote({ adminToken, personId, ...fields }, note),
+      );
+      setMessage("error" in res ? opsError(res.error) : t.ops.done);
     } catch {
       setMessage(opsError("generic"));
     }
@@ -134,6 +152,9 @@ export function PersonAdminPage() {
       </section>
 
       {message && <p role="status">{message}</p>}
+      <Button variant="outline" onClick={() => setEditing(true)}>
+        {t.ops.editPerson}
+      </Button>
       <Button variant="outline" onClick={() => setOp("signOutAll")}>
         {t.ops.signOutAll}
       </Button>
@@ -144,6 +165,13 @@ export function PersonAdminPage() {
         {p.blocked ? t.ops.unblock : t.ops.block}
       </Button>
 
+      {editing && (
+        <PersonEditSheet
+          person={p}
+          onSave={(fields, note) => void save(fields, note)}
+          onClose={() => setEditing(false)}
+        />
+      )}
       {op && (
         <ConfirmSheet
           title={t.ops[op]}
