@@ -9,19 +9,25 @@ import {
 import { nameFields } from "../directory";
 import { isArchived } from "../khatma";
 import {
-  addDays,
   isDate,
   isReadingDate,
   isValidReadingDays,
+  MAX_LATE_TAP_MS,
   messageTimesError,
   nextReadingDates,
   type ReadingDays,
   type RotaMessages,
 } from "../rota";
-import { earliestOpenDate, lastRotaDay, type RotaConfig } from "../rotaPlace";
-import { quietHours } from "../settings";
+import {
+  dayEnd,
+  earliestFirstDate,
+  earliestOpenDate,
+  lastRotaDay,
+  type RotaConfig,
+} from "../rotaPlace";
+import { getSetting, quietHours } from "../settings";
 import { cleanKhatmaName } from "../text";
-import { instantAt, localDate, safeTimeZone } from "../wakingTime";
+import { localDate, safeTimeZone } from "../wakingTime";
 
 /** How many reading dates the pause-date picker offers. */
 const UPCOMING_DATES = 8;
@@ -39,6 +45,8 @@ export type SettingsView = {
   /** The next reading dates that can still be paused or un-paused. */
   upcoming: string[];
   quiet: { startHour: number; endHour: number };
+  /** The khatma's own late-tap window, or null for the admin's default. */
+  lateTap: { override: number | null; defaultMs: number };
   cheer: CheerSetting;
   /** An archived khatma can no longer be changed. */
   archived: boolean;
@@ -63,7 +71,8 @@ export async function settings(
   rota: RotaConfig,
 ): Promise<SettingsView> {
   const today = localDate(Date.now(), rota.timeZone);
-  const from = earliestOpenDate(
+  const from = await earliestOpenDate(
+    ctx,
     rota,
     await lastRotaDay(ctx, khatma._id),
     today,
@@ -87,6 +96,10 @@ export async function settings(
       new Set(),
     ).filter((date) => rota.endDate === null || date <= rota.endDate),
     quiet: { startHour: quiet.startHour, endHour: quiet.endHour },
+    lateTap: {
+      override: rota.lateTapMs ?? null,
+      defaultMs: await getSetting(ctx, "rotaLateTapMs"),
+    },
     cheer: await cheerSetting(ctx, khatma),
     archived: isArchived(khatma),
   };
@@ -103,6 +116,8 @@ export async function update(
     endDate?: string | null;
     timeZone?: string;
     messages?: RotaMessages;
+    /** The khatma's own late-tap window; null goes back to the admin's default. */
+    lateTapMs?: number | null;
     /** The khatma's own cheer settings; null goes back to the admin's defaults. */
     cheer?: CheerConfig | null;
   },
@@ -161,7 +176,12 @@ export async function update(
     }
     // From the first open date, a reading date must remain on or before the
     // end date. (None is left only when the end date is the last started day.)
-    const from = earliestOpenDate({ ...rota, firstDate }, last, today);
+    const from = await earliestOpenDate(
+      ctx,
+      { ...rota, firstDate },
+      last,
+      today,
+    );
     if (from <= endDate) {
       const [next] = nextReadingDates(days, firstDate, from, 1, new Set());
       if (next === undefined || next > endDate) {
@@ -180,6 +200,12 @@ export async function update(
   ) {
     return { error: "invalid_dates" };
   }
+  if (
+    firstDate !== rota.firstDate &&
+    firstDate < (await earliestFirstDate(ctx, today))
+  ) {
+    return { error: "invalid_dates" };
+  }
 
   if (args.messages !== undefined) {
     const quiet = await quietHours(ctx);
@@ -187,31 +213,34 @@ export async function update(
       return { error: "invalid_times" };
     }
   }
+  if (
+    args.lateTapMs != null &&
+    !(args.lateTapMs >= 0 && args.lateTapMs <= MAX_LATE_TAP_MS)
+  ) {
+    return { error: "invalid_times" };
+  }
 
+  const { lateTapMs: keptLateTap, ...kept } = rota;
+  const lateTapMs = args.lateTapMs === undefined ? keptLateTap : args.lateTapMs;
   await ctx.db.patch(khatma._id, {
     ...(name !== undefined ? nameFields(name) : {}),
     ...(args.cheer !== undefined ? { cheer: args.cheer ?? undefined } : {}),
     rota: {
-      ...rota,
+      ...kept,
       days,
       firstDate,
       endDate,
       timeZone,
       messages: args.messages ?? rota.messages,
+      ...(lateTapMs != null ? { lateTapMs } : {}),
     },
   });
 
-  // The open day closes at the next day's start time, which may just have moved.
-  if (args.messages !== undefined || args.timeZone !== undefined) {
+  // The open day closes at midnight in the time zone, which may just have moved.
+  if (args.timeZone !== undefined) {
     const last = await lastRotaDay(ctx, khatma._id);
     if (last && last.closedAt === null) {
-      await ctx.db.patch(last._id, {
-        closesAt: instantAt(
-          addDays(last.date, 1),
-          (args.messages ?? rota.messages).dayAt,
-          timeZone,
-        ),
-      });
+      await ctx.db.patch(last._id, { closesAt: dayEnd(last.date, timeZone) });
     }
   }
   return { ok: true };

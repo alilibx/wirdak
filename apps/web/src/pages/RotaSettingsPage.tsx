@@ -22,6 +22,7 @@ import { DateLine } from "../features/rota/DateLine";
 import { firstReadingDay } from "../features/rota/dates";
 import { formatIsoDate, formatTime } from "../features/rota/format";
 import { ReadingDaysField } from "../features/rota/ReadingDaysField";
+import { LateTapField } from "../features/rota/LateTapField";
 import { TimeField } from "../features/rota/TimeField";
 import { useRotaCall } from "../features/rota/useRotaCall";
 import { t } from "../i18n/ar";
@@ -132,6 +133,9 @@ export function RotaSettingsContent({
   // The times and switches are edited here and saved together, so a move that
   // only makes sense with another one (a later reminder and summary) can be made.
   const [messages, setMessages] = useState<RotaMessages>(settings.messages);
+  const [lateTapMs, setLateTapMs] = useState(
+    settings.lateTap.override ?? settings.lateTap.defaultMs,
+  );
   const [addingDate, setAddingDate] = useState(false);
   const { busy, error, run: call } = useRotaCall(rotaErrors);
   // Which section the last call was for, and the word of thanks once it went through.
@@ -164,6 +168,8 @@ export function RotaSettingsContent({
   const changed = Object.keys(changes).length > 0;
   const messagesChanged =
     JSON.stringify(messages) !== JSON.stringify(settings.messages);
+  const lateTapChanged =
+    lateTapMs !== (settings.lateTap.override ?? settings.lateTap.defaultMs);
   // An end date behind today would end the khatma for good.
   const today = localDate(Date.now(), settings.timeZone);
   const earliestEnd = start > today ? start : today;
@@ -193,7 +199,11 @@ export function RotaSettingsContent({
       async () =>
         messageTimesError(messages, quiet.startHour, quiet.endHour)
           ? { error: "invalid_times" }
-          : update({ ...args, messages }),
+          : update({
+              ...args,
+              messages,
+              ...(lateTapChanged ? { lateTapMs } : {}),
+            }),
       t.organizer.saved,
     );
 
@@ -280,6 +290,7 @@ export function RotaSettingsContent({
               value={messages.dayAt}
               min={earliest}
               max={latest}
+              dayStart
               disabled={busy}
               onChange={(at) => setMessages({ ...messages, dayAt: at })}
             />
@@ -315,9 +326,17 @@ export function RotaSettingsContent({
               />
             </div>
           ))}
+          <div className="mt-3 rounded-ui border-2 border-line bg-card px-4 py-3">
+            <LateTapField
+              value={lateTapMs}
+              disabled={busy}
+              onChange={setLateTapMs}
+            />
+            <p className="mt-2 text-base text-ink-soft">{t.rota.lateTapHint}</p>
+          </div>
           <div className="mt-4">
             <Button
-              disabled={busy || !messagesChanged}
+              disabled={busy || (!messagesChanged && !lateTapChanged)}
               onClick={() => void saveMessages()}
             >
               {t.rota.saveTimes}

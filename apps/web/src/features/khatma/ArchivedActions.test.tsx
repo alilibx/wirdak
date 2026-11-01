@@ -31,6 +31,7 @@ vi.mock("convex/react", async () => {
     useMutation: (ref: never) =>
       getFunctionName(ref) === "khatmaLifecycle:archive" ? m.archive : m.remove,
     useAction: () => m.startAgain,
+    useQuery: () => undefined,
   };
 });
 
@@ -202,7 +203,7 @@ describe("ArchivedSection", () => {
       }),
     );
     const input = within(again).getByLabelText(t.rota.startDateInput);
-    expect(input).toHaveAttribute("min", "2026-10-29");
+    expect(input).toHaveAttribute("min", "2026-10-30");
     fireEvent.change(input, { target: { value: "2026-11-05" } });
     await user.click(
       within(again).getByRole("button", { name: t.archive.restartConfirm }),

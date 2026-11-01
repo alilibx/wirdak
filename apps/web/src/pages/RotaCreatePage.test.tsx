@@ -26,6 +26,7 @@ const m = vi.hoisted(() => ({
   joinLink: null as string | null,
   me: undefined as unknown,
   people: undefined as unknown,
+  publicSettings: undefined as unknown,
   listeners: new Set<() => void>(),
 }));
 
@@ -47,6 +48,8 @@ vi.mock("convex/react", async () => {
         },
         () => m.people,
       );
+      if (getFunctionName(ref) === "publicSettings:get")
+        return m.publicSettings;
       return getFunctionName(ref) === "people:me" ? m.me : people;
     },
     useAction: () => m.create,
@@ -155,6 +158,7 @@ beforeEach(() => {
   m.ensureJoinLink.mockResolvedValue({ ok: true });
   m.joinLink = JOIN_LINK;
   m.me = { rotaAllowed: true };
+  m.publicSettings = undefined;
   setRoster([{ id: "p1", name: "علي", isMe: true, juz: [1] }]);
 });
 afterEach(() => {
@@ -253,7 +257,22 @@ describe("RotaCreatePage (step 1)", () => {
     );
   });
 
-  it("lets the start be today, but no day before", async () => {
+  it("starts tomorrow at the earliest", async () => {
+    const user = userEvent.setup();
+    renderCreate();
+    await user.click(
+      screen.getByRole("button", {
+        name: `${t.rota.startLabel}: ${t.rota.change}`,
+      }),
+    );
+    expect(screen.getByLabelText(t.rota.startDateInput)).toHaveAttribute(
+      "min",
+      "2026-10-30",
+    );
+  });
+
+  it("lets the start be today when an admin allows it, but no day before", async () => {
+    m.publicSettings = { rotaStartNextDay: false };
     const user = userEvent.setup();
     renderCreate();
     await user.type(screen.getByLabelText(t.rota.nameQuestion), "ختمة");

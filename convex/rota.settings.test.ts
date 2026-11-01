@@ -26,6 +26,16 @@ afterEach(() => {
 
 type T = TestConvexForDataModel<DataModel>;
 
+/** These tests read from today, which needs the admin's start-tomorrow rule off. */
+const allowStartToday = (t: T) =>
+  t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaStartNextDay",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
+
 let seq = 0;
 
 async function person(t: T) {
@@ -66,6 +76,7 @@ async function setup(
   }> = {},
 ) {
   const who = await person(t);
+  await allowStartToday(t);
   const { inviteCode } = await t.action(api.rota.create, {
     sessionToken: who.token,
     name: "ختمة",
@@ -98,6 +109,7 @@ function update(
     endDate: string | null;
     timeZone: string;
     messages: RotaMessages;
+    lateTapMs: number | null;
   }>,
   token = s.token,
 ) {
@@ -175,6 +187,7 @@ test("settings shows the organizer everything, and nothing to anyone else", asyn
       "2027-03-05",
     ],
     quiet: { startHour: 22, endHour: 7 },
+    lateTap: { override: null, defaultMs: 28_800_000 },
     cheer: {
       override: null,
       defaults: {
@@ -402,34 +415,18 @@ test("a time zone that leaves the end date behind the last day is refused", asyn
   expect(await update(t, s, { timeZone: "Asia/Muscat" })).toEqual({ ok: true });
 });
 
-test("moving the day start moves the close of the open day with it", async () => {
+test("moving the juz' message leaves the day's close at midnight", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t, { days: { kind: "daily" } });
   await tickAt(t, s, "2027-01-15T08:00");
   const closesAt = async () => (await days(t, s))[0]!.closesAt;
-  expect(await closesAt()).toBe(dubai("2027-01-16T08:00"));
+  expect(await closesAt()).toBe(dubai("2027-01-16T00:00"));
 
   vi.setSystemTime(dubai("2027-01-15T12:00"));
   expect(await update(t, s, { messages: { ...MESSAGES, dayAt: 600 } })).toEqual(
     { ok: true },
   );
-  expect(await closesAt()).toBe(dubai("2027-01-16T10:00"));
-
-  // the old 08:30 tick doesn't close it
-  await tickAt(t, s, "2027-01-16T08:30");
-  expect((await days(t, s))[0]!.closedAt).toBeNull();
-  await tickAt(t, s, "2027-01-16T10:00");
-  expect((await days(t, s)).map((d) => [d.date, d.closedAt !== null])).toEqual([
-    ["2027-01-15", true],
-    ["2027-01-16", false],
-  ]);
-
-  // a time zone change moves it too, and a closed day stays as it was
-  vi.setSystemTime(dubai("2027-01-16T12:00"));
-  expect(await update(t, s, { timeZone: "Asia/Riyadh" })).toEqual({ ok: true });
-  const all = await days(t, s);
-  expect(all[0]!.closesAt).toBe(dubai("2027-01-16T10:00"));
-  expect(all[1]!.closesAt).toBe(Date.parse("2027-01-17T10:00:00+03:00"));
+  expect(await closesAt()).toBe(dubai("2027-01-16T00:00"));
 });
 
 test("an archived khatma is read-only for its organizer", async () => {
@@ -733,4 +730,31 @@ test("a westward time zone change never starts or targets a date behind the last
     inviteCode: s.inviteCode,
   });
   expect(people?.target.date).toBe("2027-01-18");
+});
+
+test("an organizer sets the khatma's own late window, and null goes back to the default", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  expect(await update(t, s, { lateTapMs: 3_600_000 })).toEqual({ ok: true });
+  expect((await settings(t, s))?.lateTap.override).toBe(3_600_000);
+  expect(await update(t, s, { lateTapMs: 13 * 3_600_000 })).toEqual({
+    error: "invalid_times",
+  });
+  expect(await update(t, s, { lateTapMs: null })).toEqual({ ok: true });
+  expect((await settings(t, s))?.lateTap.override).toBeNull();
+});
+
+test("the first date can't move to today under the start-tomorrow rule", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, { firstDate: "2027-01-22" });
+  await t.run(async (ctx) => {
+    const rows = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "rotaStartNextDay"))
+      .collect();
+    for (const r of rows) await ctx.db.patch(r._id, { value: true });
+  });
+  expect(await update(t, s, { firstDate: "2027-01-15" })).toEqual({
+    error: "invalid_dates",
+  });
 });

@@ -266,7 +266,7 @@ test("a member session can't read or write settings", async () => {
   ).rejects.toThrow(/not_admin/);
 });
 
-test("the public query shows only the four public settings", async () => {
+test("the public query shows only the five public settings", async () => {
   const t = convexTest(schema, modules);
   await signedInAdmin(t);
   await t.mutation(api.adminSettings.set, {
@@ -279,5 +279,6 @@ test("the public query shows only the four public settings", async () => {
     maintenanceMode: true,
     maintenanceMessage: null,
     minClientVersion: null,
+    rotaStartNextDay: true,
   });
 });

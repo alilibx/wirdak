@@ -22,6 +22,16 @@ afterEach(() => {
 
 type T = TestConvexForDataModel<DataModel>;
 
+/** These tests read from today, which needs the admin's start-tomorrow rule off. */
+const allowStartToday = (t: T) =>
+  t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaStartNextDay",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
+
 let seq = 0;
 
 async function person(
@@ -56,6 +66,7 @@ async function person(
 type Who = Awaited<ReturnType<typeof person>>;
 
 async function rota(t: T, who: Who, firstDate = "2027-01-15") {
+  await allowStartToday(t);
   const { inviteCode } = await t.action(api.rota.create, {
     sessionToken: who.token,
     name: "ختمة",
@@ -981,4 +992,16 @@ test("startAgain applies the cap and the date checks, and rotaAllowed is not nee
   await t.run((ctx) => ctx.db.patch(s2.personId, { rotaAllowed: false }));
   const { inviteCode } = await startAgain(t, s2);
   expect(inviteCode).toHaveLength(12);
+});
+
+test("starting again keeps the khatma's own late window", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const k = await khatmaOf(t, s.inviteCode);
+  await t.run((ctx) =>
+    ctx.db.patch(k._id, { rota: { ...k.rota!, lateTapMs: 3_600_000 } }),
+  );
+  await archive(t, s);
+  const { inviteCode } = await startAgain(t, s);
+  expect((await khatmaOf(t, inviteCode)).rota?.lateTapMs).toBe(3_600_000);
 });

@@ -31,7 +31,7 @@ import {
   weekdayText,
   welcomeText,
 } from "./lib/rotaTemplates";
-import { quietHours } from "./lib/settings";
+import { getSetting, quietHours } from "./lib/settings";
 import { localDate, nextAwake } from "./lib/wakingTime";
 import { khatmaTitle, type TemplateMessage } from "./lib/whatsappTemplates";
 import {
@@ -74,12 +74,35 @@ export async function windowOpen(
   return contact !== null && contact.lastInboundAt >= now - WINDOW_MS;
 }
 
+/** Kinds that tell a reader their juz': they don't wait for quiet hours, when the admin says so. */
+const ASSIGNMENT_KINDS: ReadonlySet<Kind> = new Set([
+  "juz",
+  "assigned",
+  "welcome",
+]);
+
+/** When a message of `kind` may go: `now`, or when quiet hours end. */
+async function sendableAt(
+  ctx: QueryCtx,
+  kind: Kind,
+  timeZone: string,
+  now: number,
+): Promise<number> {
+  if (
+    ASSIGNMENT_KINDS.has(kind) &&
+    (await getSetting(ctx, "rotaAssignDuringQuiet"))
+  ) {
+    return now;
+  }
+  return nextAwake(now, timeZone, await quietHours(ctx));
+}
+
 /** Kinds that name the ajza' of a reassignment: several on one day make one message. */
 const MERGED_KINDS: ReadonlySet<Kind> = new Set(["assigned", "covered"]);
 
 /**
- * Queues one message to one participant and schedules its delivery for when
- * quiet hours end. Nothing is queued for someone who hasn't joined, has
+ * Queues one message to one participant and schedules its delivery, for when
+ * quiet hours end unless it may go during them. Nothing is queued for someone who hasn't joined, has
  * stopped or was silenced, or for a message already queued for the same
  * day, kind and participant (rows without a day are never duplicates). The
  * exception is `assigned` and `covered`: ajza' added while the message waits
@@ -143,7 +166,7 @@ export async function enqueue(
     sentAt: null,
     skippedAt: null,
   });
-  const at = nextAwake(now, khatma.rota.timeZone, await quietHours(ctx));
+  const at = await sendableAt(ctx, row.kind, khatma.rota.timeZone, now);
   await ctx.scheduler.runAt(at, internal.rotaOutbox.deliver, { outboxId });
   return outboxId;
 }
@@ -281,15 +304,15 @@ export async function takeFreeJuzToday(
   }
 }
 
-/** Whether a welcome queued now would go at once: `plan` holds it in quiet hours, and drops it outside the window. */
+/** Whether a welcome queued now would go at once: `plan` may hold it in quiet hours, and drops it outside the window. */
 export async function welcomeGoesNow(
   ctx: QueryCtx,
   rota: RotaConfig,
   phone: string,
   now: number,
 ): Promise<boolean> {
-  const awake = nextAwake(now, rota.timeZone, await quietHours(ctx));
-  return awake <= now && (await windowOpen(ctx, phone, now));
+  const at = await sendableAt(ctx, "welcome", rota.timeZone, now);
+  return at <= now && (await windowOpen(ctx, phone, now));
 }
 
 /**
@@ -428,8 +451,8 @@ function compose(
  * What `deliver` sends for a row: null when it no longer calls for a message
  * (already sent or skipped, the participant isn't reachable, the khatma is gone,
  * or archived unless the row is a cycle thank-you, which is for reading already
- * finished, or a day's reading is closed or done), `retryAt` when it's quiet
- * hours in the khatma's time zone, or the phone and the message to send. Inside
+ * finished, or a day's reading is closed or done), `retryAt` when it must wait
+ * for quiet hours to end in the khatma's time zone, or the phone and the message to send. Inside
  * the phone's 24-hour window the message is free-form, outside it a template.
  */
 export const plan = internalQuery({
@@ -481,8 +504,8 @@ export const plan = internalQuery({
       if (!day || day.completedAt === null) return null;
     }
     const now = Date.now();
-    const awake = nextAwake(now, rota.timeZone, await quietHours(ctx));
-    if (awake > now) return { retryAt: awake };
+    const at = await sendableAt(ctx, row.kind, rota.timeZone, now);
+    if (at > now) return { retryAt: at };
     const inWindow = await windowOpen(ctx, participant.phone, now);
     if (row.kind === "welcome") {
       // No template: outside the window the next juz' message follows anyway.

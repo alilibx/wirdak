@@ -118,3 +118,15 @@ describe("wakingTime", () => {
     );
   });
 });
+
+it("a midnight the clocks skip lands just after the gap, on its own date", () => {
+  for (const [tz, date] of [
+    ["America/Havana", "2027-03-14"],
+    ["Asia/Beirut", "2027-03-28"],
+    ["Africa/Cairo", "2027-04-30"],
+  ] as const) {
+    const at = instantAt(date, 0, tz);
+    expect(localDate(at, tz)).toBe(date);
+    expect(localMinutes(at, tz)).toBe(60);
+  }
+});

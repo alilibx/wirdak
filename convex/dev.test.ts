@@ -61,6 +61,21 @@ test("dev:setSetting refuses unknown and non-numeric settings", async () => {
   await expect(
     t.mutation(internal.dev.setSetting, { key: "graceDefaults", value: 1 }),
   ).rejects.toThrow(/not a numeric setting/);
+  await expect(
+    t.mutation(internal.dev.setSetting, {
+      key: "rotaStartNextDay",
+      value: 1,
+    }),
+  ).rejects.toThrow(/not a numeric setting/);
+});
+
+test("dev:setSetting stores an on/off setting", async () => {
+  const t = convexTest(schema, modules);
+  vi.stubEnv("WIRDAK_ENV", "dev");
+  const set = (value: boolean | null) =>
+    t.mutation(internal.dev.setSetting, { key: "rotaStartNextDay", value });
+  expect(await set(false)).toBeNull();
+  expect(await set(null)).toBe(false);
 });
 
 test("dev:rotaPayload builds the participant's payload for the open day, in dev only", async () => {

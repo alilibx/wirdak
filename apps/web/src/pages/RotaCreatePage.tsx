@@ -10,6 +10,7 @@ import { firstReadingDay } from "../features/rota/dates";
 import { formatIsoDate } from "../features/rota/format";
 import { ReadingDaysField } from "../features/rota/ReadingDaysField";
 import { StepBar } from "../features/rota/StepBar";
+import { useEarliestStart } from "../features/rota/useEarliestStart";
 import { t } from "../i18n/ar";
 import { errorCode } from "../lib/errors";
 import { getSessionToken, useSessionToken } from "../lib/session";
@@ -48,6 +49,7 @@ export function RotaCreateForm({
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = localDate(Date.now(), timeZone);
   const tomorrow = addDays(today, 1);
+  const earliest = useEarliestStart(today);
   // The first day must be a reading day, so the start moves on to the next one.
   const start = firstReadingDay(days, pickedStart ?? tomorrow);
 
@@ -118,7 +120,7 @@ export function RotaCreateForm({
             inputLabel={t.rota.startDateInput}
             // A start that is not a reading day moves on; the field shows where it landed.
             inputValue={pickedStart === null ? "" : start}
-            min={today}
+            min={earliest}
             onPick={(date) => {
               setPickedStart(date);
               setError(null);

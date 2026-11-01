@@ -798,6 +798,19 @@ export const ar = {
       summary: "ملخّص اليوم (لي)",
     },
     timeLabel: "الوقت",
+    atDayStart: "عند بداية اليوم (١٢ ص)",
+    lateTapLabel: "احتساب «أتممت» بعد منتصف الليل",
+    lateTapHint:
+      "من أتمّ جزء الأمس خلال هذه المدة يُحتسب له، ولا يؤثر ذلك في جزء اليوم.",
+    lateTapMinutes: (minutes: number) => `${toArabicDigits(minutes)} دقيقة`,
+    lateTapHours: (hours: number) =>
+      hours === 0
+        ? "لا يُحتسب"
+        : hours === 1
+          ? "ساعة واحدة"
+          : hours === 2
+            ? "ساعتان"
+            : `${toArabicDigits(hours)} ${hours <= 10 ? "ساعات" : "ساعة"}`,
     locked: "هذه الرسالة لا يمكن إيقافها.",
     saveTimes: "احفظ الأوقات",
     detailsHeading: "الختمة",

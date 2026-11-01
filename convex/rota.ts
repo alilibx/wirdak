@@ -25,7 +25,7 @@ import {
   type RotaMessages,
 } from "./lib/rota";
 import * as ops from "./lib/rotaOps";
-import type { RotaConfig } from "./lib/rotaPlace";
+import { earliestFirstDate, type RotaConfig } from "./lib/rotaPlace";
 import type { SessionContext } from "./lib/session";
 import { requirePerson, sessionMutation, sessionQuery } from "./lib/session";
 import { getSetting } from "./lib/settings";
@@ -197,7 +197,7 @@ export async function insertRotaKhatma(
   const today = localDate(Date.now(), person.timeZone);
   if (
     !isDate(args.firstDate) ||
-    args.firstDate < today ||
+    args.firstDate < (await earliestFirstDate(ctx, today)) ||
     (args.endDate !== null &&
       (!isDate(args.endDate) || args.endDate < args.firstDate)) ||
     !isReadingDate(args.days, args.firstDate, args.firstDate)
@@ -349,7 +349,7 @@ export const insertAgain = internalMutation({
     const today = localDate(Date.now(), rota.timeZone);
     if (
       !isDate(args.firstDate) ||
-      args.firstDate < today ||
+      args.firstDate < (await earliestFirstDate(ctx, today)) ||
       !isReadingDate(rota.days, args.firstDate, args.firstDate)
     ) {
       throw new ConvexError({ code: "invalid_dates" });
@@ -369,6 +369,9 @@ export const insertAgain = internalMutation({
           endDate: null,
           timeZone: rota.timeZone,
           messages: rota.messages,
+          ...(rota.lateTapMs !== undefined
+            ? { lateTapMs: rota.lateTapMs }
+            : {}),
           pausedAt: null,
           pauseDates: [],
           archivedAt: null,
@@ -888,6 +891,7 @@ export const update = sessionMutation({
     endDate: v.optional(v.union(v.string(), v.null())),
     timeZone: v.optional(v.string()),
     messages: v.optional(rotaMessagesValidator),
+    lateTapMs: v.optional(v.union(v.number(), v.null())),
     cheer: v.optional(v.union(cheerConfigValidator, v.null())),
   },
   handler: async (ctx, args): ReturnType<typeof ops.update> => {

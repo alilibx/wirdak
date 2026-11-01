@@ -307,6 +307,12 @@ export default defineSchema({
     reminderSentAt: v.optional(nullableNumber),
     /** When the completion messages went out; missing means not yet. */
     celebratedAt: v.optional(nullableNumber),
+    /** When the juz' messages were queued; missing on days from before midnight starts. */
+    juzSentAt: v.optional(nullableNumber),
+    /** Until when a late «أتممت» counts, set when the day closes. */
+    lateUntil: v.optional(v.number()),
+    /** When the silence count ran, after the late window; missing on older days. */
+    settledAt: v.optional(nullableNumber),
   })
     .index("by_khatma_n", ["khatmaId", "n"])
     .index("by_khatma_date", ["khatmaId", "date"])

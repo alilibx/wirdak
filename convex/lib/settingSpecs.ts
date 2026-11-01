@@ -1,5 +1,6 @@
 import { CHEER_MAX_GAP_MS } from "./cheer";
 import { isValidGrace, type Grace } from "./grace";
+import { MAX_LATE_TAP_MS } from "./rota";
 import { SCHEDULES } from "./schedule";
 import type { SettingKey } from "./settings";
 
@@ -197,6 +198,14 @@ export const SETTING_SPECS: { [K in SettingKey]: SettingSpec } = {
   rotaUnreadOn: { kind: "bool", group: "rota" },
   rotaSummaryAt: { kind: "time", group: "rota" },
   rotaSummaryOn: { kind: "bool", group: "rota" },
+  rotaLateTapMs: {
+    kind: "duration",
+    min: 0,
+    max: MAX_LATE_TAP_MS,
+    group: "rota",
+  },
+  rotaStartNextDay: { kind: "bool", group: "rota" },
+  rotaAssignDuringQuiet: { kind: "bool", group: "rota" },
   rotaMaxActivePerOrganizer: { kind: "int", min: 1, max: 20, group: "rota" },
   rotaMaxSlotsPerPerson: { kind: "int", min: 1, max: 30, group: "rota" },
   rotaSilenceNoticeDays: { kind: "int", min: 1, max: 30, group: "rota" },

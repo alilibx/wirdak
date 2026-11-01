@@ -1,3 +1,4 @@
+import { DAY_START } from "@convex/lib/rota";
 import { useId } from "react";
 import { t } from "../../i18n/ar";
 import { formatTime } from "./format";
@@ -18,6 +19,7 @@ export function TimeField({
   value,
   min,
   max,
+  dayStart = false,
   disabled,
   onChange,
 }: {
@@ -25,6 +27,8 @@ export function TimeField({
   value: number;
   min: number;
   max: number;
+  /** Also offers 12:00 AM, as when the day starts. */
+  dayStart?: boolean;
   disabled?: boolean;
   onChange: (minutes: number) => void;
 }) {
@@ -41,9 +45,14 @@ export function TimeField({
         onChange={(event) => onChange(Number(event.target.value))}
         className="mt-1 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink disabled:opacity-50"
       >
+        {dayStart && value !== DAY_START && (
+          <option value={DAY_START}>{t.rota.atDayStart}</option>
+        )}
         {options(min, max, value).map((minutes) => (
           <option key={minutes} value={minutes}>
-            {formatTime(minutes)}
+            {dayStart && minutes === DAY_START
+              ? t.rota.atDayStart
+              : formatTime(minutes)}
           </option>
         ))}
       </select>

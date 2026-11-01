@@ -523,7 +523,14 @@ test("an admin works from the organizer's saved list", async () => {
 
 test("a day runs from the admin's screens: today, a reassign, a mark", async () => {
   const t = convexTest(schema, modules);
-  // Today, so the day can start: its message time has passed.
+  // Today, so the day can start, which the admin's start-tomorrow rule would refuse.
+  await t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaStartNextDay",
+      value: false,
+      updatedAt: NOW,
+    }),
+  );
   const { khatmaId, readerId } = await running(t, { firstDate: "2027-01-15" });
   const args = { adminToken, khatmaId };
   await t.mutation(internal.rotaDays.tick, { khatmaId });

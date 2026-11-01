@@ -20,11 +20,13 @@ const IP_LIMIT_SETTING = "verifyStartPerIpPer10Min";
 const IP_LIMIT_FOR_RUN = 10_000;
 
 /**
- * A rotating khatma's first day starts at its day time (08:00 by default), so a khatma made
- * earlier in the day would wait. The run moves the default to a time that has passed, 07:00 or
- * before 07:00 the quarter hour just gone (in the runner's zone, which is the browser's and so the
- * khatma's), and puts it back after. Set once here, not per test: the projects run in parallel.
+ * A rotating khatma starts tomorrow at the earliest, and its juz' message goes at its day time
+ * (08:00 by default), so a khatma made today would wait for both. The run lets it start today and
+ * moves the day time to one that has passed, 07:00 or before 07:00 the quarter hour just gone (in
+ * the runner's zone, which is the browser's and so the khatma's), and puts both back after. Set
+ * once here, not per test: the projects run in parallel.
  */
+const START_NEXT_DAY_SETTING = "rotaStartNextDay";
 const DAY_AT_SETTING = "rotaDayAt";
 const EARLIEST_DAY_AT = 420;
 
@@ -34,11 +36,11 @@ function dayAtPassed(): number {
   return Math.min(EARLIEST_DAY_AT, Math.floor(minutes / 15) * 15);
 }
 
-/** Stores `value` for a numeric setting (null: the default) and returns what was stored before. */
-async function setSetting(
+/** Stores `value` for a setting (null: the default) and returns what was stored before. */
+async function setSetting<V extends number | boolean>(
   key: string,
-  value: number | null,
-): Promise<number | null> {
+  value: V | null,
+): Promise<V | null> {
   const { stdout } = await convex(
     "run",
     "dev:setSetting",
@@ -46,7 +48,7 @@ async function setSetting(
   );
   // The CLI prints the return value as JSON on its last line.
   const last = stdout.trim().split("\n").at(-1) || "null";
-  return JSON.parse(last) as number | null;
+  return JSON.parse(last) as V | null;
 }
 
 /** Any of these would make the backend talk to the real WhatsApp API. */
@@ -81,8 +83,11 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   // before it is a run's.
   const dayAtRestore =
     dayAtBefore !== null && dayAtBefore <= EARLIEST_DAY_AT ? null : dayAtBefore;
+  // Off is what a killed run leaves, and on is the default.
+  await setSetting(START_NEXT_DAY_SETTING, false);
   return async () => {
     await setSetting(IP_LIMIT_SETTING, restore);
     await setSetting(DAY_AT_SETTING, dayAtRestore);
+    await setSetting(START_NEXT_DAY_SETTING, null);
   };
 }

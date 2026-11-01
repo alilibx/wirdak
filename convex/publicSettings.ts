@@ -9,5 +9,6 @@ export const get = query({
     maintenanceMode: await getSetting(ctx, "maintenanceMode"),
     maintenanceMessage: await getSetting(ctx, "maintenanceMessage"),
     minClientVersion: await getSetting(ctx, "minClientVersion"),
+    rotaStartNextDay: await getSetting(ctx, "rotaStartNextDay"),
   }),
 });

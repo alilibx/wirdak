@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   cycleOf,
+  DAY_START,
   isReadingDate,
   isValidReadingDays,
   juzFor,
@@ -158,4 +159,22 @@ test("every-two-weeks counts weeks from the first date, not from a fixed weekday
   expect(
     nextReadingDates(days, "2026-10-29", "2026-10-29", 3, new Set()),
   ).toEqual(["2026-10-31", "2026-11-01", "2026-11-14"]);
+});
+
+test("the juz' message may go at the day's start, and nothing else may", () => {
+  const m = {
+    dayAt: 480,
+    reminder: { at: 960, on: true },
+    unread: { at: 1140, on: true },
+    summary: { at: 1260, on: false },
+  };
+  expect(messageTimesError({ ...m, dayAt: DAY_START }, 22, 7)).toBeNull();
+  expect(messageTimesError({ ...m, dayAt: 15 }, 22, 7)).toBe("quiet");
+  expect(
+    messageTimesError(
+      { ...m, dayAt: DAY_START, reminder: { at: 0, on: true } },
+      22,
+      7,
+    ),
+  ).not.toBeNull();
 });

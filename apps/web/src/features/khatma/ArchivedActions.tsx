@@ -7,6 +7,7 @@ import { Button } from "../../components/Button";
 import { Sheet } from "../../components/Sheet";
 import { t } from "../../i18n/ar";
 import { useRotaBackend, type RotaBackend } from "../rota/backend";
+import { useEarliestStart } from "../rota/useEarliestStart";
 import { DateLine } from "../rota/DateLine";
 import { firstReadingDay } from "../rota/dates";
 import { ErrorLine } from "../rota/ErrorLine";
@@ -138,6 +139,7 @@ function RestartSheet({
 
   const today = localDate(Date.now(), restart.timeZone);
   const tomorrow = addDays(today, 1);
+  const earliest = useEarliestStart(today);
   // The first day must be a reading day, so the start moves on to the next one.
   const start = firstReadingDay(restart.days, picked ?? tomorrow);
 
@@ -160,7 +162,7 @@ function RestartSheet({
         inputLabel={t.rota.startDateInput}
         // A start that is not a reading day moves on; the field shows where it landed.
         inputValue={picked === null ? "" : start}
-        min={today}
+        min={earliest}
         onPick={setPicked}
       />
       <div className="mt-5 grid gap-3">

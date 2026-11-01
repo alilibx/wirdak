@@ -509,6 +509,7 @@ export const update = adminMutation({
     endDate: v.optional(v.union(v.string(), v.null())),
     timeZone: v.optional(v.string()),
     messages: v.optional(rotaMessagesValidator),
+    lateTapMs: v.optional(v.union(v.number(), v.null())),
     cheer: v.optional(v.union(cheerConfigValidator, v.null())),
   },
   handler: async (ctx, args): ReturnType<typeof ops.update> => {

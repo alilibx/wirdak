@@ -187,8 +187,10 @@ export async function reassign(
     participantId: participant._id,
     kind: "assigned",
   });
-  // Whoever had it until now (the holder, or a reader it was reassigned to) is covered.
-  if (previousId !== null && previousId !== participant._id) {
+  // Whoever had it until now (the holder, or a reader it was reassigned to) is
+  // covered, if they ever heard of it: the day's message may not have gone yet.
+  const told = found.day.juzSentAt !== null || found.read.reassignedAt !== null;
+  if (previousId !== null && previousId !== participant._id && told) {
     await enqueue(ctx, {
       ...row,
       participantId: previousId,

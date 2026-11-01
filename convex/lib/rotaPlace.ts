@@ -8,7 +8,8 @@ import {
   ROTA_SIZE,
   slotFor,
 } from "./rota";
-import { localDate } from "./wakingTime";
+import { getSetting } from "./settings";
+import { instantAt, localDate } from "./wakingTime";
 
 /** The next reading day that has not started: where new people and changes to the ajza' land. */
 export type TargetDay = {
@@ -43,17 +44,66 @@ export function lastRotaDay(
     .first();
 }
 
+/** When the reading day dated `date` ends: the next midnight in `timeZone`. */
+export function dayEnd(date: string, timeZone: string): number {
+  return instantAt(addDays(date, 1), 0, timeZone);
+}
+
+/** How long after midnight a late «أتممت» counts for this khatma. */
+export async function lateTapOf(
+  ctx: QueryCtx,
+  rota: RotaConfig,
+): Promise<number> {
+  return rota.lateTapMs ?? (await getSetting(ctx, "rotaLateTapMs"));
+}
+
 /**
- * The first date a day may still start on: today or the first date, whichever
- * is later, and always after the last started day. Days only go forward, which
- * a time zone moved west could otherwise break.
+ * The first date a khatma's first day may start: tomorrow while it is still
+ * being set up or was started today, when `startsNextDay` asks for that. A
+ * khatma from before setup was tracked, or with a day behind it, has no floor.
  */
-export function earliestOpenDate(
+export function firstDayFloor(
   rota: RotaConfig,
   last: Doc<"rotaDays"> | null,
   today: string,
+  startsNextDay: boolean,
 ): string {
-  const from = today > rota.firstDate ? today : rota.firstDate;
+  if (last || !startsNextDay || rota.setupDoneAt === undefined) return today;
+  const startedOn =
+    rota.setupDoneAt === null
+      ? today
+      : localDate(rota.setupDoneAt, rota.timeZone);
+  return startedOn >= today ? addDays(today, 1) : today;
+}
+
+/** The first date a brand new rota khatma may have. */
+export async function earliestFirstDate(
+  ctx: QueryCtx,
+  today: string,
+): Promise<string> {
+  return (await getSetting(ctx, "rotaStartNextDay"))
+    ? addDays(today, 1)
+    : today;
+}
+
+/**
+ * The first date a day may still start on: today or the first date, whichever
+ * is later, not before `firstDayFloor`, and always after the last started day.
+ * Days only go forward, which a time zone moved west could otherwise break.
+ */
+export async function earliestOpenDate(
+  ctx: QueryCtx,
+  rota: RotaConfig,
+  last: Doc<"rotaDays"> | null,
+  today: string,
+): Promise<string> {
+  const floor = firstDayFloor(
+    rota,
+    last,
+    today,
+    await getSetting(ctx, "rotaStartNextDay"),
+  );
+  const from = floor > rota.firstDate ? floor : rota.firstDate;
   return last && from <= last.date ? addDays(last.date, 1) : from;
 }
 
@@ -67,7 +117,8 @@ export async function targetDay(
   if (rota.pausedAt !== null || isArchived(khatma)) {
     return { n, number: khatmaNumber(n), date: null, started: false };
   }
-  const from = earliestOpenDate(
+  const from = await earliestOpenDate(
+    ctx,
     rota,
     last,
     localDate(Date.now(), rota.timeZone),

@@ -92,6 +92,12 @@ export const SETTING_DEFAULTS = {
   rotaUnreadOn: true,
   rotaSummaryAt: 1260,
   rotaSummaryOn: false,
+  /** how long after midnight a late «أتممت» counts; each khatma can choose its own */
+  rotaLateTapMs: 8 * HOUR,
+  /** a rotating khatma's first day is tomorrow at the earliest, even if started today */
+  rotaStartNextDay: true,
+  /** the juz' message, a reassignment and the welcome go during quiet hours */
+  rotaAssignDuringQuiet: true,
   /** active (not archived) rota khatmas one organizer may have */
   rotaMaxActivePerOrganizer: 2,
   rotaMaxSlotsPerPerson: 3,

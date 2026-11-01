@@ -103,7 +103,7 @@ test("every rota setting has a spec in the rota group", () => {
   const keys = (Object.keys(SETTING_DEFAULTS) as SettingKey[]).filter((k) =>
     /^rota[A-Z]/.test(k),
   );
-  expect(keys).toHaveLength(11);
+  expect(keys).toHaveLength(14);
   for (const key of keys) expect(SETTING_SPECS[key].group).toBe("rota");
 });
 

@@ -64,6 +64,16 @@ type Over = Partial<{
 }>;
 
 /** A rota khatma with one participant on slot 2 and one day with juz' 2 and 3 held by them. */
+/** Turns off sending assignments during quiet hours. */
+const holdAssignments = (t: T) =>
+  t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaAssignDuringQuiet",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
+
 async function setup(t: T, over: Over = {}) {
   return await t.run(async (ctx) => {
     const personId = await ctx.db.insert("people", {
@@ -446,9 +456,10 @@ test("covered and cycle messages go as their template, or as plain text in the w
   ]);
 });
 
-test("deliver reschedules during quiet hours and sends once they end", async () => {
+test("deliver reschedules a held assignment during quiet hours and sends once they end", async () => {
   vi.setSystemTime(NIGHT);
   const t = convexTest(schema, modules);
+  await holdAssignments(t);
   const ids = await setup(t, { windowOpen: true });
   await queue(t, ids);
   const scheduled = await t.run((ctx) =>
@@ -700,9 +711,10 @@ test("a welcome outside the window is skipped: there is no template, the next ju
   expect(row?.skippedAt).not.toBeNull();
 });
 
-test("a welcome waits for quiet hours to end", async () => {
+test("a held welcome waits for quiet hours to end", async () => {
   vi.setSystemTime(NIGHT);
   const t = convexTest(schema, modules);
+  await holdAssignments(t);
   const ids = await setup(t, { windowOpen: true, readDone: true });
   // They wrote just now (the setup's window opened at noon), so it is still open in the morning.
   await t.run(async (ctx) => {

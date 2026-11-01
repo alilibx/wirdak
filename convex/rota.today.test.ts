@@ -20,6 +20,16 @@ afterEach(() => {
 
 type T = TestConvexForDataModel<DataModel>;
 
+/** These tests read from today, which needs the admin's start-tomorrow rule off. */
+const allowStartToday = (t: T) =>
+  t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaStartNextDay",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
+
 let seq = 0;
 
 async function person(t: T, name = "المنظم") {
@@ -51,6 +61,7 @@ async function person(t: T, name = "المنظم") {
 /** A weekly (Fridays) rota khatma, set up, whose first day is today. */
 async function setup(t: T, finished = true) {
   const who = await person(t);
+  await allowStartToday(t);
   const { inviteCode } = await t.action(api.rota.create, {
     sessionToken: who.token,
     name: "ختمة",
@@ -635,4 +646,39 @@ test("reassigning clears the old «ليس بعد»: the new reader has not answe
     participantId: reader,
   });
   expect((await tile(t, s, 8)).answer).toBe("none");
+});
+
+test("a reader whose juz' moved before the day's message hears nothing of it", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const holder = await add(t, s, 8);
+  const first = await add(t, s, 9);
+  const second = await add(t, s, 10);
+  await startDay(t, s);
+  await t.run(async (ctx) => {
+    const day = await ctx.db.query("rotaDays").first();
+    await ctx.db.patch(day!._id, { juzSentAt: null });
+    for (const row of await ctx.db.query("rotaParticipants").collect()) {
+      await ctx.db.patch(row._id, { joinedAt: 1 });
+    }
+  });
+  const covered = async () =>
+    await t.run(async (ctx) =>
+      (await ctx.db.query("rotaOutbox").collect())
+        .filter((r) => r.kind === "covered")
+        .map((r) => r.participantId),
+    );
+  const { readId } = await tile(t, s, 8);
+  await act(t, s, "reassign", { readId, participantId: first });
+  expect(await covered()).toEqual([]);
+
+  // The first reader was told, so they hear it moved on.
+  await t.run(async (ctx) => {
+    for (const row of await ctx.db.query("rotaOutbox").collect()) {
+      await ctx.db.patch(row._id, { sentAt: 1 });
+    }
+  });
+  await act(t, s, "reassign", { readId, participantId: second });
+  expect(await covered()).toEqual([first]);
+  expect(await covered()).not.toContain(holder);
 });
