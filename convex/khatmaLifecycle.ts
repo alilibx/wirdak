@@ -2,11 +2,13 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id, TableNames } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
+import { catchUpHold, isHeld } from "./grace";
 import { refreshPerson, refreshPhone } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
 import { lastRotaDay } from "./lib/rotaPlace";
 import { sessionMutation } from "./lib/session";
 import { requireOrganizer } from "./organizer";
+import { roundAssignments } from "./rounds";
 
 /** Rows one `purgeRows` run handles. */
 const PURGE_BATCH = 200;
@@ -63,6 +65,27 @@ export async function archiveKhatma(
   if (day && day.closedAt === null) {
     await ctx.db.patch(day._id, { closedAt: now });
   }
+}
+
+/**
+ * Reopens an archived pool khatma: the one exception to "an archived khatma can
+ * only be read, and deleted" (admin spec 6). Jobs that came due while it was
+ * archived did nothing and won't run again, so its holds catch up here, and a
+ * round that reached 30 ajza' gets its completion back. Notes cleared by the
+ * archive stay cleared, apart from the alert for a juz' still open for help.
+ */
+export async function restoreKhatma(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+): Promise<void> {
+  await ctx.db.patch(khatma._id, { archivedAt: null });
+  const roundId = khatma.currentRoundId;
+  if (!roundId) return;
+  const now = Date.now();
+  for (const hold of (await roundAssignments(ctx, roundId)).filter(isHeld)) {
+    await catchUpHold(ctx, khatma, hold, now);
+  }
+  await ctx.scheduler.runAfter(0, internal.rounds.completeIfReady, { roundId });
 }
 
 export const archive = sessionMutation({

@@ -37,6 +37,7 @@ const person = (blocked: boolean, rotaAllowed = false) => ({
   sessions: [{ deviceLabel: "iPhone · Safari", lastUsedAt: 0 }],
   helpRequests: [],
   rotaAllowed,
+  whatsappNotes: false,
   blocked,
 });
 
@@ -134,5 +135,51 @@ describe("PersonAdminPage", () => {
       personId: "p2",
       allowed: false,
     });
+  });
+});
+
+describe("editing a person", () => {
+  it("saves their name and WhatsApp notes, with the note", async () => {
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: t.ops.editPerson }),
+    );
+    const name = screen.getByLabelText(t.ops.personName);
+    expect(name).toHaveValue("سارة");
+    await userEvent.clear(name);
+    await userEvent.type(name, "نورة");
+    await userEvent.click(
+      screen.getByRole("switch", { name: t.ops.whatsappNotes }),
+    );
+    await userEvent.type(screen.getByLabelText(t.ops.noteLabel), "طلبت");
+    await userEvent.click(screen.getByRole("button", { name: t.ops.save }));
+    expect(m.mutation).toHaveBeenCalledWith("adminPeople:update", {
+      adminToken: "tok",
+      personId: "p2",
+      displayName: "نورة",
+      whatsappNotes: true,
+      note: "طلبت",
+    });
+  });
+
+  it("can't save an empty name", async () => {
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: t.ops.editPerson }),
+    );
+    await userEvent.clear(screen.getByLabelText(t.ops.personName));
+    expect(screen.getByRole("button", { name: t.ops.save })).toBeDisabled();
+  });
+
+  it("says when the name is refused", async () => {
+    m.mutation.mockResolvedValue({ error: "invalid_name" });
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: t.ops.editPerson }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: t.ops.save }));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      t.ops.errors.invalid_name,
+    );
   });
 });

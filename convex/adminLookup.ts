@@ -255,6 +255,7 @@ export const person = adminQuery({
       .take(MAX_HELP);
     return {
       displayName: p.displayName,
+      whatsappNotes: p.whatsappNotes === true,
       phone: p.phone,
       timeZone: p.timeZone,
       rotaAllowed: p.rotaAllowed === true,

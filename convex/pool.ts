@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { scheduleCheer } from "./cheers";
-import { alertOrganizer, isHeld, scheduleGrace } from "./grace";
+import { alertOrganizer, catchUpHold, isHeld, scheduleGrace } from "./grace";
 import { refreshPerson } from "./lib/directory";
 import { graceTimes, graceWakingMs } from "./lib/grace";
 import { JUZ_COUNT } from "./lib/juz";
@@ -507,22 +507,7 @@ export const undoFinish = sessionMutation({
 
     // The hold is back exactly as it was (spec 3.4). Grace jobs that ran while
     // it was finished did nothing, so run what they would have done.
-    if (lastDone.openedForHelpAt !== null) {
-      await alertOrganizer(ctx, khatma, lastDone.juz, person._id);
-    } else if (lastDone.graceEndsAt <= now) {
-      await ctx.scheduler.runAfter(0, internal.grace.endDue, {
-        assignmentId: lastDone._id,
-        endsAt: lastDone.graceEndsAt,
-      });
-    } else if (
-      lastDone.noticeSentAt === null &&
-      !lastDone.extended &&
-      lastDone.noticeAt <= now
-    ) {
-      await ctx.scheduler.runAfter(0, internal.grace.noticeDue, {
-        assignmentId: lastDone._id,
-      });
-    }
+    await catchUpHold(ctx, khatma, lastDone, now);
     return { ok: true };
   },
 });

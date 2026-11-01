@@ -197,7 +197,9 @@ export const update = sessionMutation({
       return { ok: false, reason: "invalid_cheer" };
     }
     await ctx.db.patch(khatma._id, {
-      ...(args.name !== undefined ? nameFields(cleanKhatmaName(args.name)) : {}),
+      ...(args.name !== undefined
+        ? nameFields(cleanKhatmaName(args.name))
+        : {}),
       ...(args.schedule !== undefined ? { schedule: args.schedule } : {}),
       ...(args.grace !== undefined ? { grace: args.grace } : {}),
       ...(args.cheer !== undefined ? { cheer: args.cheer ?? undefined } : {}),
@@ -372,34 +374,42 @@ export const removeMember = sessionMutation({
     const { khatma } = await requireLiveOrganizer(ctx, args.inviteCode);
     const member = await otherMember(ctx, khatma, args.memberId, "active");
     if (typeof member === "string") return { ok: false, reason: member };
-
-    await ctx.db.patch(member._id, {
-      status: "blocked",
-      shareToken: undefined,
-    });
-    await refreshPerson(ctx, member.personId);
-
-    if (khatma.currentRoundId) {
-      const held = heldAssignment(
-        await roundAssignments(ctx, khatma.currentRoundId),
-        member.personId,
-      );
-      if (held) {
-        await ctx.db.patch(held._id, {
-          releasedAt: Date.now(),
-          releasedBySystem: true,
-        });
-        await clearNotes(ctx, {
-          khatmaId: khatma._id,
-          kind: "openForHelp",
-          juz: held.juz,
-        });
-      }
-    }
-    await clearPersonNotes(ctx, member.personId, khatma._id);
+    await blockMember(ctx, khatma, member);
     return { ok: true };
   },
 });
+
+/** What removing a member does, for `removeMember` and the admin's own. */
+export async function blockMember(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  member: Doc<"members">,
+): Promise<void> {
+  await ctx.db.patch(member._id, {
+    status: "blocked",
+    shareToken: undefined,
+  });
+  await refreshPerson(ctx, member.personId);
+
+  if (khatma.currentRoundId) {
+    const held = heldAssignment(
+      await roundAssignments(ctx, khatma.currentRoundId),
+      member.personId,
+    );
+    if (held) {
+      await ctx.db.patch(held._id, {
+        releasedAt: Date.now(),
+        releasedBySystem: true,
+      });
+      await clearNotes(ctx, {
+        khatmaId: khatma._id,
+        kind: "openForHelp",
+        juz: held.juz,
+      });
+    }
+  }
+  await clearPersonNotes(ctx, member.personId, khatma._id);
+}
 
 async function clearPersonNotes(
   ctx: MutationCtx,

@@ -114,6 +114,30 @@ export async function scheduleGrace(
   });
 }
 
+/**
+ * Runs what a hold's grace jobs would have done while they couldn't act: the
+ * hold was finished, or its khatma archived, and now it stands again.
+ */
+export async function catchUpHold(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  a: Doc<"assignments">,
+  now: number,
+): Promise<void> {
+  if (a.openedForHelpAt !== null) {
+    await alertOrganizer(ctx, khatma, a.juz, a.personId);
+  } else if (a.graceEndsAt <= now) {
+    await ctx.scheduler.runAfter(0, internal.grace.endDue, {
+      assignmentId: a._id,
+      endsAt: a.graceEndsAt,
+    });
+  } else if (a.noticeSentAt === null && !a.extended && a.noticeAt <= now) {
+    await ctx.scheduler.runAfter(0, internal.grace.noticeDue, {
+      assignmentId: a._id,
+    });
+  }
+}
+
 /** Whether a job for a hold still has a khatma to act on: it exists and isn't archived. */
 async function khatmaIsLive(
   ctx: MutationCtx,

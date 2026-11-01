@@ -145,7 +145,7 @@ The same flow works for a reader with no account.
 
 No delete exists today, and the privacy policy promises one: "When we delete your account, we delete your name, number, devices, and notification subscriptions."
 
-Add `adminPeople.deleteAccount`, owner-only, with a typed confirmation and a reason. The same function handles a reader with no account.
+Add `adminPeople.deleteAccount`, open to any admin (see the decision in section 9), with a typed confirmation and a reason. The same function handles a reader with no account.
 
 - **Blocked until resolved:** it's refused while the person organizes an active rotating khatma. Rotating khatmas have no successor ("a rota khatma keeps its organizer"), and archiving one stops messages to every reader, so an admin must archive or delete it as a deliberate step. It lists those khatmas. A rotating handover is a later feature **[builder's call]**.
 - **Their pool khatmas:** hand over with the existing successor rules. With no successor, archive.
@@ -204,6 +204,8 @@ Add `role` to `admins`: `owner`, `support`, or `viewer`. Existing admins become 
 | Reply to help, full phone numbers, see reading | yes | yes | no |
 | Edit people, block, edit khatmas, rotating khatma tools | yes | yes | no |
 | Delete an account or khatma, export, change settings, manage team | yes | no | no |
+
+**Decision, 2026-11-01:** Ali decided that an admin can edit, delete, and do anything on all records. Delete and export aren't owner-only, so `adminKhatmas.remove` and the planned `adminPeople.deleteAccount` take any admin. ARQ-297 must not narrow this without asking him. Every change stays in the audit log.
 | Use the assistant | yes | yes | yes, read only |
 | Connect Claude | yes | yes | no |
 
