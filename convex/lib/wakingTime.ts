@@ -106,7 +106,11 @@ function localToInstant(
   const guess = Date.UTC(year, month - 1, day, hour, minute, 0);
   const first = guess - offsetAt(guess, tz);
   // Correct once more with the offset at the result so DST changes land right.
-  return guess - offsetAt(first, tz);
+  const second = guess - offsetAt(first, tz);
+  // A time the clocks skip reads true at neither: take the moment after the gap.
+  return second + offsetAt(second, tz) === guess
+    ? second
+    : Math.max(first, second);
 }
 
 /** The local calendar date of an instant in `tz`, as days since 1970-01-01. */

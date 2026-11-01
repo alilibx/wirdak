@@ -76,6 +76,7 @@ vi.mock("convex/react", async () => {
       if (name === "khatmas:mine") return m.mine;
       if (name === "sessions:me") return m.me;
       if (name === "notes:forKhatma") return m.notes;
+      if (name === "publicSettings:get") return undefined;
       throw new Error(`unexpected query ${name}`);
     },
     useMutation: (ref: never) =>
@@ -101,6 +102,7 @@ const settings = {
   pauseDates: [],
   upcoming: [],
   quiet: { startHour: 22, endHour: 7 },
+  lateTap: { override: null, defaultMs: 28_800_000 },
   cheer: {
     override: null,
     defaults: {

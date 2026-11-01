@@ -63,6 +63,8 @@ export const rotaConfigValidator = v.object({
    * yet: their own join message makes them its organizer. Missing means no.
    */
   pendingOrganizer: v.optional(v.boolean()),
+  /** How long after midnight a late «أتممت» counts; missing means the admin's default. */
+  lateTapMs: v.optional(v.number()),
 });
 
 export const ROTA_SIZE = 30;
@@ -70,6 +72,12 @@ export const ROTA_SIZE = 30;
 const DAY_MS = 86_400_000;
 const SCAN_LIMIT_DAYS = 800;
 const TIME_STEP_MINUTES = 15;
+
+/** The juz' message time that means "when the day starts", as quiet hours otherwise forbid. */
+export const DAY_START = 0;
+
+/** The longest late-tap window, for the admin's default and a khatma's own. */
+export const MAX_LATE_TAP_MS = 12 * 3_600_000;
 
 /** The khatma number within its cycle of 30, 1 to 30. */
 export function khatmaNumber(n: number): number {
@@ -181,8 +189,8 @@ export function isValidReadingDays(days: ReadingDays): boolean {
 
 /**
  * What is wrong with the message times, if anything: not on a 15-minute step,
- * outside waking hours, or out of order (`dayAt` < reminder < unread < summary,
- * counting only the messages that are on).
+ * outside waking hours (`dayAt` may also be `DAY_START`), or out of order
+ * (`dayAt` < reminder < unread < summary, counting only the messages that are on).
  */
 export function messageTimesError(
   m: RotaMessages,
@@ -196,9 +204,10 @@ export function messageTimesError(
   if (times.some((t) => !Number.isInteger(t) || t % TIME_STEP_MINUTES !== 0)) {
     return "step";
   }
-  if (times.some((t) => t < quietEndHour * 60 || t >= quietStartHour * 60)) {
-    return "quiet";
-  }
+  const inQuiet = (t: number) =>
+    t < quietEndHour * 60 || t >= quietStartHour * 60;
+  if (times.some((t) => t !== m.dayAt && inQuiet(t))) return "quiet";
+  if (m.dayAt !== DAY_START && inQuiet(m.dayAt)) return "quiet";
   for (let i = 1; i < times.length; i++) {
     if ((times[i] ?? 0) <= (times[i - 1] ?? 0)) return "order";
   }

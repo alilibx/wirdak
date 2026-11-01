@@ -190,6 +190,11 @@ export function thanksText(doneCount: number): string {
   return `تقبّل الله منك. ${toArabicDigits(doneCount)} من ٣٠ جزءاً تمّت اليوم.`;
 }
 
+/** The answer to a «أتممت» that counted for the day that just ended, by its khatma number. */
+export function lateThanksText(number: number): string {
+  return `تقبّل الله منك. سُجّلت قراءتك في الختمة ${toArabicDigits(number)}.`;
+}
+
 /** A cheer to the other readers: `name` and `juz` are only what the khatma chose to show. */
 export function cheerText(
   doneCount: number,

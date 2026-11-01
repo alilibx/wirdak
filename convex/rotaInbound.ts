@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   internalMutation,
   internalQuery,
@@ -15,7 +15,6 @@ import { takeFreeJuzToday, titled, welcomeMessage } from "./rotaOutbox";
 import { isStaging, MAX_BUTTON_TITLE, MAX_REPLY_BUTTONS } from "./whatsapp";
 import { findJoinCode } from "./lib/rotaJoin";
 import { decodePayload, encodePayload } from "./lib/rotaPayload";
-import { lastRotaDay } from "./lib/rotaPlace";
 import { classifyReply } from "./lib/rotaReplies";
 import {
   alreadyText,
@@ -29,6 +28,7 @@ import {
   notOnListText,
   notYetText,
   stopText,
+  lateThanksText,
   thanksText,
   whichKhatmaText,
 } from "./lib/rotaTemplates";
@@ -169,6 +169,35 @@ function reminderAhead(rota: RotaConfig, day: Day, now: number): string | null {
   return clockText(reminder.at);
 }
 
+/** Whether a closed day still takes this answer: only «أتممت», until its late window ends. */
+function lateTapOpen(
+  day: Day,
+  action: "done" | "notYet",
+  now: number,
+): boolean {
+  return action === "done" && now < (day.lateUntil ?? 0);
+}
+
+/**
+ * The days of a khatma a typed answer may be for, oldest first: the day just
+ * ended, while its late window lasts, then the open day.
+ */
+async function answerableDays(
+  ctx: MutationCtx,
+  khatmaId: Id<"khatmas">,
+  action: "done" | "notYet",
+  now: number,
+): Promise<Day[]> {
+  const recent = await ctx.db
+    .query("rotaDays")
+    .withIndex("by_khatma_n", (q) => q.eq("khatmaId", khatmaId))
+    .order("desc")
+    .take(2);
+  return recent
+    .filter((d) => d.closedAt === null || lateTapOpen(d, action, now))
+    .reverse();
+}
+
 /**
  * «أتممت» or «ليس بعد» for one participant's reads of one day. «أتممت» marks
  * all of them done (two slots, one tap), and the ones they hold that were
@@ -186,7 +215,10 @@ async function answerDay(
   now: number,
 ): Promise<InboundReply[]> {
   const rota = khatma.rota;
-  if (!rota || day.closedAt !== null) return [about(khatma, closedText)];
+  const late = day.closedAt !== null;
+  if (!rota || (late && !lateTapOpen(day, action, now))) {
+    return [about(khatma, closedText)];
+  }
   const { all, reading, handedOn } = await readsOf(ctx, participant, day);
   const unread = reading.filter((r) => r.doneAt === null);
   const unreadHandedOn = handedOn.filter((r) => r.doneAt === null);
@@ -206,7 +238,9 @@ async function answerDay(
   const [first] = marked;
   if (first) await scheduleRotaCheer(ctx, first._id, now, participant._id);
   const done = all.filter((r) => r.doneAt !== null).length + marked.length;
-  const replies = [about(khatma, thanksText(done))];
+  const replies = [
+    about(khatma, late ? lateThanksText(day.number) : thanksText(done)),
+  ];
   if (await completeIfDone(ctx, day._id)) {
     await celebrateIfComplete(ctx, day._id, participant._id);
     replies.push(about(khatma, duaText()));
@@ -465,15 +499,22 @@ async function answerTyped(
   const open: { participant: Participant; khatma: Khatma; day: Day }[] = [];
   let anyRead = false;
   for (const participant of joined) {
-    const day = await lastRotaDay(ctx, participant.khatmaId);
-    if (!day || day.closedAt !== null) continue;
-    const { reading, handedOn } = await readsOf(ctx, participant, day);
-    const reads = [...reading, ...handedOn];
-    if (reads.length === 0) continue;
-    anyRead = true;
-    if (!reads.some((r) => r.doneAt === null)) continue;
-    const khatma = await ctx.db.get(participant.khatmaId);
-    if (khatma) open.push({ participant, khatma, day });
+    for (const day of await answerableDays(
+      ctx,
+      participant.khatmaId,
+      action,
+      now,
+    )) {
+      const { reading, handedOn } = await readsOf(ctx, participant, day);
+      const reads = [...reading, ...handedOn];
+      if (reads.length === 0) continue;
+      anyRead = true;
+      if (!reads.some((r) => r.doneAt === null)) continue;
+      const khatma = await ctx.db.get(participant.khatmaId);
+      if (khatma) open.push({ participant, khatma, day });
+      // The older unread day first; the next «تم» reaches the newer one.
+      break;
+    }
   }
   if (open.length === 1) {
     const [{ participant, khatma, day }] = open as [(typeof open)[number]];

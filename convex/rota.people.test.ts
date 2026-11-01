@@ -22,6 +22,16 @@ afterEach(() => {
 
 type T = TestConvexForDataModel<DataModel>;
 
+/** These tests read from today, which needs the admin's start-tomorrow rule off. */
+const allowStartToday = (t: T) =>
+  t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaStartNextDay",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
+
 let seq = 0;
 
 async function person(t: T, rotaAllowed = true) {
@@ -52,6 +62,7 @@ async function person(t: T, rotaAllowed = true) {
 
 async function setup(t: T) {
   const who = await person(t);
+  await allowStartToday(t);
   const { inviteCode } = await t.action(api.rota.create, {
     sessionToken: who.token,
     name: "ختمة",
@@ -408,6 +419,7 @@ test("once day 12 has started, new people join khatma 13 and day 12 keeps its re
 test("there is no next day to place people on once the end date has passed", async () => {
   const t = convexTest(schema, modules);
   const who = await person(t);
+  await allowStartToday(t);
   const { inviteCode } = await t.action(api.rota.create, {
     sessionToken: who.token,
     name: "ختمة",
@@ -794,9 +806,16 @@ test("someone accepted outside their 24-hour window takes nothing today: no welc
   expect(taken).toEqual([]);
 });
 
-test("someone accepted in quiet hours takes nothing today: the welcome waits for morning", async () => {
+test("with assignments held for quiet hours, someone accepted at night takes nothing today: the welcome waits for morning", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t);
+  await t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaAssignDuringQuiet",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
   const dayId = await openDay(t, s);
   // 23:00 in Dubai
   const night = Date.UTC(2027, 0, 15, 19, 0, 0);

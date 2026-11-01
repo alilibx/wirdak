@@ -57,6 +57,7 @@ const baseSettings = {
   pauseDates: ["2026-11-27"],
   upcoming: ["2026-11-27", "2026-11-28", "2026-11-29"],
   quiet: { startHour: 22, endHour: 7 },
+  lateTap: { override: null, defaultMs: 28_800_000 },
   cheer: {
     override: null,
     defaults: {
@@ -218,15 +219,16 @@ describe("RotaSettingsPage", () => {
       ).toBeInTheDocument();
     });
 
-    it("offers quarter hours between the quiet hours only", () => {
+    it("offers quarter hours between the quiet hours, and the day's start for the juz' message", () => {
       renderPage();
       const select = within(section(t.rota.messagesHeading)).getAllByLabelText(
         t.rota.timeLabel,
       )[0] as HTMLSelectElement;
       const values = Array.from(select.options).map((o) => Number(o.value));
-      expect(values[0]).toBe(420);
+      expect(values[0]).toBe(0);
+      expect(values[1]).toBe(420);
       expect(values.at(-1)).toBe(1305);
-      expect(values).toHaveLength(60);
+      expect(values).toHaveLength(61);
       expect(values.every((v) => v % 15 === 0)).toBe(true);
     });
 
@@ -234,6 +236,25 @@ describe("RotaSettingsPage", () => {
       within(section(t.rota.messagesHeading)).getAllByLabelText(
         t.rota.timeLabel,
       ) as HTMLSelectElement[];
+    it("saves the khatma's own late-tap window with the message times", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.selectOptions(
+        within(section(t.rota.messagesHeading)).getByLabelText(
+          t.rota.lateTapLabel,
+        ),
+        t.rota.lateTapHours(2),
+      );
+      await user.click(
+        within(section(t.rota.messagesHeading)).getByRole("button", {
+          name: t.rota.saveTimes,
+        }),
+      );
+      expect(m.fns.update).toHaveBeenCalledWith(
+        expect.objectContaining({ lateTapMs: 7_200_000 }),
+      );
+    });
+
     it("saves the khatma's own cheer settings beside the messages", async () => {
       const user = userEvent.setup();
       renderPage();

@@ -81,6 +81,7 @@ const settings = {
   pauseDates: [],
   upcoming: [],
   quiet: { startHour: 22, endHour: 7 },
+  lateTap: { override: null, defaultMs: 28_800_000 },
   cheer: {
     override: null,
     defaults: {

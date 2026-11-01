@@ -25,6 +25,16 @@ afterEach(() => {
 
 type T = TestConvexForDataModel<DataModel>;
 
+/** These tests read from today, which needs the admin's start-tomorrow rule off. */
+const allowStartToday = (t: T) =>
+  t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaStartNextDay",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
+
 let seq = 0;
 
 async function person(t: T, displayName = "سارة", rotaAllowed = true) {
@@ -102,14 +112,16 @@ const poolKhatma = (t: T, who: Who) =>
     schedule: "daily",
   });
 
-const rotaKhatma = (t: T, who: Who) =>
-  t.action(api.rota.create, {
+const rotaKhatma = async (t: T, who: Who) => {
+  await allowStartToday(t);
+  return t.action(api.rota.create, {
     sessionToken: who.token,
     name: "ختمة الرّفاق",
     days: { kind: "weekly", weekdays: [5], everyWeeks: 1 },
     firstDate: "2027-01-15",
     endDate: null,
   });
+};
 
 let phoneSeq = 0;
 async function addReader(
@@ -369,6 +381,7 @@ test("an admin's setup makes a no-show organizer a listed person", async () => {
   const t = convexTest(schema, modules);
   const adminToken = await admin(t);
   const phone = "+971501112233";
+  await allowStartToday(t);
   await t.action(api.adminRota.create, {
     adminToken,
     organizerName: "خالد",

@@ -52,7 +52,17 @@ async function organizer(t: T, rotaAllowed = true) {
 
 const fridays: ReadingDays = { kind: "weekly", weekdays: [5], everyWeeks: 1 };
 
-function create(
+/** These tests read from today, which needs the admin's start-tomorrow rule off. */
+const allowStartToday = (t: T) =>
+  t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaStartNextDay",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
+
+async function create(
   t: T,
   who: { token: string },
   over: Partial<{
@@ -61,7 +71,8 @@ function create(
     endDate: string | null;
   }> = {},
 ) {
-  return t.action(api.rota.create, {
+  await allowStartToday(t);
+  return await t.action(api.rota.create, {
     sessionToken: who.token,
     name: "ختمة الأحباب",
     days: fridays,
@@ -299,10 +310,10 @@ function finishSetup(t: T, who: { token: string }, inviteCode: string) {
   });
 }
 
-test("a khatma set up after its first day's start time starts that day once setup is done, with the people added", async () => {
+test("with the rule off, a khatma set up late on its first date starts that day once setup is done, with the people added", async () => {
   const t = convexTest(schema, modules);
   const who = await organizer(t);
-  // 15:00 in Dubai, after the 08:00 start time.
+  // 15:00 in Dubai.
   vi.setSystemTime(Date.UTC(2027, 0, 15, 11, 0, 0));
   const { inviteCode } = await create(t, who);
   for (const phone of ["+971506660001", "+971506660002"]) {
@@ -377,4 +388,19 @@ test("finishing setup twice keeps the first time, and only the organizer can", a
 
   const stranger = await organizer(t);
   expect(await code(finishSetup(t, stranger, inviteCode))).toBe("forbidden");
+});
+
+test("a new khatma can't start today under the admin's rule", async () => {
+  const t = convexTest(schema, modules);
+  const who = await organizer(t);
+  const start = (firstDate: string) =>
+    t.action(api.rota.create, {
+      sessionToken: who.token,
+      name: "ختمة",
+      days: { kind: "daily" },
+      firstDate,
+      endDate: null,
+    });
+  expect(await code(start("2027-01-15"))).toBe("invalid_dates");
+  expect(await code(start("2027-01-16"))).toBeUndefined();
 });

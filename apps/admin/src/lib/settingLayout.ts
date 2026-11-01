@@ -21,6 +21,7 @@ export type SettingSection =
   | "helpRetention"
   | "rotaTimes"
   | "rotaLimits"
+  | "rotaDay"
   | "rotaSilence";
 
 /**
@@ -146,6 +147,10 @@ export const SETTING_LAYOUT: Record<
         "rotaSummaryAt",
         "rotaSummaryOn",
       ],
+    },
+    {
+      section: "rotaDay",
+      keys: ["rotaLateTapMs", "rotaStartNextDay", "rotaAssignDuringQuiet"],
     },
     {
       section: "rotaLimits",

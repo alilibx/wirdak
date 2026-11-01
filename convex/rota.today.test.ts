@@ -20,6 +20,16 @@ afterEach(() => {
 
 type T = TestConvexForDataModel<DataModel>;
 
+/** These tests read from today, which needs the admin's start-tomorrow rule off. */
+const allowStartToday = (t: T) =>
+  t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaStartNextDay",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
+
 let seq = 0;
 
 async function person(t: T, name = "المنظم") {
@@ -51,6 +61,7 @@ async function person(t: T, name = "المنظم") {
 /** A weekly (Fridays) rota khatma, set up, whose first day is today. */
 async function setup(t: T, finished = true) {
   const who = await person(t);
+  await allowStartToday(t);
   const { inviteCode } = await t.action(api.rota.create, {
     sessionToken: who.token,
     name: "ختمة",

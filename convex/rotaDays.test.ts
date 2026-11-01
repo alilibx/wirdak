@@ -141,13 +141,13 @@ function notes(t: T, s: Setup) {
   );
 }
 
-test("starts nothing at 07:59 and day 1 at 08:00 with 30 reads", async () => {
+test("starts nothing before midnight and day 1 at 00:00 with 30 reads", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t);
-  await tickAt(t, s, "2027-01-16T07:59");
+  await tickAt(t, s, "2027-01-15T23:59");
   expect(await days(t, s)).toHaveLength(0);
 
-  await tickAt(t, s, "2027-01-16T08:00");
+  await tickAt(t, s, "2027-01-16T00:00");
   const [day, ...rest] = await days(t, s);
   expect(rest).toHaveLength(0);
   expect(day).toMatchObject({
@@ -155,8 +155,8 @@ test("starts nothing at 07:59 and day 1 at 08:00 with 30 reads", async () => {
     number: 1,
     cycle: 1,
     date: "2027-01-16",
-    startedAt: dubai("2027-01-16T08:00"),
-    closesAt: dubai("2027-01-17T08:00"),
+    startedAt: dubai("2027-01-16T00:00"),
+    closesAt: dubai("2027-01-17T00:00"),
     completedAt: null,
     closedAt: null,
     unreadSentAt: null,

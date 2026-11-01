@@ -8,16 +8,21 @@ import { isArchived } from "./lib/khatma";
 import { clearNotes, notify } from "./notes";
 import { enqueue } from "./rotaOutbox";
 import {
-  addDays,
   cycleOf,
   isReadingDate,
   khatmaNumber,
   ROTA_SIZE,
   slotFor,
 } from "./lib/rota";
-import { lastRotaDay, slotRowsByJuz } from "./lib/rotaPlace";
+import {
+  dayEnd,
+  firstDayFloor,
+  lastRotaDay,
+  lateTapOf,
+  slotRowsByJuz,
+} from "./lib/rotaPlace";
 import { getSetting } from "./lib/settings";
-import { instantAt, localDate, localMinutes } from "./lib/wakingTime";
+import { localDate, localMinutes } from "./lib/wakingTime";
 
 type RotaConfig = NonNullable<Doc<"khatmas">["rota"]>;
 
@@ -73,13 +78,16 @@ export async function celebrateIfComplete(
 /**
  * Whether a day should start now: setup is done, and today is a reading date
  * after the last started day (days only go forward, even if the time zone
- * moved west), so no started day can have today's date. A khatma from before setup was tracked counts as set up.
+ * moved west), so no started day can have today's date. The reading day is the
+ * calendar day, so it starts as soon as the date comes, not at the juz' message.
+ * A first day waits for `firstDayFloor`. A khatma from before setup was tracked
+ * counts as set up.
  */
 function shouldStart(
   rota: RotaConfig,
   last: Doc<"rotaDays"> | null,
   today: string,
-  now: number,
+  startsNextDay: boolean,
 ): boolean {
   if (rota.setupDoneAt === null) return false;
   if (rota.pausedAt !== null) return false;
@@ -87,7 +95,7 @@ function shouldStart(
   if (rota.endDate !== null && today > rota.endDate) return false;
   if (!isReadingDate(rota.days, rota.firstDate, today)) return false;
   if (rota.pauseDates.includes(today)) return false;
-  return localMinutes(now, rota.timeZone) >= rota.messages.dayAt;
+  return today >= firstDayFloor(rota, last, today, startsNextDay);
 }
 
 async function startDay(
@@ -110,15 +118,15 @@ async function startDay(
     cycle: cycleOf(n),
     date: today,
     startedAt: now,
-    closesAt: instantAt(addDays(today, 1), rota.messages.dayAt, rota.timeZone),
+    closesAt: dayEnd(today, rota.timeZone),
     completedAt: null,
     closedAt: null,
     unreadSentAt: skipIfPast(rota.messages.unread.at),
     summarySentAt: skipIfPast(rota.messages.summary.at),
     reminderSentAt: skipIfPast(rota.messages.reminder.at),
+    juzSentAt: null,
   });
   const byJuz = await slotRowsByJuz(ctx, khatma._id, number);
-  const juzByHolder = new Map<Id<"rotaParticipants">, number[]>();
   for (let juz = 1; juz <= ROTA_SIZE; juz++) {
     const slot = slotFor(juz, number);
     const holderId = byJuz.get(juz)?.participantId ?? null;
@@ -133,24 +141,57 @@ async function startDay(
       doneByOrganizer: false,
       reassignedAt: null,
     });
-    if (holderId !== null) {
-      juzByHolder.set(holderId, [...(juzByHolder.get(holderId) ?? []), juz]);
-    }
-  }
-  // One message per reader, with all their ajza' of the day.
-  for (const [participantId, juz] of juzByHolder) {
-    await enqueue(ctx, {
-      khatmaId: khatma._id,
-      participantId,
-      dayId,
-      kind: "juz",
-      juz,
-      number,
-    });
   }
   const day = await ctx.db.get(dayId);
   if (!day) throw new Error("rota day vanished");
   return day;
+}
+
+/**
+ * One juz' message per reader at the khatma's message time, with all their
+ * ajza' of the day. It leaves out what someone has heard already: a juz' read
+ * or reassigned since midnight, and anyone who joined since, in their welcome.
+ */
+async function sendJuzMessages(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  rota: RotaConfig,
+  day: Doc<"rotaDays">,
+  now: number,
+): Promise<void> {
+  if (
+    day.juzSentAt !== null ||
+    localMinutes(now, rota.timeZone) < rota.messages.dayAt
+  ) {
+    return;
+  }
+  const reads = await ctx.db
+    .query("rotaReads")
+    .withIndex("by_day_juz", (q) => q.eq("dayId", day._id))
+    .collect();
+  const juzByReader = new Map<Id<"rotaParticipants">, number[]>();
+  for (const r of reads) {
+    if (r.doneAt !== null || r.readerId === null || r.reassignedAt !== null) {
+      continue;
+    }
+    juzByReader.set(r.readerId, [
+      ...(juzByReader.get(r.readerId) ?? []),
+      r.juz,
+    ]);
+  }
+  for (const [participantId, juz] of juzByReader) {
+    const p = await ctx.db.get(participantId);
+    if (p?.joinedAt != null && p.joinedAt >= day.startedAt) continue;
+    await enqueue(ctx, {
+      khatmaId: khatma._id,
+      participantId,
+      dayId: day._id,
+      kind: "juz",
+      juz,
+      number: day.number,
+    });
+  }
+  await ctx.db.patch(day._id, { juzSentAt: now });
 }
 
 /**
@@ -364,10 +405,9 @@ async function sendCycleMessages(
 }
 
 /**
- * Closes a day and runs its silence count and cycle messages, once per day:
- * it does nothing for a closed day. (Archiving a khatma closes its open day
- * without them.) A day closing while the khatma is paused doesn't count toward
- * silence.
+ * Closes a day and runs its cycle messages, once per day: it does nothing for
+ * a closed day. (Archiving a khatma closes its open day without them.) A late
+ * «أتممت» still counts until `lateUntil`, and the silence count waits for that.
  */
 async function closeDay(
   ctx: MutationCtx,
@@ -377,16 +417,49 @@ async function closeDay(
   now: number,
 ): Promise<Doc<"rotaDays">> {
   if (day.closedAt !== null) return day;
-  await ctx.db.patch(day._id, { closedAt: now });
-  // Nobody is asked to reply while the khatma is paused.
-  if (rota.pausedAt === null) await countSilentDay(ctx, khatma, day, now);
+  const lateUntil =
+    dayEnd(day.date, rota.timeZone) + (await lateTapOf(ctx, rota));
+  const closed = { closedAt: now, lateUntil, settledAt: null };
+  await ctx.db.patch(day._id, closed);
   if (day.number === ROTA_SIZE) await sendCycleMessages(ctx, day);
-  return { ...day, closedAt: now };
+  return { ...day, ...closed };
+}
+
+/**
+ * Runs the silence count of closed days whose late window has ended, once per
+ * day. Returns whether one is still waiting. A window is at most 12 hours, so
+ * only the last two days can be. Nobody is asked to reply while the khatma is
+ * paused, so a day settling then doesn't count.
+ */
+async function settleDays(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  rota: RotaConfig,
+  now: number,
+): Promise<boolean> {
+  const recent = await ctx.db
+    .query("rotaDays")
+    .withIndex("by_khatma_n", (q) => q.eq("khatmaId", khatma._id))
+    .order("desc")
+    .take(2);
+  let waiting = false;
+  for (const day of recent) {
+    // `settledAt` is missing on days closed before late windows, which are done.
+    if (day.closedAt === null || day.settledAt !== null) continue;
+    if (now < (day.lateUntil ?? 0)) {
+      waiting = true;
+      continue;
+    }
+    if (rota.pausedAt === null) await countSilentDay(ctx, khatma, day, now);
+    await ctx.db.patch(day._id, { settledAt: now });
+  }
+  return waiting;
 }
 
 /**
  * Moves one rota khatma forward: closes the open day when it is due, starts
- * today's day, sends the organizer's notes and archives a finished khatma.
+ * today's day, sends the day's messages, counts silence once a late window
+ * ends and archives a finished khatma.
  * Every step is safe to repeat.
  */
 export const tick = internalMutation({
@@ -404,7 +477,8 @@ export const tick = internalMutation({
       last = await closeDay(ctx, khatma, rota, last, now);
     }
 
-    if (shouldStart(rota, last, today, now)) {
+    const startsNextDay = await getSetting(ctx, "rotaStartNextDay");
+    if (shouldStart(rota, last, today, startsNextDay)) {
       if (last) await closeDay(ctx, khatma, rota, last, now);
       last = await startDay(ctx, khatma, rota, last, today, now);
     }
@@ -416,12 +490,14 @@ export const tick = internalMutation({
       last.date === today &&
       rota.pausedAt === null
     ) {
+      await sendJuzMessages(ctx, khatma, rota, last, now);
       await sendOrganizerNotes(ctx, khatma, rota, last, now);
       await sendReminders(ctx, khatma, rota, last, now);
     }
 
+    const settling = await settleDays(ctx, khatma, rota, now);
     const open = last !== null && last.closedAt === null;
-    if (rota.endDate !== null && today > rota.endDate && !open) {
+    if (rota.endDate !== null && today > rota.endDate && !open && !settling) {
       await archiveKhatma(ctx, khatma);
     }
   },
