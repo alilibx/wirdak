@@ -128,6 +128,23 @@ test("an allowlisted admin signs in with the code and gets a 12-hour session", a
   );
 });
 
+test("switching off the member sign-in alert leaves the admin alert on", async () => {
+  const t = convexTest(schema, modules);
+  await addAdmin(t);
+  await t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "signInAlertOn",
+      value: false,
+      updatedAt: NOW,
+    }),
+  );
+  const { verificationId, pin } = await adminAtPin(t);
+
+  expect(await confirm(t, verificationId, pin)).toHaveProperty("adminToken");
+
+  expect(sent.at(-1)?.body).toMatch(ALERT_RE);
+});
+
 test("a wrong code counts attempts, then locks", async () => {
   const t = convexTest(schema, modules);
   await addAdmin(t);

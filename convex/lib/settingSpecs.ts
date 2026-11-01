@@ -58,6 +58,7 @@ export const SETTING_SPECS: { [K in SettingKey]: SettingSpec } = {
     group: "sessions",
   },
   pinMaxAttempts: { kind: "int", min: 3, max: 10, group: "sessions" },
+  signInAlertOn: { kind: "bool", group: "sessions" },
   verifyStartPerClientPer10Min: {
     kind: "int",
     min: 1,

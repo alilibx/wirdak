@@ -13,6 +13,7 @@ const labels: Record<SettingKey, string> = {
   completionDelayMs: "انتظار قبل إعلان اكتمال الختمة",
   verificationTtlMs: "صلاحية رمز التحقق",
   pinMaxAttempts: "محاولات الرمز المسموحة",
+  signInAlertOn: "تنبيه الأعضاء عند تسجيل الدخول",
   verifyStartPerClientPer10Min: "بدء التحقق لكل جهاز / ١٠ دقائق",
   verifyStartPerIpPer10Min: "بدء التحقق لكل عنوان IP / ١٠ دقائق",
   verifyPerPhonePerHour: "رسائل التحقق لكل رقم / ساعة",

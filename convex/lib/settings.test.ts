@@ -77,6 +77,7 @@ test("defaults match the spec", () => {
     cheerGapMs: 86_400_000,
     cheerShowName: false,
     cheerShowJuz: false,
+    signInAlertOn: true,
     organizerInactiveMs: 30 * 86_400_000,
     successorActiveMs: 7 * 86_400_000,
     notesRetentionMs: 30 * 86_400_000,

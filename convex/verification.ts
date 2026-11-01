@@ -558,6 +558,8 @@ type SignInResult =
       created: boolean;
       /** The person's sessions other than the one just opened. */
       otherSessions: number;
+      /** Send the sign-in alert (`signInAlertOn`). */
+      alertOn: boolean;
     }
   | { kind: "needs_pin"; phone: string | null }
   | { kind: "expired" | "wrong_pin" | "too_many_attempts" };
@@ -598,7 +600,13 @@ export const claimInternal = internalMutation({
     const personId = await insertPerson(ctx, doc, doc.phone, args.timeZone);
     await completeSignIn(ctx, doc, personId, args);
     await bumpCounter(ctx, signInKey(dubaiDay(Date.now()), "completed"));
-    return { kind: "ok", phone: doc.phone, created: true, otherSessions: 0 };
+    return {
+      kind: "ok",
+      phone: doc.phone,
+      created: true,
+      otherSessions: 0,
+      alertOn: await getSetting(ctx, "signInAlertOn"),
+    };
   },
 });
 
@@ -644,6 +652,7 @@ export const confirmPinInternal = internalMutation({
       phone: doc.phone,
       created: existing === null,
       otherSessions: sessions.filter((s) => s._id !== sessionId).length,
+      alertOn: await getSetting(ctx, "signInAlertOn"),
     };
   },
 });
@@ -673,12 +682,14 @@ export const claim = action({
     });
     switch (res.kind) {
       case "ok":
-        await sendSignInAlert(
-          res.phone,
-          res.created,
-          deviceLabel,
-          tokens.alertToken,
-        );
+        if (res.alertOn) {
+          await sendSignInAlert(
+            res.phone,
+            res.created,
+            deviceLabel,
+            tokens.alertToken,
+          );
+        }
         return { sessionToken: tokens.sessionToken };
       case "needs_pin":
         if (res.phone) await sendPin(res.phone, pin);
@@ -722,12 +733,14 @@ export const confirmPin = action({
     );
     switch (res.kind) {
       case "ok":
-        await sendSignInAlert(
-          res.phone,
-          res.created,
-          deviceLabel,
-          tokens.alertToken,
-        );
+        if (res.alertOn) {
+          await sendSignInAlert(
+            res.phone,
+            res.created,
+            deviceLabel,
+            tokens.alertToken,
+          );
+        }
         return {
           sessionToken: tokens.sessionToken,
           otherSessions: res.otherSessions,
