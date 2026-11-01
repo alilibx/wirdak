@@ -50,6 +50,14 @@ crons.daily(
   {},
 );
 
+// Daily: put right any count or directory row a write left out of date (spec 6).
+crons.daily(
+  "repair the admin lists",
+  { hourUTC: 22, minuteUTC: 0 },
+  internal.directory.repair,
+  {},
+);
+
 // Hourly: the morning summary goes out when the Dubai hour is `summaryHour`.
 crons.hourly(
   "send the admins' morning summary",

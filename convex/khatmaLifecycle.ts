@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id, TableNames } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
+import { refreshPerson, refreshPhone } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
 import { lastRotaDay } from "./lib/rotaPlace";
 import { sessionMutation } from "./lib/session";
@@ -87,6 +88,12 @@ export async function deleteKhatma(
     .collect();
   for (const member of members) await ctx.db.delete(member._id);
   await ctx.db.delete(khatma._id);
+  for (const personId of new Set([
+    khatma.creatorPersonId,
+    ...members.map((m) => m.personId),
+  ])) {
+    await refreshPerson(ctx, personId);
+  }
   await ctx.scheduler.runAfter(0, internal.khatmaLifecycle.purgeRows, {
     khatmaId: khatma._id,
     stage: 0,
@@ -109,7 +116,7 @@ export const remove = sessionMutation({
 type Purge = (
   ctx: MutationCtx,
   khatmaId: Id<"khatmas">,
-) => Promise<{ _id: Id<TableNames> }[]>;
+) => Promise<{ _id: Id<TableNames>; phone?: string }[]>;
 
 /**
  * The next rows of a deleted khatma for each stage to delete. Finished
@@ -183,7 +190,11 @@ export const purgeRows = internalMutation({
     const purge = PURGE_STAGES[stage];
     if (purge) {
       const rows = await purge(ctx, khatmaId);
-      for (const row of rows) await ctx.db.delete(row._id);
+      for (const row of rows) {
+        await ctx.db.delete(row._id);
+        // A participant's phone reads one khatma fewer now.
+        if (row.phone !== undefined) await refreshPhone(ctx, row.phone);
+      }
       await next(rows.length === PURGE_BATCH ? stage : stage + 1);
       return;
     }

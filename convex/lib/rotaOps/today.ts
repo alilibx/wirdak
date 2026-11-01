@@ -3,6 +3,7 @@ import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { scheduleRotaCheer } from "../../cheers";
 import { celebrateIfComplete, completeIfDone } from "../../rotaDays";
 import { enqueue } from "../../rotaOutbox";
+import { changeCompletedDays } from "../directory";
 import { isArchived } from "../khatma";
 import { lastRotaDay, targetDay, type RotaConfig } from "../rotaPlace";
 import { localDate } from "../wakingTime";
@@ -248,6 +249,7 @@ export async function markNotDone(
   });
   if (found.day.completedAt !== null) {
     await ctx.db.patch(found.day._id, { completedAt: null });
+    await changeCompletedDays(ctx, found.day.khatmaId, -1);
   }
   return { ok: true };
 }

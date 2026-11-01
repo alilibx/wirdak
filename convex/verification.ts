@@ -26,6 +26,7 @@ import {
   type RateLimitBucket,
 } from "./lib/rateLimit";
 import { isBlocked } from "./lib/blocked";
+import { refreshPhone } from "./lib/directory";
 import { getSetting } from "./lib/settings";
 import { bumpCounter, dubaiDay, signInKey } from "./lib/stats";
 import { insertSession } from "./sessions";
@@ -166,19 +167,21 @@ async function toAdminNeedsPin(
   });
 }
 
-function insertPerson(
+async function insertPerson(
   ctx: MutationCtx,
   doc: Doc<"verifications">,
   phone: string,
   timeZone: string,
 ): Promise<Id<"people">> {
-  return ctx.db.insert("people", {
+  const personId = await ctx.db.insert("people", {
     phone,
     displayName: doc.displayName,
     verifiedAt: Date.now(),
     timeZone,
     lastSeenAt: Date.now(),
   });
+  await refreshPhone(ctx, phone);
+  return personId;
 }
 
 /** Opens a session for `personId` and marks the verification claimed. */
@@ -623,6 +626,11 @@ export const confirmPinInternal = internalMutation({
     // The PIN went to this phone, so its holder owns whichever account has
     // the number now.
     const existing = await personByPhone(ctx, doc.phone);
+    // An organizer an admin set up has only now signed in.
+    if (existing?.verifiedAt === 0) {
+      const now = Date.now();
+      await ctx.db.patch(existing._id, { verifiedAt: now, lastSeenAt: now });
+    }
     const personId =
       existing?._id ?? (await insertPerson(ctx, doc, doc.phone, args.timeZone));
     const sessionId = await completeSignIn(ctx, doc, personId, args);

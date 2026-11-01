@@ -6,6 +6,7 @@ import {
   type CheerConfig,
   type CheerSetting,
 } from "../cheer";
+import { nameFields } from "../directory";
 import { isArchived } from "../khatma";
 import {
   addDays,
@@ -188,7 +189,7 @@ export async function update(
   }
 
   await ctx.db.patch(khatma._id, {
-    ...(name !== undefined ? { name } : {}),
+    ...(name !== undefined ? nameFields(name) : {}),
     ...(args.cheer !== undefined ? { cheer: args.cheer ?? undefined } : {}),
     rota: {
       ...rota,

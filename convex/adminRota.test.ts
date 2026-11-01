@@ -607,18 +607,6 @@ test("the admin lookup says who a rota khatma waits for, and its join link", asy
   expect(k?.rota?.joinLink).toContain("https://wa.me/971500000000");
 });
 
-test("the organizers list keeps the paginator's fields", async () => {
-  const t = convexTest(schema, modules);
-  await running(t);
-  const result = await t.query(api.adminLookup.organizers, {
-    adminToken,
-    paginationOpts: { numItems: 10, cursor: null },
-  });
-  expect(result.page).toHaveLength(1);
-  expect(result).toHaveProperty("splitCursor");
-  expect(result).toHaveProperty("pageStatus");
-});
-
 test("a person's view lists the khatma waiting for them", async () => {
   const t = convexTest(schema, modules);
   const { khatmaId } = await running(t);

@@ -25,6 +25,7 @@ import { ReadingDaysField } from "../features/rota/ReadingDaysField";
 import { TimeField } from "../features/rota/TimeField";
 import { useRotaCall } from "../features/rota/useRotaCall";
 import { t } from "../i18n/ar";
+import { timeZoneOptions } from "../lib/timeZones";
 
 type SectionId = "pause" | "messages" | "cheer" | "details";
 type Feedback = { section: SectionId; kind: "saved" | "error"; text: string };
@@ -37,15 +38,6 @@ const fieldClass =
 
 const khatmaPath = (inviteCode: string) =>
   `/j/${encodeURIComponent(inviteCode)}`;
-
-/** The zones this browser knows, the khatma's own first. */
-function timeZones(current: string): string[] {
-  const known =
-    typeof Intl.supportedValuesOf === "function"
-      ? Intl.supportedValuesOf("timeZone")
-      : [];
-  return [current, ...known.filter((zone) => zone !== current)];
-}
 
 const sameDays = (a: ReadingDays, b: ReadingDays) =>
   JSON.stringify(a) === JSON.stringify(b);
@@ -395,14 +387,13 @@ export function RotaSettingsContent({
           </label>
           <select
             id="rota-settings-zone"
-            dir="ltr"
             value={timeZone}
             onChange={(event) => setTimeZone(event.target.value)}
-            className={`${fieldClass} text-end`}
+            className={fieldClass}
           >
-            {timeZones(settings.timeZone).map((zone) => (
-              <option key={zone} value={zone}>
-                {zone}
+            {timeZoneOptions(settings.timeZone).map((zone) => (
+              <option key={zone.value} value={zone.value}>
+                {zone.label}
               </option>
             ))}
           </select>

@@ -95,11 +95,11 @@ Two kinds of record reach support, and the console must handle both:
 
 Everything about someone is therefore looked up **by phone as well as by person**, using `rotaParticipants.by_phone`, so a signed-in reader's page still shows their rotating khatmas and reading.
 
-**New on `people`:** `organizesCount`, `memberOfCount` (pool memberships plus rota participations, by phone), and `searchName` (folded). **New indexes:** `by_lastSeenAt`, `by_verifiedAt`, and `by_organizesCount` and `by_memberOfCount`, used to filter, never to sort.
+**New on `people`:** `organizesCount`, `memberOfCount` (pool memberships plus rota participations, by phone), `listTab` (`organizers`, `members`, or `noKhatma`, from the two counts), and `searchName` (folded). **New indexes:** `by_lastSeenAt`, `by_verifiedAt`, `by_searchName`, and one per sort order on `listTab` **[builder's call: an index range on a count pages in count order, the ranking this section forbids, and can't page a tab by name or last seen. An equality on `listTab` can.]**
 
 **New table `readerDirectory`:** one row per phone that reads in a rotating khatma and has no account, with a name, khatma count, and last reply. It exists because the reader list needs paging by distinct phone **[builder's call]**.
 
-The tabs are **All**, **Organizers** (`organizesCount > 0`), **Members** (`organizesCount = 0`, `memberOfCount > 0`), **No khatma**, and **WhatsApp readers** (from `readerDirectory`). Update the counts and the directory with one helper, wherever `members`, `khatmas.creatorPersonId`, or `rotaParticipants` change, and repair drift in a nightly cron **[builder's call]**.
+The tabs are **All**, **Organizers** (`organizesCount > 0`), **Members** (`organizesCount = 0`, `memberOfCount > 0`), **No khatma**, and **WhatsApp readers** (from `readerDirectory`). Update the counts and the directory with one helper (`refreshPhone`), wherever `members`, `khatmas.creatorPersonId`, or `rotaParticipants` change, and repair drift in a nightly cron **[builder's call]**. The same run, `internal.directory.repair`, is the backfill.
 
 **Sorting.** Name, last seen, joined, and created. Counts can show, and filters can use them, but no column sorts by organizing, membership, or completions, because that's a leaderboard one click away. The prototype's count sorts don't carry over.
 
@@ -122,7 +122,7 @@ A reader's page is read-only apart from deletion: their khatmas, slots, reading,
 
 ### Khatmas
 
-**New on `khatmas`:** `searchName`. Use the default `_creationTime` order, or `by_kind` for the kind filter.
+**New on `khatmas`:** `searchName`, and `completedDays` for a rotating khatma, because counting its reading days on every list row reads too much **[builder's call]**. Use the default `_creationTime` order, or `by_kind` for the kind filter.
 
 Pool khatmas gain edit name, edit schedule and grace, archive, restore, and delete. `archive` and `remove` already exist as `sessionMutation`s in `convex/khatmaLifecycle.ts`, so move their logic to shared functions and add `adminMutation` versions. Admin creation of a pool khatma takes an existing person as organizer. Reset invite and hand over stay as they are.
 

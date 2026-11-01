@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { t } from "../i18n/ar";
-import { OrganizersPage } from "./OrganizersPage";
+import { OrganizersTab } from "./OrganizersTab";
 
 const m = vi.hoisted(() => ({
   results: [] as unknown[],
@@ -45,16 +45,19 @@ const organizer = (id: string, name: string, rotaAllowed: boolean) => ({
   displayName: name,
   phoneMasked: "+971 50 ••• 4567",
   rotaAllowed,
+  status: "active",
+  away: false,
+  totalMembers: 4,
   khatmas: [
     { khatmaId: `${id}-k1`, name: "ختمة العائلة", memberCount: 3 },
     { khatmaId: `${id}-k2`, name: null, memberCount: 1 },
   ],
 });
 
-function renderPage() {
+function renderPage(search = "") {
   return render(
     <MemoryRouter>
-      <OrganizersPage />
+      <OrganizersTab search={search} />
     </MemoryRouter>,
   );
 }
@@ -70,11 +73,65 @@ beforeEach(() => {
   m.mutation.mockReset().mockResolvedValue({ ok: true });
 });
 
-describe("OrganizersPage", () => {
-  it("lists a page of 50 khatmas' organizers, with a masked phone, their khatmas and the switch", () => {
+describe("OrganizersTab", () => {
+  it("shows the total members, and flags who is away or never signed in", () => {
+    m.results = [
+      { ...organizer("p1", "سارة", false), away: true },
+      { ...organizer("p2", "علي", false), status: "notJoined" },
+    ];
+    renderPage();
+    const row = screen.getByRole("link", { name: "سارة" }).closest("li")!;
+    expect(within(row).getByText(t.organizers.away)).toBeInTheDocument();
+    expect(
+      within(row).getByText(t.organizers.totalMembers("٤")),
+    ).toBeInTheDocument();
+    const other = screen.getByRole("link", { name: "علي" }).closest("li")!;
+    expect(
+      within(other).queryByText(t.organizers.away),
+    ).not.toBeInTheDocument();
+    expect(
+      within(other).getByText(t.people.statuses.notJoined),
+    ).toBeInTheDocument();
+  });
+
+  it("sorts on the server", async () => {
+    renderPage();
+    await userEvent.selectOptions(
+      screen.getByLabelText(t.lists.sortBy),
+      "lastSeen",
+    );
+    expect(m.paginatedArgs.at(-1)).toEqual([
+      { adminToken: "tok", sort: "lastSeen", order: "desc" },
+      { initialNumItems: 50 },
+    ]);
+  });
+
+  it("passes the search on", () => {
+    renderPage("سارة");
+    expect(m.paginatedArgs.at(-1)).toMatchObject([{ search: "سارة" }, {}]);
+  });
+
+  it("turns the order round, with no way to sort during a search", async () => {
+    const { unmount } = renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: t.lists.reverse }),
+    );
+    expect(m.paginatedArgs.at(-1)).toMatchObject([
+      { sort: "created", order: "asc" },
+      { initialNumItems: 50 },
+    ]);
+    unmount();
+
+    m.results = [];
+    renderPage("سارة");
+    expect(screen.queryByLabelText(t.lists.sortBy)).not.toBeInTheDocument();
+    expect(screen.getByText(t.lists.empty)).toBeInTheDocument();
+  });
+
+  it("lists a page of 50 organizers, with a masked phone, their khatmas and the switch", () => {
     renderPage();
     expect(m.paginatedArgs[0]).toEqual([
-      { adminToken: "tok" },
+      { adminToken: "tok", sort: "created", order: "desc" },
       { initialNumItems: 50 },
     ]);
     const row = screen.getByRole("link", { name: "سارة" }).closest("li")!;
@@ -152,9 +209,7 @@ describe("OrganizersPage", () => {
   it("loads more, and says so when there are none", async () => {
     m.status = "CanLoadMore";
     const { unmount } = renderPage();
-    await userEvent.click(
-      screen.getByRole("button", { name: t.organizers.more }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: t.lists.more }));
     expect(m.loadMore).toHaveBeenCalledWith(50);
     unmount();
 
@@ -232,7 +287,7 @@ describe("OrganizersPage", () => {
     renderPage();
     expect(screen.queryByText(t.organizers.empty)).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: t.organizers.more }),
+      screen.getByRole("button", { name: t.lists.more }),
     ).toBeInTheDocument();
   });
 

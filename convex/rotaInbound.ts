@@ -7,6 +7,7 @@ import {
 } from "./_generated/server";
 import { scheduleRotaCheer } from "./cheers";
 import { isBlocked } from "./lib/blocked";
+import { refreshPhone } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
 import { notify } from "./notes";
 import { celebrateIfComplete, completeIfDone } from "./rotaDays";
@@ -136,6 +137,7 @@ async function recordReply(
       silencedAt: null,
     });
   }
+  if (active.length > 0) await refreshPhone(ctx, phone);
   return active;
 }
 
@@ -280,6 +282,7 @@ async function takeUpOrganizing(
     lastNudgeAt: null,
     lastCelebratedRound: 0,
   });
+  await refreshPhone(ctx, organizer.phone);
   await ctx.db.patch(khatma._id, {
     rota: { ...rota, pendingOrganizer: false },
   });

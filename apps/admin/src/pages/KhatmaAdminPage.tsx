@@ -74,7 +74,12 @@ export function KhatmaAdminPage() {
               "—"
             ),
           ],
-          [t.lookup.schedule, webT.schedules[k.schedule]],
+          ...(k.rota
+            ? []
+            : ([[t.lookup.schedule, webT.schedules[k.schedule]]] as [
+                string,
+                string,
+              ][])),
           [
             t.help.khatma,
             <span dir="ltr" className="block text-start">

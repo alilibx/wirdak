@@ -10,6 +10,7 @@
 
 import type * as adminAuth from "../adminAuth.js";
 import type * as adminHelp from "../adminHelp.js";
+import type * as adminLists from "../adminLists.js";
 import type * as adminLookup from "../adminLookup.js";
 import type * as adminOps from "../adminOps.js";
 import type * as adminPush from "../adminPush.js";
@@ -21,6 +22,7 @@ import type * as audit from "../audit.js";
 import type * as cheers from "../cheers.js";
 import type * as crons from "../crons.js";
 import type * as dev from "../dev.js";
+import type * as directory from "../directory.js";
 import type * as grace from "../grace.js";
 import type * as handoff from "../handoff.js";
 import type * as help from "../help.js";
@@ -35,6 +37,7 @@ import type * as lib_blocked from "../lib/blocked.js";
 import type * as lib_cheer from "../lib/cheer.js";
 import type * as lib_crypto from "../lib/crypto.js";
 import type * as lib_digits from "../lib/digits.js";
+import type * as lib_directory from "../lib/directory.js";
 import type * as lib_duas from "../lib/duas.js";
 import type * as lib_grace from "../lib/grace.js";
 import type * as lib_help from "../lib/help.js";
@@ -56,6 +59,7 @@ import type * as lib_rotaPlace from "../lib/rotaPlace.js";
 import type * as lib_rotaReplies from "../lib/rotaReplies.js";
 import type * as lib_rotaTemplates from "../lib/rotaTemplates.js";
 import type * as lib_schedule from "../lib/schedule.js";
+import type * as lib_searchFold from "../lib/searchFold.js";
 import type * as lib_session from "../lib/session.js";
 import type * as lib_settingSpecs from "../lib/settingSpecs.js";
 import type * as lib_settings from "../lib/settings.js";
@@ -93,6 +97,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   adminAuth: typeof adminAuth;
   adminHelp: typeof adminHelp;
+  adminLists: typeof adminLists;
   adminLookup: typeof adminLookup;
   adminOps: typeof adminOps;
   adminPush: typeof adminPush;
@@ -104,6 +109,7 @@ declare const fullApi: ApiFromModules<{
   cheers: typeof cheers;
   crons: typeof crons;
   dev: typeof dev;
+  directory: typeof directory;
   grace: typeof grace;
   handoff: typeof handoff;
   help: typeof help;
@@ -118,6 +124,7 @@ declare const fullApi: ApiFromModules<{
   "lib/cheer": typeof lib_cheer;
   "lib/crypto": typeof lib_crypto;
   "lib/digits": typeof lib_digits;
+  "lib/directory": typeof lib_directory;
   "lib/duas": typeof lib_duas;
   "lib/grace": typeof lib_grace;
   "lib/help": typeof lib_help;
@@ -139,6 +146,7 @@ declare const fullApi: ApiFromModules<{
   "lib/rotaReplies": typeof lib_rotaReplies;
   "lib/rotaTemplates": typeof lib_rotaTemplates;
   "lib/schedule": typeof lib_schedule;
+  "lib/searchFold": typeof lib_searchFold;
   "lib/session": typeof lib_session;
   "lib/settingSpecs": typeof lib_settingSpecs;
   "lib/settings": typeof lib_settings;

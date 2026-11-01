@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { scheduleCheer } from "./cheers";
 import { alertOrganizer, isHeld, scheduleGrace } from "./grace";
+import { refreshPerson } from "./lib/directory";
 import { graceTimes, graceWakingMs } from "./lib/grace";
 import { JUZ_COUNT } from "./lib/juz";
 import { personPace } from "./lib/pace";
@@ -216,6 +217,7 @@ export const take = sessionMutation({
           ...fresh,
         });
       }
+      await refreshPerson(ctx, person._id);
     }
 
     const takenAt = Date.now();

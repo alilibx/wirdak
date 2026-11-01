@@ -10,6 +10,7 @@ import {
 import { membersByJoin, organizerOf, requireOrganizer } from "./organizer";
 import { cheerConfigValidator } from "./lib/cheer";
 import { randomToken } from "./lib/crypto";
+import { nameFields, refreshPerson, refreshPhone } from "./lib/directory";
 import { DEFAULT_GRACE } from "./lib/grace";
 import { isArchived } from "./lib/khatma";
 import { checkRateLimit } from "./lib/rateLimit";
@@ -132,7 +133,7 @@ async function insertRotaRow(
   }
 
   return ctx.db.insert("khatmas", {
-    name: spec.name,
+    ...nameFields(spec.name),
     schedule: "none",
     grace: DEFAULT_GRACE.none,
     creatorPersonId: person._id,
@@ -163,6 +164,7 @@ async function insertOrganizerMembership(
     lastNudgeAt: null,
     lastCelebratedRound: 0,
   });
+  await refreshPerson(ctx, personId);
 }
 
 /**
@@ -239,6 +241,7 @@ export async function insertRotaKhatma(
     removedAt: null,
   });
   await ctx.db.insert("rotaSlots", { khatmaId, slot: 1, participantId });
+  await refreshPhone(ctx, person.phone);
   return khatmaId;
 }
 
@@ -404,6 +407,7 @@ export const insertAgain = internalMutation({
         removedAt: null,
         ...(old.phoneHidden === true ? { phoneHidden: true } : {}),
       });
+      await refreshPhone(ctx, old.phone);
       const slots = await ctx.db
         .query("rotaSlots")
         .withIndex("by_participant", (q) => q.eq("participantId", old._id))

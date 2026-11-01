@@ -16,6 +16,7 @@ import {
   type CheerSetting,
 } from "./lib/cheer";
 import { randomToken } from "./lib/crypto";
+import { nameFields, refreshPerson } from "./lib/directory";
 import { graceValidator, isValidGrace, type Grace } from "./lib/grace";
 import { isArchived, khatmaByInviteCode } from "./lib/khatma";
 import { scheduleValidator, type Schedule } from "./lib/schedule";
@@ -196,7 +197,7 @@ export const update = sessionMutation({
       return { ok: false, reason: "invalid_cheer" };
     }
     await ctx.db.patch(khatma._id, {
-      ...(args.name !== undefined ? { name: cleanKhatmaName(args.name) } : {}),
+      ...(args.name !== undefined ? nameFields(cleanKhatmaName(args.name)) : {}),
       ...(args.schedule !== undefined ? { schedule: args.schedule } : {}),
       ...(args.grace !== undefined ? { grace: args.grace } : {}),
       ...(args.cheer !== undefined ? { cheer: args.cheer ?? undefined } : {}),
@@ -298,6 +299,8 @@ export async function handOverTo(
   previous: Doc<"people"> | null,
 ): Promise<void> {
   await ctx.db.patch(khatma._id, { creatorPersonId: member.personId });
+  await refreshPerson(ctx, khatma.creatorPersonId);
+  await refreshPerson(ctx, member.personId);
   if (isArchived(khatma)) return;
   await notify(ctx, {
     personId: member.personId,
@@ -374,6 +377,7 @@ export const removeMember = sessionMutation({
       status: "blocked",
       shareToken: undefined,
     });
+    await refreshPerson(ctx, member.personId);
 
     if (khatma.currentRoundId) {
       const held = heldAssignment(
