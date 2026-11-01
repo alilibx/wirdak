@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0](https://github.com/alilibx/wirdak/compare/v0.6.0...v0.7.0) (2026-11-01)
+
+
+### Features
+
+* **admin:** browse people and khatmas in paged lists ([#53](https://github.com/alilibx/wirdak/issues/53)) ([0cc04a8](https://github.com/alilibx/wirdak/commit/0cc04a863df06490d49e64801e35a9d67ccdac64))
+* **admin:** move the panel to the console shell ([#48](https://github.com/alilibx/wirdak/issues/48)) ([2663056](https://github.com/alilibx/wirdak/commit/2663056668a1f3847c3a7e81bc3c5c49704234d6))
+* cheer readers when someone in their khatma finishes a juz' ([#51](https://github.com/alilibx/wirdak/issues/51)) ([7e51df5](https://github.com/alilibx/wirdak/commit/7e51df5afde4f14f1f42268c9ac60e90fd08c08c))
+* **rota:** ask when someone added late starts, and show numbers in the people list ([#52](https://github.com/alilibx/wirdak/issues/52)) ([235ba60](https://github.com/alilibx/wirdak/commit/235ba6031d76a812e14e9a594f493240e13a3b13))
+* **rota:** give late joiners today's free juz', and let organizers rename people ([#49](https://github.com/alilibx/wirdak/issues/49)) ([ae2a7b4](https://github.com/alilibx/wirdak/commit/ae2a7b46476d4970d814b326be81d6e4c6da6045))
+
 ## [0.6.0](https://github.com/alilibx/wirdak/compare/v0.5.0...v0.6.0) (2026-10-30)
 
 
