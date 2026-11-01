@@ -564,6 +564,15 @@ type SignInResult =
   | { kind: "needs_pin"; phone: string | null }
   | { kind: "expired" | "wrong_pin" | "too_many_attempts" };
 
+async function alertSignIn(
+  res: Extract<SignInResult, { kind: "ok" }>,
+  deviceLabel: string,
+  alertToken: string,
+): Promise<void> {
+  if (!res.alertOn) return;
+  await sendSignInAlert(res.phone, res.created, deviceLabel, alertToken);
+}
+
 const signInArgs = {
   verificationId: v.id("verifications"),
   secretHash: v.string(),
@@ -682,14 +691,7 @@ export const claim = action({
     });
     switch (res.kind) {
       case "ok":
-        if (res.alertOn) {
-          await sendSignInAlert(
-            res.phone,
-            res.created,
-            deviceLabel,
-            tokens.alertToken,
-          );
-        }
+        await alertSignIn(res, deviceLabel, tokens.alertToken);
         return { sessionToken: tokens.sessionToken };
       case "needs_pin":
         if (res.phone) await sendPin(res.phone, pin);
@@ -733,14 +735,7 @@ export const confirmPin = action({
     );
     switch (res.kind) {
       case "ok":
-        if (res.alertOn) {
-          await sendSignInAlert(
-            res.phone,
-            res.created,
-            deviceLabel,
-            tokens.alertToken,
-          );
-        }
+        await alertSignIn(res, deviceLabel, tokens.alertToken);
         return {
           sessionToken: tokens.sessionToken,
           otherSessions: res.otherSessions,
