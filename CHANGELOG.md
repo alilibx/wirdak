@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/alilibx/wirdak/compare/v0.8.0...v0.9.0) (2026-11-01)
+
+
+### Features
+
+* **rota:** make the reading day the calendar day ([#57](https://github.com/alilibx/wirdak/issues/57)) ([4cc5111](https://github.com/alilibx/wirdak/commit/4cc51111790ef1ac5ce5806ff10e0849033616a7))
+
 ## [0.8.0](https://github.com/alilibx/wirdak/compare/v0.7.0...v0.8.0) (2026-11-01)
 
 
