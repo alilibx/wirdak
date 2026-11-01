@@ -802,6 +802,7 @@ export const ar = {
     lateTapLabel: "احتساب «أتممت» بعد منتصف الليل",
     lateTapHint:
       "من أتمّ جزء الأمس خلال هذه المدة يُحتسب له، ولا يؤثر ذلك في جزء اليوم.",
+    lateTapMinutes: (minutes: number) => `${toArabicDigits(minutes)} دقيقة`,
     lateTapHours: (hours: number) =>
       hours === 0
         ? "لا يُحتسب"

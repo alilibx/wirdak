@@ -1,7 +1,8 @@
 import { useId } from "react";
 import { t } from "../../i18n/ar";
 
-const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
 const MAX_HOURS = 12;
 
 /** How long after midnight a late «أتممت» counts, chosen in whole hours; `value` is kept even off the hour. */
@@ -34,7 +35,9 @@ export function LateTapField({
       >
         {options.map((ms) => (
           <option key={ms} value={ms}>
-            {t.rota.lateTapHours(Math.round(ms / HOUR_MS))}
+            {ms % HOUR_MS === 0
+              ? t.rota.lateTapHours(ms / HOUR_MS)
+              : t.rota.lateTapMinutes(Math.round(ms / MINUTE_MS))}
           </option>
         ))}
       </select>

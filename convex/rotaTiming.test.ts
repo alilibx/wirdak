@@ -225,6 +225,10 @@ test("the morning message leaves out someone who joined since midnight, and a ju
     await ctx.db.patch(s.participantId, {
       joinedAt: dubai("2027-01-16T03:00"),
     });
+    await ctx.db.insert("waContacts", {
+      phone: PHONE,
+      lastInboundAt: dubai("2027-01-16T03:00"),
+    });
   });
   await tickAt(t, s, "2027-01-16T08:00");
   expect(await outbox(t, "juz")).toHaveLength(0);
@@ -307,6 +311,7 @@ test("a late tap saves a reader from a silent day: the count waits for the windo
   const t = convexTest(schema, modules);
   const s = await setup(t);
   await tickAt(t, s, "2027-01-16T00:00");
+  await tickAt(t, s, "2027-01-16T08:00");
   await tickAt(t, s, "2027-01-17T00:00");
   const silent = () =>
     t.run(async (ctx) => (await ctx.db.get(s.participantId))?.silentDays ?? 0);
@@ -324,6 +329,7 @@ test("a reader who never answers is counted once, when the window ends", async (
   const t = convexTest(schema, modules);
   const s = await setup(t);
   await tickAt(t, s, "2027-01-16T00:00");
+  await tickAt(t, s, "2027-01-16T08:00");
   await tickAt(t, s, "2027-01-17T00:00");
   await tickAt(t, s, "2027-01-17T08:00");
   await tickAt(t, s, "2027-01-17T08:15");
@@ -337,6 +343,7 @@ test("an ended khatma stays until the late window of its last day ends", async (
   const t = convexTest(schema, modules);
   const s = await setup(t, { endDate: "2027-01-16" });
   await tickAt(t, s, "2027-01-16T00:00");
+  await tickAt(t, s, "2027-01-16T08:00");
   await tickAt(t, s, "2027-01-17T00:00");
   const archivedAt = () =>
     t.run(async (ctx) => (await ctx.db.get(s.khatmaId))?.rota?.archivedAt);
@@ -376,4 +383,81 @@ test("the rule binds only a first day: a running khatma carries on", async () =>
   await tickAt(t, s, "2027-01-16T00:00");
   await tickAt(t, s, "2027-01-17T00:00");
   expect(await days(t, s)).toHaveLength(2);
+});
+
+const setPaused = (t: T, s: Setup, pausedAt: number | null) =>
+  t.run(async (ctx) => {
+    const k = await ctx.db.get(s.khatmaId);
+    await ctx.db.patch(s.khatmaId, { rota: { ...k!.rota!, pausedAt } });
+  });
+
+const silentDays = (t: T, s: Setup) =>
+  t.run(async (ctx) => (await ctx.db.get(s.participantId))?.silentDays ?? 0);
+
+test("someone who joined since midnight still gets the message if their welcome couldn't reach them", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await tickAt(t, s, "2027-01-16T00:00");
+  await t.run((ctx) =>
+    ctx.db.patch(s.participantId, { joinedAt: dubai("2027-01-16T03:00") }),
+  );
+  await tickAt(t, s, "2027-01-16T08:00");
+  expect(await outbox(t, "juz")).toHaveLength(1);
+});
+
+test("a day that closes paused doesn't count, even if the pause ends within the window", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await tickAt(t, s, "2027-01-16T00:00");
+  await tickAt(t, s, "2027-01-16T08:00");
+  await setPaused(t, s, dubai("2027-01-16T12:00"));
+  await tickAt(t, s, "2027-01-17T00:00");
+  await setPaused(t, s, null);
+  await tickAt(t, s, "2027-01-17T08:00");
+  expect(await silentDays(t, s)).toBe(0);
+});
+
+test("a day whose juz' message never went doesn't count as silent", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await tickAt(t, s, "2027-01-16T00:00");
+  await setPaused(t, s, dubai("2027-01-16T01:00"));
+  await tickAt(t, s, "2027-01-16T08:00");
+  await setPaused(t, s, null);
+  await tickAt(t, s, "2027-01-17T00:00");
+  await tickAt(t, s, "2027-01-17T08:00");
+  expect((await days(t, s))[0]?.juzSentAt).toBeNull();
+  expect(await silentDays(t, s)).toBe(0);
+});
+
+test("a juz' message a pause held past the reminder's time goes without the reminder", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, {
+    messages: { ...MESSAGES, reminder: { at: 960, on: true } },
+  });
+  await tickAt(t, s, "2027-01-16T00:00");
+  await setPaused(t, s, dubai("2027-01-16T07:00"));
+  await tickAt(t, s, "2027-01-16T08:00");
+  await setPaused(t, s, null);
+  await tickAt(t, s, "2027-01-16T17:00");
+  await tickAt(t, s, "2027-01-16T17:15");
+  expect(await outbox(t, "juz")).toHaveLength(1);
+  expect(await outbox(t, "reminder")).toHaveLength(0);
+});
+
+test("a late tap doesn't touch a khatma archived since", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await tickAt(t, s, "2027-01-16T00:00");
+  await tickAt(t, s, "2027-01-17T00:00");
+  const [old] = await days(t, s);
+  await t.run(async (ctx) => {
+    const k = await ctx.db.get(s.khatmaId);
+    await ctx.db.patch(s.khatmaId, {
+      rota: { ...k!.rota!, archivedAt: dubai("2027-01-17T00:30") },
+    });
+  });
+  const result = await tap(t, s, old!._id, "done", "2027-01-17T01:00");
+  expect(JSON.stringify(result)).toContain(closedText);
+  expect(await doneReads(t, old!._id)).toHaveLength(0);
 });

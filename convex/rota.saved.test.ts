@@ -993,3 +993,15 @@ test("startAgain applies the cap and the date checks, and rotaAllowed is not nee
   const { inviteCode } = await startAgain(t, s2);
   expect(inviteCode).toHaveLength(12);
 });
+
+test("starting again keeps the khatma's own late window", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const k = await khatmaOf(t, s.inviteCode);
+  await t.run((ctx) =>
+    ctx.db.patch(k._id, { rota: { ...k.rota!, lateTapMs: 3_600_000 } }),
+  );
+  await archive(t, s);
+  const { inviteCode } = await startAgain(t, s);
+  expect((await khatmaOf(t, inviteCode)).rota?.lateTapMs).toBe(3_600_000);
+});

@@ -369,6 +369,9 @@ export const insertAgain = internalMutation({
           endDate: null,
           timeZone: rota.timeZone,
           messages: rota.messages,
+          ...(rota.lateTapMs !== undefined
+            ? { lateTapMs: rota.lateTapMs }
+            : {}),
           pausedAt: null,
           pauseDates: [],
           archivedAt: null,

@@ -6,7 +6,7 @@ import { archiveKhatma } from "./khatmaLifecycle";
 import { changeCompletedDays } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
 import { clearNotes, notify } from "./notes";
-import { enqueue } from "./rotaOutbox";
+import { enqueue, windowOpen } from "./rotaOutbox";
 import {
   cycleOf,
   isReadingDate,
@@ -150,7 +150,9 @@ async function startDay(
 /**
  * One juz' message per reader at the khatma's message time, with all their
  * ajza' of the day. It leaves out what someone has heard already: a juz' read
- * or reassigned since midnight, and anyone who joined since, in their welcome.
+ * or reassigned since midnight, and anyone who joined since, in their welcome
+ * (which only reached them if their window is open). A message a pause held
+ * past the reminder's time stands in for the reminder.
  */
 async function sendJuzMessages(
   ctx: MutationCtx,
@@ -158,13 +160,9 @@ async function sendJuzMessages(
   rota: RotaConfig,
   day: Doc<"rotaDays">,
   now: number,
-): Promise<void> {
-  if (
-    day.juzSentAt !== null ||
-    localMinutes(now, rota.timeZone) < rota.messages.dayAt
-  ) {
-    return;
-  }
+): Promise<Doc<"rotaDays">> {
+  const minutes = localMinutes(now, rota.timeZone);
+  if (day.juzSentAt !== null || minutes < rota.messages.dayAt) return day;
   const reads = await ctx.db
     .query("rotaReads")
     .withIndex("by_day_juz", (q) => q.eq("dayId", day._id))
@@ -181,7 +179,13 @@ async function sendJuzMessages(
   }
   for (const [participantId, juz] of juzByReader) {
     const p = await ctx.db.get(participantId);
-    if (p?.joinedAt != null && p.joinedAt >= day.startedAt) continue;
+    if (
+      p?.joinedAt != null &&
+      p.joinedAt >= day.startedAt &&
+      (await windowOpen(ctx, p.phone, now))
+    ) {
+      continue;
+    }
     await enqueue(ctx, {
       khatmaId: khatma._id,
       participantId,
@@ -191,7 +195,15 @@ async function sendJuzMessages(
       number: day.number,
     });
   }
-  await ctx.db.patch(day._id, { juzSentAt: now });
+  const sent = {
+    juzSentAt: now,
+    reminderSentAt:
+      minutes >= rota.messages.reminder.at
+        ? (day.reminderSentAt ?? now)
+        : day.reminderSentAt,
+  };
+  await ctx.db.patch(day._id, sent);
+  return { ...day, ...sent };
 }
 
 /**
@@ -408,6 +420,8 @@ async function sendCycleMessages(
  * Closes a day and runs its cycle messages, once per day: it does nothing for
  * a closed day. (Archiving a khatma closes its open day without them.) A late
  * «أتممت» still counts until `lateUntil`, and the silence count waits for that.
+ * A day that closes paused, or with no juz' message sent, doesn't count at all:
+ * nobody was asked to reply.
  */
 async function closeDay(
   ctx: MutationCtx,
@@ -419,7 +433,8 @@ async function closeDay(
   if (day.closedAt !== null) return day;
   const lateUntil =
     dayEnd(day.date, rota.timeZone) + (await lateTapOf(ctx, rota));
-  const closed = { closedAt: now, lateUntil, settledAt: null };
+  const counts = rota.pausedAt === null && day.juzSentAt !== null;
+  const closed = { closedAt: now, lateUntil, settledAt: counts ? null : now };
   await ctx.db.patch(day._id, closed);
   if (day.number === ROTA_SIZE) await sendCycleMessages(ctx, day);
   return { ...day, ...closed };
@@ -490,7 +505,7 @@ export const tick = internalMutation({
       last.date === today &&
       rota.pausedAt === null
     ) {
-      await sendJuzMessages(ctx, khatma, rota, last, now);
+      last = await sendJuzMessages(ctx, khatma, rota, last, now);
       await sendOrganizerNotes(ctx, khatma, rota, last, now);
       await sendReminders(ctx, khatma, rota, last, now);
     }
