@@ -4,6 +4,7 @@ import {
   parsePhoneNumberFromString,
 } from "libphonenumber-js/min";
 import examples from "libphonenumber-js/examples.mobile.json";
+import { parsePhoneNumberFromString as parseMobile } from "libphonenumber-js/mobile";
 import { normalizeDigits } from "./digits";
 
 // Re-exported so existing Convex imports keep working; the web app imports ./digits directly.
@@ -95,7 +96,7 @@ export function localPhoneExample(
 const DIALABLE_RE = /^\+?\d+$/;
 
 /**
- * A typed phone number in E.164 form, or `null` when it is not a real number.
+ * A typed mobile number in E.164 form, or `null` when it is not a real one.
  * Reads Arabic and Persian digits, drops spaces, dashes, dots and brackets,
  * and turns a leading `00` into `+`. A number without a country code is read
  * as a number of `country`, so `01012345678` with `EG` gives `+201012345678`;
@@ -112,6 +113,8 @@ export function normalizePhone(
     : compact;
   if (!DIALABLE_RE.test(international)) return null;
   if (!international.startsWith("+") && country === undefined) return null;
-  const parsed = parsePhoneNumberFromString(international, country);
+  // Mobile metadata, so a local number from elsewhere (a UAE `050…` typed
+  // for `EG`) isn't saved as a landline of the organizer's country.
+  const parsed = parseMobile(international, country);
   return parsed?.isValid() ? parsed.number : null;
 }

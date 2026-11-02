@@ -197,6 +197,12 @@ describe("normalizePhone", () => {
     expect(normalizePhone("+20 12345")).toBeNull();
     expect(normalizePhone("05012345678901", "AE")).toBeNull();
   });
+
+  it("refuses a landline, so another country's local number isn't misread", () => {
+    // `050…` is a UAE mobile, and a Mansoura landline when read as Egyptian.
+    expect(normalizePhone("0501234567", "EG")).toBeNull();
+    expect(normalizePhone("+20 50 123 4567")).toBeNull();
+  });
 });
 
 describe("phoneCountry", () => {

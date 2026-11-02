@@ -139,6 +139,11 @@ export type PeopleView = {
   phoneExample: string | null;
 };
 
+/** A number typed without a country code is one from the organizer's country. */
+function homeCountry(organizer: Doc<"people"> | null) {
+  return organizer ? phoneCountry(organizer.phone) : undefined;
+}
+
 function personState(
   p: Doc<"rotaParticipants">,
   khatma: Doc<"khatmas">,
@@ -232,9 +237,7 @@ export async function people(
       (juz) => !byJuz.has(juz),
     ),
     maxSlots: await getSetting(ctx, "rotaMaxSlotsPerPerson"),
-    phoneExample: localPhoneExample(
-      organizer ? phoneCountry(organizer.phone) : undefined,
-    ),
+    phoneExample: localPhoneExample(homeCountry(organizer)),
   };
 }
 
@@ -341,11 +344,7 @@ export async function addParticipant(
   const name = cleanDisplayName(args.name);
   if (name === null) return { error: "bad_name" };
   const organizer = await ctx.db.get(khatma.creatorPersonId);
-  // A number typed without a country code is one from the organizer's country.
-  const phone = normalizePhone(
-    args.phone,
-    organizer ? phoneCountry(organizer.phone) : undefined,
-  );
+  const phone = normalizePhone(args.phone, homeCountry(organizer));
   if (phone === null) return { error: "bad_phone" };
   const same = await ctx.db
     .query("rotaParticipants")
