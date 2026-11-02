@@ -323,6 +323,7 @@ export function PeoplePanel({
   const backend = useRotaBackend(inviteCode);
   const view = useQuery(backend.people, backend.scope);
   const [open, setOpen] = useState<Open | null>(null);
+  const [spreadResult, setSpreadResult] = useState<string | null>(null);
   // An archived khatma refuses a new join link, and has no use for one.
   useEnsureJoinLink(inviteCode, archived ? undefined : view?.joinLink);
 
@@ -357,9 +358,18 @@ export function PeoplePanel({
       {!archived && view.freeJuz.length > 0 && (
         <section className="mt-4 grid gap-3 rounded-ui border-2 border-gold bg-[#FBF1D9] p-4">
           <p className="font-medium">{t.rota.leftover(view.freeJuz)}</p>
-          <SpreadFreeJuz inviteCode={inviteCode} view={view} />
+          <SpreadFreeJuz
+            inviteCode={inviteCode}
+            view={view}
+            onStart={() => setSpreadResult(null)}
+            onSpread={setSpreadResult}
+          />
         </section>
       )}
+      {/* Mounted even once the banner is gone, so the result is still read out. */}
+      <p role="status" className="mt-3 font-medium text-green empty:hidden">
+        {spreadResult}
+      </p>
 
       <ol className="mt-4 grid gap-2">
         {view.rows.map((row) => {

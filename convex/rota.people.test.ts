@@ -234,19 +234,38 @@ test("spreadFreeJuz evens out who reads more first, and fills all 30", async () 
   ).toEqual({ error: "no_free_juz" });
 });
 
-test("spreadFreeJuz skips someone who stopped their messages", async () => {
+test("spreadFreeJuz skips whoever stopped, was silenced, or holds none", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t);
-  const a = participantId(await add(t, s)); // 2
-  const b = participantId(await add(t, s)); // 3
-  await t.run((ctx) => ctx.db.patch(a, { stoppedAt: NOW }));
-  await t.mutation(api.rota.spreadFreeJuz, {
+  const stopped = participantId(await add(t, s)); // 2
+  const silenced = participantId(await add(t, s)); // 3
+  const b = participantId(await add(t, s)); // 4
+  await t.run(async (ctx) => {
+    await ctx.db.patch(stopped, { stoppedAt: NOW });
+    await ctx.db.patch(silenced, { silencedAt: NOW });
+  });
+  // The organizer stops reading: their juz' 1 goes, and they stay in the khatma.
+  const me = (await people(t, s))?.participants.find((p) => p.isMe)?.id;
+  if (!me) throw new Error("no organizer");
+  await t.mutation(api.rota.freeJuz, {
     sessionToken: s.token,
     inviteCode: s.inviteCode,
+    participantId: me,
+    juz: 1,
   });
+  expect(
+    await t.mutation(api.rota.spreadFreeJuz, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+    }),
+  ).toEqual({ ok: true, given: 2, left: 25 });
   const view = await people(t, s);
-  expect(view?.participants.find((p) => p.id === a)?.juz).toEqual([2]);
-  expect(view?.participants.find((p) => p.id === b)?.juz).toEqual([3, 5, 7]);
+  const juzOf = (id: Id<"rotaParticipants">) =>
+    view?.participants.find((p) => p.id === id)?.juz;
+  expect(view?.participants.find((p) => p.isMe)?.juz).toEqual([]);
+  expect(juzOf(stopped)).toEqual([2]);
+  expect(juzOf(silenced)).toEqual([3]);
+  expect(juzOf(b)).toEqual([1, 4, 5]);
 });
 
 test("moveJuz moves to a free juz' and swaps with a held one", async () => {

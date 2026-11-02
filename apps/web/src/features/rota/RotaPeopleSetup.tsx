@@ -291,6 +291,7 @@ export function RotaPeopleSetupContent({
             inviteCode={inviteCode}
             view={view}
             onStart={() => setImportResult(null)}
+            onSpread={setImportResult}
           />
         </div>
       )}

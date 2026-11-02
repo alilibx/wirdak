@@ -84,6 +84,9 @@ beforeEach(() => {
 
 describe("PeoplePanel", () => {
   it("says how many ajza' have no reader above the 30 rows, and spreads them in one press", async () => {
+    m.fns.spreadFreeJuz = vi
+      .fn()
+      .mockResolvedValue({ ok: true, given: 2, left: 26 });
     const user = userEvent.setup();
     render(<PeoplePanel inviteCode="CODE" archived={false} />);
     const count = screen.getByText("بقي ٢٨ جزءاً بلا قارئ");
@@ -97,6 +100,9 @@ describe("PeoplePanel", () => {
       sessionToken: "tok",
       inviteCode: "CODE",
     });
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      t.rota.spreadResult(26),
+    );
   });
 
   it("shows why a spread was refused", async () => {
@@ -109,13 +115,16 @@ describe("PeoplePanel", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers no spread when everyone reads the most they can, or someone who stopped", () => {
+  it("offers no spread when nobody left can take one more", () => {
     const view = makeView();
     m.view = {
       ...view,
       participants: [
         { ...hidden, juz: [1, 3] },
         { ...shown, juz: [2], stopped: true },
+        { ...shown, id: "p3", juz: [4], silenced: true },
+        // Stopped reading on purpose: holds none, and the spread gives none back.
+        { ...shown, id: "p4", juz: [] },
       ],
     };
     render(<PeoplePanel inviteCode="CODE" archived={false} />);

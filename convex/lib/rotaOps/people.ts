@@ -73,6 +73,13 @@ export async function activeParticipant(
     : null;
 }
 
+/** The ajza' with no reader, lowest first. */
+function freeJuzOf(byJuz: Map<number, unknown>): number[] {
+  return Array.from({ length: ROTA_SIZE }, (_, i) => i + 1).filter(
+    (juz) => !byJuz.has(juz),
+  );
+}
+
 function isJuz(juz: number): boolean {
   return Number.isInteger(juz) && juz >= 1 && juz <= ROTA_SIZE;
 }
@@ -219,9 +226,7 @@ export async function people(
       juz: heldBy.get(p._id) ?? [],
       ...personState(p, khatma),
     })),
-    freeJuz: Array.from({ length: ROTA_SIZE }, (_, i) => i + 1).filter(
-      (juz) => !byJuz.has(juz),
-    ),
+    freeJuz: freeJuzOf(byJuz),
     maxSlots: await getSetting(ctx, "rotaMaxSlotsPerPerson"),
   };
 }
@@ -393,8 +398,9 @@ export async function giveJuz(
 
 /**
  * Gives every juz' with no reader to the people already in the khatma, lowest juz' first: each
- * goes to whoever holds the fewest (the earliest added on a tie), up to the per-person cap. Someone
- * who stopped their messages gets none. `left` is how many stay without a reader.
+ * goes to whoever holds the fewest (the earliest added on a tie), up to the per-person cap. Nobody
+ * who holds none, stopped their messages, or was silenced gets one. `left` is how many stay
+ * without a reader.
  */
 export async function spreadFreeJuz(
   ctx: MutationCtx,
@@ -405,9 +411,7 @@ export async function spreadFreeJuz(
 > {
   const target = await targetDay(ctx, khatma);
   const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
-  const free = Array.from({ length: ROTA_SIZE }, (_, i) => i + 1).filter(
-    (juz) => !byJuz.has(juz),
-  );
+  const free = freeJuzOf(byJuz);
   if (free.length === 0) return { error: "no_free_juz" };
   const max = await getSetting(ctx, "rotaMaxSlotsPerPerson");
   const active = (
@@ -416,10 +420,13 @@ export async function spreadFreeJuz(
       .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
       .collect()
   )
-    .filter((p) => p.removedAt === null && p.stoppedAt == null)
+    .filter(
+      (p) =>
+        p.removedAt === null && p.stoppedAt == null && p.silencedAt == null,
+    )
     .sort((a, b) => a.addedAt - b.addedAt || a._creationTime - b._creationTime);
   // Held counts the way `giveJuz` checks the cap.
-  const readers = await Promise.all(
+  const counted = await Promise.all(
     active.map(async (p) => ({
       id: p._id,
       held: (
@@ -430,6 +437,8 @@ export async function spreadFreeJuz(
       ).length,
     })),
   );
+  // Someone holding none stopped reading on purpose (the organizer can), so they get none back.
+  const readers = counted.filter((r) => r.held > 0);
 
   let given = 0;
   for (const juz of free) {
