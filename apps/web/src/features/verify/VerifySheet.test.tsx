@@ -58,7 +58,6 @@ function ui() {
 }
 
 async function signInStart(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(t.verify.nameLabel), "علي");
   await user.click(screen.getByRole("button", { name: t.verify.start }));
 }
 
@@ -93,21 +92,19 @@ describe("VerifySheet", () => {
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
   });
 
-  it("name step links to the privacy policy in a new tab, outside the router", () => {
+  it("start step links to the privacy policy in a new tab, outside the router", () => {
     ui();
     const link = screen.getByRole("link", { name: t.verify.privacy });
     expect(link).toHaveAttribute("href", "/privacy");
     expect(link).toHaveAttribute("target", "_blank");
   });
 
-  it("name step: a blank name shows the error and sends nothing", async () => {
+  it("start step asks for no name: a returning number never needs one", async () => {
     const user = userEvent.setup();
     ui();
-    await user.click(screen.getByRole("button", { name: t.verify.start }));
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      t.verify.errors.nameRequired,
-    );
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(t.verify.nameLabel)).not.toBeInTheDocument();
+    await signInStart(user);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("waiting step offers a real WhatsApp link, labelled for a first open when the popup was blocked", async () => {
@@ -140,22 +137,51 @@ describe("VerifySheet", () => {
     ).toBeInTheDocument();
   });
 
-  it("confirm step shows the greeting and a ltr masked number, and yes finishes", async () => {
+  it("confirm step greets a new number, shows it ltr, and yes sends the name typed", async () => {
     const user = userEvent.setup();
     m.status = { status: "matched", maskedPhone: "+971 50 ••• 1234" };
     m.claim.mockResolvedValue({ sessionToken: "tok" });
     ui();
     await signInStart(user);
     expect(
-      await screen.findByText(t.verify.confirmTitle("علي")),
+      await screen.findByText(t.verify.confirmTitle),
     ).toBeInTheDocument();
     const phone = screen.getByText("+971 50 ••• 1234");
     expect(phone).toHaveAttribute("dir", "ltr");
+    await user.type(screen.getByLabelText(t.verify.nameLabel), "علي");
     await user.click(screen.getByRole("button", { name: t.verify.yes }));
     await waitFor(() => expect(onVerified).toHaveBeenCalledTimes(1));
+    expect(m.claim).toHaveBeenCalledWith(
+      expect.objectContaining({ displayName: "علي" }),
+    );
   });
 
-  it("not me rejects and offers a retry that returns to the name step", async () => {
+  it("confirm step: a blank name shows the error and claims nothing", async () => {
+    const user = userEvent.setup();
+    m.status = { status: "matched", maskedPhone: "+971 50 ••• 1234" };
+    ui();
+    await signInStart(user);
+    await user.click(await screen.findByRole("button", { name: t.verify.yes }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      t.verify.errors.nameRequired,
+    );
+    expect(screen.getByLabelText(t.verify.nameLabel)).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(m.claim).not.toHaveBeenCalled();
+  });
+
+  it("a returning number goes from waiting to the PIN without a name", async () => {
+    const user = userEvent.setup();
+    m.status = { status: "needs_pin", maskedPhone: "+971 50 ••• 1234" };
+    ui();
+    await signInStart(user);
+    expect(await screen.findByLabelText(t.verify.pinLabel)).toBeInTheDocument();
+    expect(screen.queryByLabelText(t.verify.nameLabel)).not.toBeInTheDocument();
+  });
+
+  it("not me rejects and offers a retry that returns to the start step", async () => {
     const user = userEvent.setup();
     m.status = { status: "matched", maskedPhone: "+971 50 ••• 1234" };
     m.reject.mockResolvedValue(null);
@@ -168,7 +194,9 @@ describe("VerifySheet", () => {
       t.verify.errors.rejected,
     );
     await user.click(screen.getByRole("button", { name: t.verify.retry }));
-    expect(screen.getByLabelText(t.verify.nameLabel)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: t.verify.start }),
+    ).toBeInTheDocument();
     expect(onVerified).not.toHaveBeenCalled();
   });
 
@@ -380,13 +408,12 @@ describe("VerifySheet", () => {
       JSON.stringify({
         verificationId: "v1",
         secret: "sec",
-        displayName: "علي",
         expiresAt: Date.now() + 60_000,
       }),
     );
     m.status = { status: "matched", maskedPhone: "+971 50 ••• 1234" };
     ui();
-    expect(screen.getByText(t.verify.confirmTitle("علي"))).toBeInTheDocument();
+    expect(screen.getByText(t.verify.confirmTitle)).toBeInTheDocument();
   });
 
   it("resuming at the pin step leaves focus in the pin box", () => {
@@ -395,7 +422,6 @@ describe("VerifySheet", () => {
       JSON.stringify({
         verificationId: "v1",
         secret: "sec",
-        displayName: "علي",
         expiresAt: Date.now() + 60_000,
       }),
     );
@@ -425,7 +451,7 @@ describe("VerifySheet", () => {
         />,
       );
       const confirm = await screen.findByRole("heading", {
-        name: t.verify.confirmTitle("علي"),
+        name: t.verify.confirmTitle,
       });
       await waitFor(() => expect(confirm).toHaveFocus());
     });
@@ -484,17 +510,22 @@ describe("VerifySheet", () => {
       await signInStart(user);
       await screen.findByRole("status");
       expect(events("verification_step")).toEqual([
-        { step: "name", intent: "signin" },
+        { step: "start", intent: "signin" },
         { step: "waiting", intent: "signin" },
       ]);
     });
 
     it("records an error by its code, never the name typed", async () => {
+      m.status = { status: "matched", maskedPhone: "+971 50 ••• 1234" };
+      m.claim.mockResolvedValue({ error: "invalid_name" });
       const user = userEvent.setup();
       ui();
-      await user.click(screen.getByRole("button", { name: t.verify.start }));
+      await signInStart(user);
+      await user.type(await screen.findByLabelText(t.verify.nameLabel), "!!");
+      await user.click(screen.getByRole("button", { name: t.verify.yes }));
+      await screen.findByText(t.verify.errors.invalid_name);
       expect(events("verification_error")).toEqual([
-        { code: "nameRequired", step: "name", intent: "signin" },
+        { code: "invalid_name", step: "confirm", intent: "signin" },
       ]);
     });
 
@@ -504,9 +535,8 @@ describe("VerifySheet", () => {
       const user = userEvent.setup();
       const view = ui();
       await signInStart(user);
-      await user.click(
-        await screen.findByRole("button", { name: t.verify.yes }),
-      );
+      await user.type(await screen.findByLabelText(t.verify.nameLabel), "علي");
+      await user.click(screen.getByRole("button", { name: t.verify.yes }));
       await screen.findByText(t.verify.errors.network);
       m.status = { status: "needs_pin", maskedPhone: "+971 50 ••• 1234" };
       view.rerender(
@@ -557,7 +587,7 @@ describe("VerifySheet", () => {
         />,
       );
       expect(events("verification_step")).toEqual([
-        { step: "name", intent: "take" },
+        { step: "start", intent: "take" },
       ]);
     });
   });

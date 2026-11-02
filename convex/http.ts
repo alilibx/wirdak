@@ -160,10 +160,12 @@ http.route({
     } catch {
       body = null;
     }
-    const { displayName, clientKey, returnPath } = (body ?? {}) as Record<
-      string,
-      unknown
-    >;
+    const {
+      displayName = "",
+      clientKey,
+      returnPath,
+    } = (body ?? {}) as Record<string, unknown>;
+    // A new number gives its name when it claims, so the name here is optional.
     if (
       typeof displayName !== "string" ||
       typeof clientKey !== "string" ||

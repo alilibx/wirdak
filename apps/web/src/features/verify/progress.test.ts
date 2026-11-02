@@ -5,7 +5,6 @@ const KEY = "wirdak.verify";
 const base = () => ({
   verificationId: "v1",
   secret: "sec",
-  displayName: "علي",
   expiresAt: Date.now() + 60_000,
 });
 
