@@ -80,6 +80,7 @@ function peopleView(people: Person[]) {
     joinLink: m.joinLink,
     requests: [],
     target: { number: 1, date: "2026-10-30", isFirst: true },
+    phoneExample: "010 01234567",
     rows: Array.from({ length: 30 }, (_, i) => {
       const person = holder.get(i + 1);
       return {
@@ -378,7 +379,9 @@ describe("RotaPeopleSetup (step 2)", () => {
     expect(screen.getByText("٢ من ٢")).toBeInTheDocument();
     const phone = screen.getByLabelText(t.rota.personPhone);
     expect(phone).toHaveAttribute("inputmode", "tel");
-    expect(screen.getByText(/مع رمز الدولة، مثل/)).toBeInTheDocument();
+    expect(phone).toHaveAccessibleDescription(
+      "مثل \u2066010 01234567\u2069، أو مع رمز الدولة إن كان من بلد آخر",
+    );
     const items = within(screen.getByRole("list")).getAllByRole("listitem");
     expect(items).toHaveLength(1);
     expect(items[0]).toHaveTextContent("١");

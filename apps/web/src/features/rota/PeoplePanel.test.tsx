@@ -70,6 +70,7 @@ function makeView() {
       { ...shown, juz: [2] },
     ],
     freeJuz: Array.from({ length: 28 }, (_, i) => i + 3),
+    phoneExample: null,
     maxSlots: 2,
   };
 }

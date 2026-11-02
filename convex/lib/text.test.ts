@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   cleanDisplayName,
   cleanKhatmaName,
+  localPhoneExample,
   maskPhone,
   normalizeDigits,
   normalizePhone,
+  phoneCountry,
   toArabicDigits,
 } from "./text";
 
@@ -159,5 +161,58 @@ describe("normalizePhone", () => {
   it("refuses a country code that starts with 0", () => {
     expect(normalizePhone("+0123456789")).toBeNull();
     expect(normalizePhone("000971501234567")).toBeNull();
+  });
+
+  it.each([
+    ["EG", "01012345678", "+201012345678"],
+    ["EG", "٠١٠١٢٣٤٥٦٧٨", "+201012345678"],
+    ["EG", "1012345678", "+201012345678"],
+    ["AE", "050 123 4567", "+971501234567"],
+    ["AE", "٠٥٠١٢٣٤٥٦٧", "+971501234567"],
+    ["SA", "055 123 4567", "+966551234567"],
+    ["SA", "٠٥٥١٢٣٤٥٦٧", "+966551234567"],
+  ] as const)("reads a %s local number %s", (country, raw, e164) => {
+    expect(normalizePhone(raw, country)).toBe(e164);
+  });
+
+  it.each([
+    ["EG", "+971 50 123 4567", "+971501234567"],
+    ["AE", "00201012345678", "+201012345678"],
+    ["SA", "+٢٠١٠١٢٣٤٥٦٧٨", "+201012345678"],
+    ["EG", "+966 55 123 4567", "+966551234567"],
+  ] as const)(
+    "keeps the country code a %s organizer types: %s",
+    (country, raw, e164) => {
+      expect(normalizePhone(raw, country)).toBe(e164);
+    },
+  );
+
+  it("drops a national 0 kept after the country code", () => {
+    expect(normalizePhone("+20 010 1234 5678")).toBe("+201012345678");
+    expect(normalizePhone("+9710501234567")).toBe("+971501234567");
+  });
+
+  it("refuses a number that is not real for its country", () => {
+    expect(normalizePhone("0101234", "EG")).toBeNull();
+    expect(normalizePhone("+20 12345")).toBeNull();
+    expect(normalizePhone("05012345678901", "AE")).toBeNull();
+  });
+});
+
+describe("phoneCountry", () => {
+  it("names the country of a stored number", () => {
+    expect(phoneCountry("+201012345678")).toBe("EG");
+    expect(phoneCountry("+971501234567")).toBe("AE");
+    expect(phoneCountry("+966551234567")).toBe("SA");
+    expect(phoneCountry("not a number")).toBeUndefined();
+  });
+});
+
+describe("localPhoneExample", () => {
+  it("gives a mobile number as people write it at home", () => {
+    expect(localPhoneExample("EG")).toBe("010 01234567");
+    expect(localPhoneExample("AE")).toBe("050 123 4567");
+    expect(localPhoneExample("SA")).toBe("051 234 5678");
+    expect(localPhoneExample(undefined)).toBeNull();
   });
 });
