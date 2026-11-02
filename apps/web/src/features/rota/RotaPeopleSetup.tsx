@@ -14,6 +14,7 @@ import { PersonPhone } from "./PersonPhone";
 import { RenameSheet } from "./RenameSheet";
 import { JoinChip, ShareJoinLink, useEnsureJoinLink } from "./JoinStatus";
 import { SavedPicker } from "./SavedPicker";
+import { SpreadFreeJuz } from "./SpreadFreeJuz";
 import { StepBar } from "./StepBar";
 import { useRotaCall } from "./useRotaCall";
 
@@ -271,6 +272,29 @@ export function RotaPeopleSetupContent({
         />
       </div>
 
+      {/* Above the list, so a long one doesn't hide what is left to give out. */}
+      {view.freeJuz.length > 0 && (
+        <div className="mt-5 grid gap-3">
+          <button
+            type="button"
+            onClick={() => setGiving(true)}
+            className="block min-h-14 w-full rounded-ui border-2 border-gold bg-[#FBF1D9] px-4 py-3 text-start"
+          >
+            <span className="block font-medium">
+              {t.rota.leftover(view.freeJuz)}
+            </span>
+            <span className="block text-base text-ink-soft">
+              {t.rota.leftoverHint}
+            </span>
+          </button>
+          <SpreadFreeJuz
+            inviteCode={inviteCode}
+            view={view}
+            onStart={() => setImportResult(null)}
+          />
+        </div>
+      )}
+
       <ol
         aria-label={t.rota.peopleList}
         className="mt-5 divide-y divide-line rounded-ui border-2 border-line bg-card px-4"
@@ -316,21 +340,6 @@ export function RotaPeopleSetupContent({
           </li>
         ))}
       </ol>
-
-      {view.freeJuz.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setGiving(true)}
-          className="mt-4 block min-h-14 w-full rounded-ui border-2 border-gold bg-[#FBF1D9] px-4 py-3 text-start"
-        >
-          <span className="block font-medium">
-            {t.rota.leftover(view.freeJuz)}
-          </span>
-          <span className="block text-base text-ink-soft">
-            {t.rota.leftoverHint}
-          </span>
-        </button>
-      )}
 
       <div className="mt-6 grid gap-3">
         <ShareJoinLink

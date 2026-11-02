@@ -94,6 +94,7 @@ const rotaOps = {
   finishSetup: "أنهى إضافة القرّاء",
   addParticipant: "أضاف قارئاً",
   giveJuz: "أعطى قارئاً جزءاً",
+  spreadFreeJuz: "وزّع الأجزاء التي بلا قارئ",
   moveJuz: "نقل جزءاً إلى قارئ آخر",
   freeJuz: "أخلى جزءاً",
   renameParticipant: "غيّر اسم قارئ",

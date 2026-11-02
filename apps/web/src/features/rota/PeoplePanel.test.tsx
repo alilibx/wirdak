@@ -83,6 +83,53 @@ beforeEach(() => {
 });
 
 describe("PeoplePanel", () => {
+  it("says how many ajza' have no reader above the 30 rows, and spreads them in one press", async () => {
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} />);
+    const count = screen.getByText("بقي ٢٨ جزءاً بلا قارئ");
+    const firstRow = screen.getByRole("button", { name: /سعد/ });
+    expect(
+      count.compareDocumentPosition(firstRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: t.rota.spread }));
+    expect(m.fns.spreadFreeJuz).toHaveBeenCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+    });
+  });
+
+  it("shows why a spread was refused", async () => {
+    m.fns.spreadFreeJuz = vi.fn().mockResolvedValue({ error: "no_room" });
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} />);
+    await user.click(screen.getByRole("button", { name: t.rota.spread }));
+    expect(
+      await screen.findByText(t.rota.spreadErrors.no_room ?? ""),
+    ).toBeInTheDocument();
+  });
+
+  it("offers no spread when everyone reads the most they can, or someone who stopped", () => {
+    const view = makeView();
+    m.view = {
+      ...view,
+      participants: [
+        { ...hidden, juz: [1, 3] },
+        { ...shown, juz: [2], stopped: true },
+      ],
+    };
+    render(<PeoplePanel inviteCode="CODE" archived={false} />);
+    // The count still shows: the organizer can add people or free a row.
+    expect(screen.getByText("بقي ٢٨ جزءاً بلا قارئ")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: t.rota.spread })).toBeNull();
+  });
+
+  it("has no count or spread once archived", () => {
+    render(<PeoplePanel inviteCode="CODE" archived />);
+    expect(screen.queryByText("بقي ٢٨ جزءاً بلا قارئ")).toBeNull();
+    expect(screen.queryByRole("button", { name: t.rota.spread })).toBeNull();
+  });
+
   it("shows each person's number under their name, unless it's hidden", () => {
     render(<PeoplePanel inviteCode="CODE" archived={false} />);
     expect(screen.getByRole("button", { name: /منى/ })).toHaveTextContent(

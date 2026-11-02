@@ -619,6 +619,13 @@ export const ar = {
       return `بقي ${toArabicDigits(n)} جزءاً بلا قارئ`;
     },
     leftoverHint: "أعطِها لمن يحب أن يقرأ أكثر، أو أضف أشخاصاً.",
+    spread: "وزّعها على المشاركين",
+    spreadHint:
+      "يأخذ كل مشارك جزءاً آخر بالترتيب، من معه أقل أولاً، حتى الحدّ لكل شخص.",
+    spreadErrors: {
+      no_free_juz: "الأجزاء كلها لها قرّاء الآن.",
+      no_room: "كل مشارك معه أكثر ما يمكن من الأجزاء. أضف أشخاصاً.",
+    } as Record<string, string>,
     giveTitle: (juz: number) => `من يقرأ الجزء ${toArabicDigits(juz)} أيضاً؟`,
     giveHint: "يقرأ أكثر من جزء كل يوم، ويتقدّمان معاً.",
     giveErrors: {

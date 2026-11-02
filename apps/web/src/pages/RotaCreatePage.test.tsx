@@ -21,6 +21,7 @@ const m = vi.hoisted(() => ({
   create: vi.fn(),
   addParticipant: vi.fn(),
   giveJuz: vi.fn(),
+  spreadFreeJuz: vi.fn(),
   finishSetup: vi.fn(),
   ensureJoinLink: vi.fn(),
   joinLink: null as string | null,
@@ -58,6 +59,7 @@ vi.mock("convex/react", async () => {
       if (name === "rota:addParticipant") return m.addParticipant;
       if (name === "rota:finishSetup") return m.finishSetup;
       if (name === "rota:ensureJoinLink") return m.ensureJoinLink;
+      if (name === "rota:spreadFreeJuz") return m.spreadFreeJuz;
       return m.giveJuz;
     },
   };
@@ -152,6 +154,7 @@ beforeEach(() => {
   m.create.mockResolvedValue({ inviteCode: "NEWCODE" });
   m.addParticipant.mockReset();
   m.giveJuz.mockReset();
+  m.spreadFreeJuz.mockReset();
   m.finishSetup.mockReset();
   m.finishSetup.mockResolvedValue({ ok: true });
   m.ensureJoinLink.mockReset();
@@ -536,6 +539,40 @@ describe("RotaPeopleSetup (step 2)", () => {
     expect(
       screen.getByRole("button", { name: /بقي ٢٨ جزءاً بلا قارئ/ }),
     ).toBeInTheDocument();
+  });
+
+  it("shows the leftover ajza' above the list, and spreads them over everyone in one press", async () => {
+    m.spreadFreeJuz.mockResolvedValue({ ok: true, given: 4, left: 24 });
+    setRoster([
+      { id: "p1", name: "علي", isMe: true, juz: [1] },
+      { id: "p2", name: "خالد", isMe: false, juz: [2] },
+    ]);
+    const user = userEvent.setup();
+    renderSetup();
+    const banner = screen.getByRole("button", {
+      name: /بقي ٢٨ جزءاً بلا قارئ/,
+    });
+    const list = screen.getByRole("list", { name: t.rota.peopleList });
+    expect(
+      banner.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: t.rota.spread }));
+    expect(m.spreadFreeJuz).toHaveBeenCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+    });
+  });
+
+  it("offers no spread when everyone already reads the most they can", () => {
+    setRoster([
+      { id: "p1", name: "علي", isMe: true, juz: [1, 2, 3] },
+      { id: "p2", name: "خالد", isMe: false, juz: [4, 5, 6] },
+    ]);
+    renderSetup();
+    expect(
+      screen.getByRole("button", { name: /بلا قارئ/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: t.rota.spread })).toBeNull();
   });
 
   it("names the leftover ajza' while they are few", () => {

@@ -15,6 +15,7 @@ import { JoinRequests } from "./JoinRequests";
 import { PersonPhone } from "./PersonPhone";
 import { RenameSheet } from "./RenameSheet";
 import { SavedPicker } from "./SavedPicker";
+import { SpreadFreeJuz } from "./SpreadFreeJuz";
 import { useRotaCall } from "./useRotaCall";
 import { formatIsoDate } from "./format";
 
@@ -351,6 +352,14 @@ export function PeoplePanel({
       </p>
 
       {!archived && <JoinRequests inviteCode={inviteCode} view={view} />}
+
+      {/* Above the 30 rows, so the organizer sees what is left without scrolling. */}
+      {!archived && view.freeJuz.length > 0 && (
+        <section className="mt-4 grid gap-3 rounded-ui border-2 border-gold bg-[#FBF1D9] p-4">
+          <p className="font-medium">{t.rota.leftover(view.freeJuz)}</p>
+          <SpreadFreeJuz inviteCode={inviteCode} view={view} />
+        </section>
+      )}
 
       <ol className="mt-4 grid gap-2">
         {view.rows.map((row) => {
