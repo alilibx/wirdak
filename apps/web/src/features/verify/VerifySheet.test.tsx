@@ -538,6 +538,11 @@ describe("VerifySheet", () => {
       await user.type(await screen.findByLabelText(t.verify.nameLabel), "علي");
       await user.click(screen.getByRole("button", { name: t.verify.yes }));
       await screen.findByText(t.verify.errors.network);
+      // A network error says nothing about the name, so the field stays valid.
+      expect(screen.getByLabelText(t.verify.nameLabel)).toHaveAttribute(
+        "aria-invalid",
+        "false",
+      );
       m.status = { status: "needs_pin", maskedPhone: "+971 50 ••• 1234" };
       view.rerender(
         <VerifySheet

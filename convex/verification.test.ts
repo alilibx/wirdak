@@ -508,7 +508,10 @@ test("a PIN for an account deleted meanwhile, with no name to start a new one, h
   await send(t, v.message);
   await t.run((ctx) => ctx.db.delete(personId));
 
-  expect(await confirmPin(t, v, pinsSent()[0]!)).toEqual({ error: "expired" });
+  const pin = pinsSent()[0]!;
+  expect(await confirmPin(t, v, pin)).toEqual({ error: "expired" });
+  expect((await status(t, v)).status).toBe("expired");
+  expect(await confirmPin(t, v, pin)).toEqual({ error: "expired" });
   expect(await t.run((ctx) => ctx.db.query("people").collect())).toEqual([]);
   expect(await sessionCount(t)).toBe(0);
 });

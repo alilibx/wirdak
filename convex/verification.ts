@@ -30,7 +30,12 @@ import { refreshPhone } from "./lib/directory";
 import { getSetting } from "./lib/settings";
 import { bumpCounter, dubaiDay, signInKey } from "./lib/stats";
 import { insertSession } from "./sessions";
-import { cleanDisplayName, maskPhone, normalizeDigits } from "./lib/text";
+import {
+  cleanDisplayName,
+  DISPLAY_NAME_INPUT_MAX,
+  maskPhone,
+  normalizeDigits,
+} from "./lib/text";
 import {
   env,
   isDev,
@@ -51,8 +56,6 @@ const HOUR_MS = 60 * MINUTE_MS;
 const MAX_CLIENT_KEY = 200;
 const MAX_DEVICE_LABEL = 40;
 const MAX_RETURN_PATH = 200;
-/** Longer input is cut before cleaning; the cleaned name is far shorter anyway. */
-const MAX_DISPLAY_NAME_INPUT = 1000;
 const UNKNOWN_DEVICE = "جهاز غير معروف";
 
 type Status = Doc<"verifications">["status"];
@@ -682,7 +685,10 @@ export const confirmPinInternal = internalMutation({
     }
     // The account was deleted since the message came. Without a name to start
     // a new one, the person begins again and goes the new-number way.
-    if (!existing && doc.displayName === "") return { kind: "expired" };
+    if (!existing && doc.displayName === "") {
+      await ctx.db.patch(doc._id, { status: "expired", pinHash: undefined });
+      return { kind: "expired" };
+    }
     const personId =
       existing?._id ??
       (await insertPerson(ctx, doc.displayName, doc.phone, args.timeZone));
@@ -730,7 +736,7 @@ export const claim = action({
       timeZone: cleanTimeZone(args.timeZone),
       ...(args.displayName === undefined
         ? {}
-        : { displayName: args.displayName.slice(0, MAX_DISPLAY_NAME_INPUT) }),
+        : { displayName: args.displayName.slice(0, DISPLAY_NAME_INPUT_MAX) }),
     });
     switch (res.kind) {
       case "ok":

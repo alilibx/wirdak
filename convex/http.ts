@@ -4,6 +4,7 @@ import { httpAction, type ActionCtx } from "./_generated/server";
 import { reporterHash } from "./help";
 import { hmacSha256Hex, timingSafeEqual } from "./lib/crypto";
 import { cleanContext } from "./lib/help";
+import { DISPLAY_NAME_INPUT_MAX } from "./lib/text";
 import {
   adminSiteUrl,
   env,
@@ -27,7 +28,6 @@ const http = httpRouter();
 
 const DEV_ORIGIN = "http://localhost:5173";
 const MAX_START_BODY = 4096;
-const MAX_DISPLAY_NAME_INPUT = 1000;
 const MAX_CLIENT_KEY = 200;
 const MAX_IP = 64;
 
@@ -169,7 +169,7 @@ http.route({
     if (
       typeof displayName !== "string" ||
       typeof clientKey !== "string" ||
-      displayName.length > MAX_DISPLAY_NAME_INPUT ||
+      displayName.length > DISPLAY_NAME_INPUT_MAX ||
       clientKey.length === 0 ||
       clientKey.length > MAX_CLIENT_KEY
     ) {

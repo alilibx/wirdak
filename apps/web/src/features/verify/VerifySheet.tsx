@@ -168,6 +168,9 @@ function WaitingStep({ v }: StepProps) {
 /** Only a new number gets here, so this is where its name is asked, once. */
 function ConfirmStep({ v }: StepProps) {
   const [name, setName] = useState("");
+  // Only a name error marks the field; a network error says nothing about it.
+  const nameError =
+    v.errorCode === "nameRequired" || v.errorCode === "invalid_name";
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     void v.confirm(name);
@@ -204,12 +207,16 @@ function ConfirmStep({ v }: StepProps) {
         value={name}
         onChange={(event) => setName(event.target.value)}
         placeholder={t.verify.namePlaceholder}
-        aria-invalid={v.error !== null}
-        aria-describedby={v.error ? "verify-name-error" : undefined}
+        aria-invalid={nameError}
+        aria-describedby={nameError ? "verify-name-error" : undefined}
         className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
       />
       {v.error && (
-        <p id="verify-name-error" role="alert" className={errorText}>
+        <p
+          id={nameError ? "verify-name-error" : undefined}
+          role="alert"
+          className={errorText}
+        >
           {v.error}
         </p>
       )}
