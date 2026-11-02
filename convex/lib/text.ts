@@ -85,7 +85,9 @@ export function phoneCountry(e164: string): CountryCode | undefined {
 }
 
 /** A mobile number of `country` as people there write it, such as `010 01234567` for `EG`. */
-export function localPhoneExample(country: CountryCode | undefined): string | null {
+export function localPhoneExample(
+  country: CountryCode | undefined,
+): string | null {
   if (country === undefined) return null;
   return getExampleNumber(country, examples)?.formatNational() ?? null;
 }
