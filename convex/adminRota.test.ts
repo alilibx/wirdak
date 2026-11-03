@@ -325,6 +325,22 @@ test("create refuses a blocked number, and makes nothing", async () => {
   expect(await auditRows(t)).toEqual([]);
 });
 
+test("addParticipant reads a local number as one from the organizer's country", async () => {
+  const t = convexTest(schema, modules);
+  const { khatmaId } = await running(t, { organizerPhone: "+201000009000" });
+  const added = await t.mutation(api.adminRota.addParticipant, {
+    adminToken,
+    khatmaId,
+    name: "قارئ مصري",
+    phone: "01012345678",
+  });
+  if (!("participantId" in added)) throw new Error(JSON.stringify(added));
+  const saved = await t.run((ctx) => ctx.db.get(added.participantId));
+  expect(saved?.phone).toBe("+201012345678");
+  const view = await t.query(api.adminRota.people, { adminToken, khatmaId });
+  expect(view?.phoneExample).toBe("010 01234567");
+});
+
 test("create refuses a bad name, number or dates, and anyone but an admin", async () => {
   const t = convexTest(schema, modules);
   await admin(t);

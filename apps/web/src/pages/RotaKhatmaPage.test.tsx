@@ -200,6 +200,7 @@ function peopleView(
       (j) => !byJuz.has(j),
     ),
     maxSlots: 3,
+    phoneExample: null,
   };
 }
 

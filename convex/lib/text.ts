@@ -1,10 +1,18 @@
-import { parsePhoneNumberFromString } from "libphonenumber-js/min";
+import {
+  type CountryCode,
+  getExampleNumber,
+  parsePhoneNumberFromString,
+} from "libphonenumber-js/min";
+import examples from "libphonenumber-js/examples.mobile.json";
+import { parsePhoneNumberFromString as parseMobile } from "libphonenumber-js/mobile";
 import { normalizeDigits } from "./digits";
 
 // Re-exported so existing Convex imports keep working; the web app imports ./digits directly.
 export { normalizeDigits, toArabicDigits } from "./digits";
 
 const DISPLAY_NAME_MAX = 40;
+/** Raw name input longer than this is refused or cut before cleaning; the cleaned name is far shorter. */
+export const DISPLAY_NAME_INPUT_MAX = 1000;
 const KHATMA_NAME_MAX = 60;
 
 // Invisible characters that render as blank but are not whitespace or \p{Cf}:
@@ -74,17 +82,41 @@ export function maskPhone(e164: string): string {
   return digits.length >= 4 ? `••• ${digits.slice(-4)}` : "•••";
 }
 
-const E164_RE = /^\+[1-9]\d{7,14}$/;
+/** The country of a stored `+…` number, such as `EG` for `+201012345678`. */
+export function phoneCountry(e164: string): CountryCode | undefined {
+  return parsePhoneNumberFromString(e164)?.country;
+}
+
+/** A mobile number of `country` as people there write it, such as `010 01234567` for `EG`. */
+export function localPhoneExample(
+  country: CountryCode | undefined,
+): string | null {
+  if (country === undefined) return null;
+  return getExampleNumber(country, examples)?.formatNational() ?? null;
+}
+
+const DIALABLE_RE = /^\+?\d+$/;
 
 /**
- * A typed phone number as `+` and 8 to 15 digits, or `null`. Reads Arabic and
- * Persian digits, drops spaces, dashes, dots and brackets, and turns a leading
- * `00` into `+`. A number without a country code is not guessed.
+ * A typed mobile number in E.164 form, or `null` when it is not a real one.
+ * Reads Arabic and Persian digits, drops spaces, dashes, dots and brackets,
+ * and turns a leading `00` into `+`. A number without a country code is read
+ * as a number of `country`, so `01012345678` with `EG` gives `+201012345678`;
+ * without `country` it gives `null`. A national `0` kept after the country
+ * code (`+2001012345678`) is dropped.
  */
-export function normalizePhone(raw: string): string | null {
+export function normalizePhone(
+  raw: string,
+  country?: CountryCode,
+): string | null {
   const compact = normalizeDigits(raw).replace(/[\s\-.()[\]]/g, "");
   const international = compact.startsWith("00")
     ? `+${compact.slice(2)}`
     : compact;
-  return E164_RE.test(international) ? international : null;
+  if (!DIALABLE_RE.test(international)) return null;
+  if (!international.startsWith("+") && country === undefined) return null;
+  // Mobile metadata, so a local number from elsewhere (a UAE `050…` typed
+  // for `EG`) isn't saved as a landline of the organizer's country.
+  const parsed = parseMobile(international, country);
+  return parsed?.isValid() ? parsed.number : null;
 }

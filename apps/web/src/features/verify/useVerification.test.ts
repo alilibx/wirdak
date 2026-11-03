@@ -68,7 +68,7 @@ async function started() {
   reply(200, START);
   const hook = renderHook(() => useVerification());
   await act(async () => {
-    await hook.result.current.start("علي");
+    await hook.result.current.start();
   });
   return hook;
 }
@@ -103,18 +103,7 @@ afterEach(() => {
 });
 
 describe("useVerification: start", () => {
-  it("blank name shows the name error and does not call start", async () => {
-    const { result } = renderHook(() => useVerification());
-    await act(async () => {
-      await result.current.start("   ");
-    });
-    expect(result.current.step).toBe("name");
-    expect(result.current.error).toBe(t.verify.errors.nameRequired);
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(open).not.toHaveBeenCalled();
-  });
-
-  it("posts name and client key, moves to waiting and persists progress", async () => {
+  it("posts the client key without a name, moves to waiting and persists progress", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(1_000_000);
     window.history.replaceState(null, "", "/j/ABC123");
@@ -123,7 +112,7 @@ describe("useVerification: start", () => {
     expect(url).toBe("https://x.convex.site/api/verification/start");
     expect(init.method).toBe("POST");
     const body = JSON.parse(init.body as string) as Record<string, string>;
-    expect(body.displayName).toBe("علي");
+    expect(body).not.toHaveProperty("displayName");
     expect(body.clientKey).toMatch(/^[0-9a-f]{32}$/);
     // The WhatsApp reply links back to this page, not the home page.
     expect(body.returnPath).toBe("/j/ABC123");
@@ -131,7 +120,6 @@ describe("useVerification: start", () => {
     expect(JSON.parse(localStorage.getItem(STORE) ?? "null")).toMatchObject({
       verificationId: "v1",
       secret: "sec",
-      displayName: "علي",
       expiresAt: 1_000_000 + 10 * 60_000,
     });
   });
@@ -157,7 +145,7 @@ describe("useVerification: start", () => {
     reply(429, { error: "rate_limited" });
     const { result } = renderHook(() => useVerification());
     await act(async () => {
-      await result.current.start("علي");
+      await result.current.start();
     });
     expect(fakeWindow.close).toHaveBeenCalled();
   });
@@ -172,7 +160,7 @@ describe("useVerification: start", () => {
       reply(status, { error: code });
       const { result } = renderHook(() => useVerification());
       await act(async () => {
-        await result.current.start("علي");
+        await result.current.start();
       });
       expect(result.current.step).toBe("error");
       expect(result.current.error).toBe(t.verify.errors[code]);
@@ -181,27 +169,17 @@ describe("useVerification: start", () => {
     },
   );
 
-  it("invalid_name keeps the name step with its message", async () => {
-    reply(400, { error: "invalid_name" });
-    const { result } = renderHook(() => useVerification());
-    await act(async () => {
-      await result.current.start("علي");
-    });
-    expect(result.current.step).toBe("name");
-    expect(result.current.error).toBe(t.verify.errors.invalid_name);
-  });
-
   it("a network failure is a retryable error", async () => {
     fetchMock.mockRejectedValueOnce(new TypeError("offline"));
     const { result } = renderHook(() => useVerification());
     await act(async () => {
-      await result.current.start("علي");
+      await result.current.start();
     });
     expect(result.current.step).toBe("error");
     expect(result.current.error).toBe(t.verify.errors.network);
     expect(result.current.canRetry).toBe(true);
     await act(async () => result.current.reset());
-    expect(result.current.step).toBe("name");
+    expect(result.current.step).toBe("start");
     expect(result.current.error).toBeNull();
   });
 
@@ -227,25 +205,55 @@ describe("useVerification: statuses", () => {
     expect(result.current.step).toBe("confirm");
     expect(result.current.maskedPhone).toBe("+971 50 ••• 1234");
     await act(async () => {
-      await result.current.confirm();
+      await result.current.confirm("  علي ");
     });
     expect(m.claim).toHaveBeenCalledWith({
       verificationId: "v1",
       secret: "sec",
       deviceLabel: expect.any(String),
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      displayName: "علي",
     });
     expect(getSessionToken()).toBe("tok");
     expect(result.current.step).toBe("done");
     expect(localStorage.getItem(STORE)).toBeNull();
   });
 
+  it("a blank name on confirm shows the name error and does not claim", async () => {
+    setStatus("matched", "+971 50 ••• 1234");
+    const { result } = await started();
+    await act(async () => {
+      await result.current.confirm("   ");
+    });
+    expect(result.current.step).toBe("confirm");
+    expect(result.current.error).toBe(t.verify.errors.nameRequired);
+    expect(m.claim).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["name_required", "nameRequired"],
+    ["invalid_name", "invalid_name"],
+  ] as const)(
+    "claim answering %s keeps the confirm step and the attempt",
+    async (answer, code) => {
+      setStatus("matched", "+971 50 ••• 1234");
+      m.claim.mockResolvedValue({ error: answer });
+      const { result } = await started();
+      await act(async () => {
+        await result.current.confirm("علي");
+      });
+      expect(result.current.step).toBe("confirm");
+      expect(result.current.error).toBe(t.verify.errors[code]);
+      expect(localStorage.getItem(STORE)).not.toBeNull();
+    },
+  );
+
   it("claim answering needs_pin goes to the pin step", async () => {
     setStatus("matched", "+971 50 ••• 1234");
     m.claim.mockResolvedValue({ error: "needs_pin" });
     const { result } = await started();
     await act(async () => {
-      await result.current.confirm();
+      await result.current.confirm("علي");
     });
     expect(result.current.step).toBe("pin");
     expect(getSessionToken()).toBeNull();
@@ -256,7 +264,7 @@ describe("useVerification: statuses", () => {
     m.claim.mockResolvedValue({ error: "expired" });
     const { result } = await started();
     await act(async () => {
-      await result.current.confirm();
+      await result.current.confirm("علي");
     });
     expect(result.current.step).toBe("error");
     expect(result.current.error).toBe(t.verify.errors.expired);
@@ -268,13 +276,13 @@ describe("useVerification: statuses", () => {
     m.claim.mockResolvedValueOnce({ sessionToken: "tok" });
     const { result } = await started();
     await act(async () => {
-      await result.current.confirm();
+      await result.current.confirm("علي");
     });
     expect(result.current.step).toBe("confirm");
     expect(result.current.error).toBe(t.verify.errors.network);
     expect(localStorage.getItem(STORE)).not.toBeNull();
     await act(async () => {
-      await result.current.confirm();
+      await result.current.confirm("علي");
     });
     expect(result.current.error).toBeNull();
     expect(result.current.step).toBe("done");
@@ -445,7 +453,7 @@ describe("useVerification: intent", () => {
     const intent = { kind: "take", inviteCode: "CODE", juz: 7 } as const;
     const { result } = renderHook(() => useVerification(intent));
     await act(async () => {
-      await result.current.start("علي");
+      await result.current.start();
     });
     expect(JSON.parse(localStorage.getItem(STORE) ?? "null")).toMatchObject({
       verificationId: "v1",
@@ -461,7 +469,6 @@ describe("useVerification: resume from storage", () => {
       JSON.stringify({
         verificationId: "v9",
         secret: "s9",
-        displayName: "سارة",
         expiresAt: Date.now() + 5 * 60_000,
         waUrl: WA_URL,
         ...over,
@@ -473,7 +480,6 @@ describe("useVerification: resume from storage", () => {
     setStatus("pending");
     const { result } = renderHook(() => useVerification());
     expect(result.current.step).toBe("waiting");
-    expect(result.current.displayName).toBe("سارة");
     expect(m.queryCalls).toContainEqual([
       "verification:status",
       { verificationId: "v9", secret: "s9" },
@@ -519,24 +525,30 @@ describe("useVerification: resume from storage", () => {
       vi.setSystemTime(t0 + 11 * 60_000);
       const reloaded = renderHook(() => useVerification());
       expect(reloaded.result.current.step).toBe(step);
-      expect(reloaded.result.current.displayName).toBe("علي");
     },
   );
+
+  it("resumes progress saved before the name moved to confirm", () => {
+    save({ displayName: "سارة" });
+    setStatus("matched", "+971 50 ••• 1234");
+    const { result } = renderHook(() => useVerification());
+    expect(result.current.step).toBe("confirm");
+  });
 
   it("drops expired or malformed progress", () => {
     save({ expiresAt: Date.now() - 1 });
     const stale = renderHook(() => useVerification());
-    expect(stale.result.current.step).toBe("name");
+    expect(stale.result.current.step).toBe("start");
     expect(localStorage.getItem(STORE)).toBeNull();
     localStorage.setItem(STORE, "{not json");
     const bad = renderHook(() => useVerification());
-    expect(bad.result.current.step).toBe("name");
+    expect(bad.result.current.step).toBe("start");
     expect(localStorage.getItem(STORE)).toBeNull();
   });
 
-  it("starts at name with nothing saved and skips the status query", () => {
+  it("starts at start with nothing saved and skips the status query", () => {
     const { result } = renderHook(() => useVerification());
-    expect(result.current.step).toBe("name");
+    expect(result.current.step).toBe("start");
     expect(m.queryCalls).toContainEqual(["verification:status", "skip"]);
   });
 });

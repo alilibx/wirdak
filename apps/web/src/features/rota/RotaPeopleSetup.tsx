@@ -268,6 +268,7 @@ export function RotaPeopleSetupContent({
         />
         <AddPersonForm
           inviteCode={inviteCode}
+          phoneExample={view.phoneExample}
           onStart={() => setImportResult(null)}
         />
       </div>

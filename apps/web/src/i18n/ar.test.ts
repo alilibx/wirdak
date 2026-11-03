@@ -26,6 +26,18 @@ describe("separators next to numbers", () => {
   });
 });
 
+describe("phone hint", () => {
+  it("shows the organizer's local example, isolated left-to-right", () => {
+    expect(t.rota.phoneHint("010 01234567")).toBe(
+      "مثل \u2066010 01234567\u2069، أو مع رمز الدولة إن كان من بلد آخر",
+    );
+  });
+
+  it("asks for the country code when the organizer's country is unknown", () => {
+    expect(t.rota.phoneHint(null)).toBe("مع رمز الدولة، مثل \u200E+971");
+  });
+});
+
 describe("celebration duas", () => {
   it("are the same ones the WhatsApp dua text sends", () => {
     expect(t.celebration.duas).toBe(DUAS);

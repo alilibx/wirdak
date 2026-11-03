@@ -355,7 +355,7 @@ export const ar = {
     waitingHint: "اضغط «إرسال» في واتساب ثم ارجع إلى هنا. سنكمل تلقائياً.",
     openWhatsApp: "افتح واتساب",
     reopenWhatsApp: "افتح واتساب مرة أخرى",
-    confirmTitle: (name: string) => `تمّ التحقق، أهلاً ${name}`,
+    confirmTitle: "تمّ التحقق، أهلاً بك في وِردك",
     yourNumber: "رقمك:",
     yes: "نعم، هذا رقمي",
     notMe: "ليس رقمي",
@@ -585,7 +585,11 @@ export const ar = {
     setupTitle: "من سيقرأ معك؟",
     personName: "الاسم",
     personPhone: "الرقم",
-    phoneHint: "مع رمز الدولة، مثل \u200E+971",
+    // The example is isolated left-to-right so its digit groups keep their order.
+    phoneHint: (example: string | null) =>
+      example === null
+        ? "مع رمز الدولة، مثل \u200E+971"
+        : `مثل \u2066${example}\u2069، أو مع رمز الدولة إن كان من بلد آخر`,
     add: "أضف",
     adding: "جارٍ الإضافة",
     me: "أنا",
@@ -597,7 +601,7 @@ export const ar = {
     readsNextDay: "يبدأ من يوم القراءة التالي",
     addErrors: {
       bad_name: "اكتب اسم الشخص.",
-      bad_phone: "الرقم غير صحيح. اكتبه مع رمز الدولة، مثل \u200E+971",
+      bad_phone: "الرقم غير صحيح. تأكد من أرقامه، أو اكتبه مع رمز الدولة.",
       no_free_juz: "الأجزاء الثلاثون كلها لها قرّاء.",
       juz_taken: "هذا الجزء له قارئ. حاول مرة أخرى.",
       already_added: "هذا الرقم مضاف في الختمة.",

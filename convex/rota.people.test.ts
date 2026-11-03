@@ -149,10 +149,24 @@ test("refuses a held juz', a repeated phone, a bad name or phone", async () => {
   expect(await add(t, s, { phone: "+971 50 555 0001" })).toEqual({
     error: "already_added",
   });
-  expect(await add(t, s, { phone: "0505550002" })).toEqual({
+  expect(await add(t, s, { phone: "050555" })).toEqual({
     error: "bad_phone",
   });
   expect(await add(t, s, { name: "  " })).toEqual({ error: "bad_name" });
+});
+
+test("reads a number without a country code as one from the organizer's country", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await t.run((ctx) => ctx.db.patch(s.personId, { phone: "+201000000001" }));
+  const added = await add(t, s, { phone: "٠١٠١٢٣٤٥٦٧٨" });
+  expect(added).toMatchObject({ ok: true });
+  const saved = await t.run((ctx) => ctx.db.get(participantId(added)));
+  expect(saved?.phone).toBe("+201012345678");
+  expect(await add(t, s, { phone: "+20 010 1234 5678" })).toEqual({
+    error: "already_added",
+  });
+  expect((await people(t, s))?.phoneExample).toBe("010 01234567");
 });
 
 test("says when no juz' is free", async () => {
