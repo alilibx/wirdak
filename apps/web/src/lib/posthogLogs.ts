@@ -1,4 +1,5 @@
 import posthog from "posthog-js";
+import { scrubEvent, scrubUrl } from "./analyticsScrub";
 
 type LogAttributes = Record<string, string | number | boolean>;
 
@@ -24,6 +25,9 @@ export function initializePostHogLogging(): void {
   const host = import.meta.env.VITE_POSTHOG_HOST;
   posthog.init(token, {
     ...(host ? { api_host: host } : {}),
+    // Runs before `HandoffGate` takes `?h=<token>` out of the address bar, so the scrub matters
+    // from the very first pageview.
+    before_send: scrubEvent,
     logs: {
       serviceName: "wirdak-web",
       environment: import.meta.env.MODE,
@@ -31,15 +35,23 @@ export function initializePostHogLogging(): void {
   });
   logsEnabled = true;
 
-  posthog.logger.info("web application started", { runtime: "browser" });
+  posthogLog.info("web application started", { runtime: "browser" });
+}
+
+/**
+ * PostHog Logs adds the raw page URL as `url.full`; an attribute of that name replaces it, so
+ * every record carries the scrubbed one instead.
+ */
+function withUrl(attributes: LogAttributes): LogAttributes {
+  return { ...attributes, "url.full": scrubUrl(window.location.href) };
 }
 
 /** The only logger whose records this integration exports to PostHog Logs. */
 export const posthogLog = {
   info(message: string, attributes: LogAttributes): void {
-    if (logsEnabled) posthog.logger.info(message, attributes);
+    if (logsEnabled) posthog.logger.info(message, withUrl(attributes));
   },
   error(message: string, attributes: LogAttributes): void {
-    if (logsEnabled) posthog.logger.error(message, attributes);
+    if (logsEnabled) posthog.logger.error(message, withUrl(attributes));
   },
 };

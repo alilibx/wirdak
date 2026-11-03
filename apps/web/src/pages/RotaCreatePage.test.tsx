@@ -19,6 +19,7 @@ const JOIN_LINK = "https://wa.me/971500000000?text=join";
 
 const m = vi.hoisted(() => ({
   create: vi.fn(),
+  capture: vi.fn(),
   addParticipant: vi.fn(),
   giveJuz: vi.fn(),
   spreadFreeJuz: vi.fn(),
@@ -31,6 +32,7 @@ const m = vi.hoisted(() => ({
   listeners: new Set<() => void>(),
 }));
 
+vi.mock("posthog-js", () => ({ default: { capture: m.capture } }));
 vi.mock("../lib/session", () => ({
   useSessionToken: () => "tok",
   getSessionToken: () => "tok",
@@ -153,6 +155,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-29T08:00:00Z"));
   m.create.mockReset();
   m.create.mockResolvedValue({ inviteCode: "NEWCODE" });
+  m.capture.mockReset();
   m.addParticipant.mockReset();
   m.giveJuz.mockReset();
   m.spreadFreeJuz.mockReset();
@@ -198,6 +201,10 @@ describe("RotaCreatePage (step 1)", () => {
     expect(
       await screen.findByText("landed /j/NEWCODE/setup"),
     ).toBeInTheDocument();
+    expect(m.capture).toHaveBeenCalledWith("rota_created", {
+      reading_days: "daily",
+      has_end_date: false,
+    });
   });
 
   it("sends Friday every week after choosing every week", async () => {
@@ -212,6 +219,12 @@ describe("RotaCreatePage (step 1)", () => {
       days: { kind: "weekly", weekdays: [5], everyWeeks: 1 },
       firstDate: "2026-10-30",
       endDate: null,
+    });
+    // How often it is read, never its name.
+    expect(m.capture).toHaveBeenCalledWith("rota_created", {
+      reading_days: "weekly",
+      days_per_week: 1,
+      has_end_date: false,
     });
   });
 
@@ -332,20 +345,41 @@ describe("RotaCreatePage (step 1)", () => {
     ["rota_not_allowed", t.rota.errors.rota_not_allowed],
     ["rate_limited", t.rota.errors.rate_limited],
     ["something_new", t.errors.generic],
-  ])("maps %s to its message", async (code, message) => {
-    m.create.mockRejectedValue(new ConvexError({ code }));
+  ])(
+    "maps %s to its message and tells PostHog the create was blocked",
+    async (code, message) => {
+      m.create.mockRejectedValue(new ConvexError({ code }));
+      const user = userEvent.setup();
+      renderCreate();
+      await user.click(screen.getByRole("button", { name: "التالي" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(message ?? "");
+      expect(m.capture).toHaveBeenCalledWith("khatma_create_blocked", {
+        kind: "rota",
+        code,
+      });
+      expect(m.capture).not.toHaveBeenCalledWith(
+        "rota_created",
+        expect.anything(),
+      );
+    },
+  );
+
+  it("sends no blocked event for a dead sign-in", async () => {
+    m.create.mockRejectedValue(new ConvexError({ code: "not_signed_in" }));
     const user = userEvent.setup();
     renderCreate();
     await user.click(screen.getByRole("button", { name: "التالي" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(message ?? "");
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(m.capture).not.toHaveBeenCalled();
   });
 
-  it("shows the network message when the call itself fails", async () => {
+  it("shows the network message when the call itself fails, and sends no blocked event", async () => {
     m.create.mockRejectedValue(new Error("offline"));
     const user = userEvent.setup();
     renderCreate();
     await user.click(screen.getByRole("button", { name: "التالي" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("تعذّر الاتصال");
+    expect(m.capture).not.toHaveBeenCalled();
   });
 
   it("creates only once while the call is in flight", async () => {

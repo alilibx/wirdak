@@ -11,6 +11,7 @@ import { OpenInBrowser } from "./features/status/OpenInBrowser";
 import { StatusBanners } from "./features/status/StatusBanners";
 import { BottomBar } from "./components/BottomBar";
 import { RetryBoundary } from "./components/RetryBoundary";
+import { AnalyticsIdentity } from "./lib/AnalyticsIdentity";
 import { useTouch } from "./lib/useTouch";
 import { CreatePage } from "./pages/CreatePage";
 import { HomePage } from "./pages/HomePage";
@@ -39,6 +40,9 @@ export function App() {
         <BottomBarProvider>
           <RetryBoundary resetKey={pathname} quiet>
             <StatusBanners />
+          </RetryBoundary>
+          <RetryBoundary resetKey={pathname} quiet>
+            <AnalyticsIdentity />
           </RetryBoundary>
           <OpenInBrowser />
           <HelpButton />

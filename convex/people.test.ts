@@ -232,16 +232,44 @@ test("touch writes only what changed: nothing at all when the person was seen wi
 test("me: says whether the caller may create a rota khatma; missing means no; signed out is null", async () => {
   const c = await setup();
   const { t, token, personId } = c;
-  expect(await t.query(api.people.me, { sessionToken: token })).toEqual({
-    rotaAllowed: false,
-  });
+  const rotaAllowed = async () =>
+    (await t.query(api.people.me, { sessionToken: token }))?.rotaAllowed;
+  expect(await rotaAllowed()).toBe(false);
   await t.run((ctx) => ctx.db.patch(personId, { rotaAllowed: true }));
-  expect(await t.query(api.people.me, { sessionToken: token })).toEqual({
-    rotaAllowed: true,
-  });
+  expect(await rotaAllowed()).toBe(true);
   await t.run((ctx) => ctx.db.patch(personId, { rotaAllowed: false }));
-  expect(await t.query(api.people.me, { sessionToken: token })).toEqual({
-    rotaAllowed: false,
-  });
+  expect(await rotaAllowed()).toBe(false);
   expect(await t.query(api.people.me, {})).toBeNull();
+});
+
+test("me: gives each person a stable analytics id that is not their Convex id", async () => {
+  const c = await setup();
+  const { t, token, personId } = c;
+  const first = await t.query(api.people.me, { sessionToken: token });
+  const again = await t.query(api.people.me, { sessionToken: token });
+  expect(first?.analyticsId).toMatch(/^[0-9a-f]{64}$/);
+  expect(first?.analyticsId).not.toContain(personId);
+  expect(again?.analyticsId).toBe(first?.analyticsId);
+
+  const otherToken = "other-token";
+  await t.run(async (ctx) => {
+    const otherId = await ctx.db.insert("people", {
+      phone: "+971570000003",
+      displayName: "سارة",
+      verifiedAt: 0,
+      timeZone: "Asia/Dubai",
+      lastSeenAt: 0,
+    });
+    await ctx.db.insert("sessions", {
+      personId: otherId,
+      tokenHash: await sha256Hex(otherToken),
+      alertTokenHash: "alert-other",
+      deviceLabel: "test",
+      createdAt: NOW,
+      lastUsedAt: NOW,
+    });
+  });
+  const other = await t.query(api.people.me, { sessionToken: otherToken });
+  expect(other?.analyticsId).toMatch(/^[0-9a-f]{64}$/);
+  expect(other?.analyticsId).not.toBe(first?.analyticsId);
 });

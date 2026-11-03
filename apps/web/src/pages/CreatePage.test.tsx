@@ -8,10 +8,12 @@ import { CreatePage } from "./CreatePage";
 
 const m = vi.hoisted(() => ({
   create: vi.fn(),
+  capture: vi.fn(),
   token: undefined as string | undefined,
   me: { rotaAllowed: false } as { rotaAllowed: boolean } | null | undefined,
 }));
 
+vi.mock("posthog-js", () => ({ default: { capture: m.capture } }));
 vi.mock("../lib/session", () => ({
   useSessionToken: () => m.token,
   getSessionToken: () => m.token ?? null,
@@ -73,6 +75,7 @@ describe("CreatePage", () => {
   beforeEach(() => {
     m.create.mockReset();
     m.create.mockResolvedValue({ inviteCode: "NEWCODE" });
+    m.capture.mockReset();
     m.token = "tok";
     m.me = { rotaAllowed: false };
     localStorage.clear();
@@ -184,14 +187,23 @@ describe("CreatePage", () => {
       "أنشأتَ ختمات كثيرة اليوم",
     );
     expect(screen.getByRole("button", { name: "أنشئ الختمة" })).toBeEnabled();
+    expect(m.capture).toHaveBeenCalledWith("khatma_create_blocked", {
+      kind: "pool",
+      code: "rate_limited",
+    });
+    expect(m.capture).not.toHaveBeenCalledWith(
+      "khatma_created",
+      expect.anything(),
+    );
   });
 
-  it("shows the network copy when the call itself fails", async () => {
+  it("shows the network copy when the call itself fails, and sends no blocked event", async () => {
     m.create.mockRejectedValue(new Error("offline"));
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByRole("button", { name: "أنشئ الختمة" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("تعذّر الاتصال");
+    expect(m.capture).not.toHaveBeenCalled();
   });
 
   it("a dead token: clears it, signs in again, then creates once more with the same values", async () => {
@@ -215,6 +227,11 @@ describe("CreatePage", () => {
     });
     expect(await screen.findByText(/\/j\/NEWCODE/)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
+    // Signing in again is not a blocked create.
+    expect(m.capture).not.toHaveBeenCalledWith(
+      "khatma_create_blocked",
+      expect.anything(),
+    );
   });
 
   it("tells the verify sheet the name and schedule it is creating", async () => {
