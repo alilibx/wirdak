@@ -250,6 +250,7 @@ function EmptyRowSheet({
       <AddPersonForm
         inviteCode={inviteCode}
         juz={juz}
+        phoneExample={view.phoneExample}
         variant="primary"
         onAdded={onClose}
       />
