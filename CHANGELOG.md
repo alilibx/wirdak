@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.0](https://github.com/alilibx/wirdak/compare/v0.9.0...v0.10.0) (2026-11-03)
+
+
+### Features
+
+* **rota:** give out the leftover ajza' in one press ([#61](https://github.com/alilibx/wirdak/issues/61)) ([1880afc](https://github.com/alilibx/wirdak/commit/1880afc25fc51f9998072920c4e7b4dae8820715))
+* **web:** ask for the name only when a new number signs up ([#59](https://github.com/alilibx/wirdak/issues/59)) ([b649a76](https://github.com/alilibx/wirdak/commit/b649a7661f31527af49208dc2c933791b6db1b37))
+* **web:** track rota creation, blocked creates, and who is signed in ([#62](https://github.com/alilibx/wirdak/issues/62)) ([da3955a](https://github.com/alilibx/wirdak/commit/da3955a1fe4f4b42eb9344547fcf6d3ded6eb20a))
+
+
+### Bug Fixes
+
+* **rota:** accept local phone numbers from the organizer's country ([#60](https://github.com/alilibx/wirdak/issues/60)) ([b46c25a](https://github.com/alilibx/wirdak/commit/b46c25a662adb58eb95bdf57b997cb0586f8745c))
+
 ## [0.9.0](https://github.com/alilibx/wirdak/compare/v0.8.0...v0.9.0) (2026-11-01)
 
 
