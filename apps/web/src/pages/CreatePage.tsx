@@ -108,6 +108,9 @@ export function CreatePage() {
         setVerifying(true);
         return;
       }
+      if (code !== null) {
+        posthog.capture("khatma_create_blocked", { kind: "pool", code });
+      }
       setError(
         code === null
           ? t.create.errors.network

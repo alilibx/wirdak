@@ -1,7 +1,8 @@
 import { api } from "@convex/_generated/api";
-import { addDays, type ReadingDays } from "@convex/lib/rota";
+import { addDays, readingDaysKind, type ReadingDays } from "@convex/lib/rota";
 import { localDate } from "@convex/lib/wakingTime";
 import { useAction, useQuery } from "convex/react";
+import posthog from "posthog-js";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router";
 import { Button } from "../components/Button";
@@ -13,6 +14,7 @@ import { StepBar } from "../features/rota/StepBar";
 import { useEarliestStart } from "../features/rota/useEarliestStart";
 import { t } from "../i18n/ar";
 import { errorCode } from "../lib/errors";
+import { posthogLog } from "../lib/posthogLogs";
 import { getSessionToken, useSessionToken } from "../lib/session";
 
 const rotaErrors: Record<string, string> = t.rota.errors;
@@ -155,6 +157,16 @@ export function RotaCreateForm({
   );
 }
 
+/** What `rota_created` says about a new rota khatma: how often it is read, never its name. */
+function rotaCreatedProperties({ days, endDate }: RotaDetails) {
+  return {
+    reading_days: readingDaysKind(days),
+    ...(days.kind === "weekly" ? { days_per_week: days.weekdays.length } : {}),
+    ...(days.kind === "monthly" ? { days_per_month: days.days.length } : {}),
+    has_end_date: endDate !== null,
+  };
+}
+
 /** The first step for people an admin turned rota khatmas on for. */
 export function RotaCreatePage() {
   const navigate = useNavigate();
@@ -169,10 +181,22 @@ export function RotaCreatePage() {
     <main className="mx-auto max-w-xl p-5">
       <RotaCreateForm
         create={async (details) => {
-          const { inviteCode } = await createRota({
-            sessionToken: getSessionToken() ?? undefined,
-            ...details,
-          });
+          let inviteCode: string;
+          try {
+            ({ inviteCode } = await createRota({
+              sessionToken: getSessionToken() ?? undefined,
+              ...details,
+            }));
+          } catch (caught) {
+            const code = errorCode(caught);
+            if (code !== null) {
+              posthog.capture("khatma_create_blocked", { kind: "rota", code });
+            }
+            throw caught;
+          }
+          const created = rotaCreatedProperties(details);
+          posthog.capture("rota_created", created);
+          posthogLog.info("rota creation completed", created);
           void navigate(`/j/${encodeURIComponent(inviteCode)}/setup`);
         }}
       />

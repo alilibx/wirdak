@@ -9,6 +9,7 @@ import {
   sessionMutation,
   sessionQuery,
 } from "./lib/session";
+import { sha256Hex } from "./lib/crypto";
 import { refreshPhone } from "./lib/directory";
 import { getSetting } from "./lib/settings";
 import { cleanDisplayName } from "./lib/text";
@@ -84,12 +85,25 @@ export const touch = sessionMutation({
 });
 
 /** What the web needs to know about the signed-in person: `null` when signed out. */
+/**
+ * The id PostHog knows a signed-in person by: a hash of their Convex id, so no event carries
+ * the id itself, a phone number or a name.
+ */
+function analyticsId(personId: Id<"people">): Promise<string> {
+  return sha256Hex(`analytics:${personId}`);
+}
+
 export const me = sessionQuery({
   args: {},
-  handler: async (ctx): Promise<{ rotaAllowed: boolean } | null> => {
+  handler: async (
+    ctx,
+  ): Promise<{ rotaAllowed: boolean; analyticsId: string } | null> => {
     const person = ctx.person;
     if (!person) return null;
-    return { rotaAllowed: person.rotaAllowed === true };
+    return {
+      rotaAllowed: person.rotaAllowed === true,
+      analyticsId: await analyticsId(person._id),
+    };
   },
 });
 
