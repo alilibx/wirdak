@@ -78,7 +78,7 @@ export function VerifySheet({ title, intent, onVerified, onClose }: Props) {
   return (
     <Sheet title={title} onClose={close}>
       <div ref={body}>
-        {v.step === "name" && <NameStep v={v} />}
+        {v.step === "start" && <StartStep v={v} />}
         {v.step === "waiting" && <WaitingStep v={v} />}
         {v.step === "confirm" && <ConfirmStep v={v} />}
         {v.step === "pin" && <PinStep v={v} />}
@@ -91,32 +91,17 @@ export function VerifySheet({ title, intent, onVerified, onClose }: Props) {
 
 type StepProps = { v: ReturnType<typeof useVerification> };
 
-function NameStep({ v }: StepProps) {
-  const [name, setName] = useState("");
+/** No name here: a returning number never needs one, and a new one gives it on confirm. */
+function StartStep({ v }: StepProps) {
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    void v.start(name);
+    void v.start();
   };
   return (
     <form onSubmit={onSubmit} noValidate>
       <p className={hint}>{t.verify.intro}</p>
-      <label htmlFor="verify-name" className="mt-3.5 block font-medium">
-        {t.verify.nameLabel}
-      </label>
-      <input
-        id="verify-name"
-        type="text"
-        autoComplete="name"
-        maxLength={40}
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        placeholder={t.verify.namePlaceholder}
-        aria-invalid={v.error !== null}
-        aria-describedby={v.error ? "verify-name-error" : undefined}
-        className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
-      />
       {v.error && (
-        <p id="verify-name-error" role="alert" className={errorText}>
+        <p role="alert" className={errorText}>
           {v.error}
         </p>
       )}
@@ -180,9 +165,18 @@ function WaitingStep({ v }: StepProps) {
   );
 }
 
+/** Only a new number gets here, so this is where its name is asked, once. */
 function ConfirmStep({ v }: StepProps) {
+  const [name, setName] = useState("");
+  // Only a name error marks the field; a network error says nothing about it.
+  const nameError =
+    v.errorCode === "nameRequired" || v.errorCode === "invalid_name";
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    void v.confirm(name);
+  };
   return (
-    <div>
+    <form onSubmit={onSubmit} noValidate>
       <div className="text-center">
         <div
           aria-hidden="true"
@@ -191,7 +185,7 @@ function ConfirmStep({ v }: StepProps) {
           ✓
         </div>
         <h3 className={`${heading} mt-3`} {...stepHeading}>
-          {t.verify.confirmTitle(v.displayName)}
+          {t.verify.confirmTitle}
         </h3>
         {v.maskedPhone && (
           <p className={hint}>
@@ -202,13 +196,32 @@ function ConfirmStep({ v }: StepProps) {
           </p>
         )}
       </div>
+      <label htmlFor="verify-name" className="mt-4 block font-medium">
+        {t.verify.nameLabel}
+      </label>
+      <input
+        id="verify-name"
+        type="text"
+        autoComplete="name"
+        maxLength={40}
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        placeholder={t.verify.namePlaceholder}
+        aria-invalid={nameError}
+        aria-describedby={nameError ? "verify-name-error" : undefined}
+        className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
+      />
       {v.error && (
-        <p role="alert" className={errorText}>
+        <p
+          id={nameError ? "verify-name-error" : undefined}
+          role="alert"
+          className={errorText}
+        >
           {v.error}
         </p>
       )}
       <div className="mt-5 grid gap-3">
-        <Button disabled={v.busy} onClick={() => void v.confirm()}>
+        <Button type="submit" disabled={v.busy}>
           {t.verify.yes}
         </Button>
         <Button
@@ -219,7 +232,7 @@ function ConfirmStep({ v }: StepProps) {
           {t.verify.notMe}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }
 

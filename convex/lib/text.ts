@@ -5,6 +5,8 @@ import { normalizeDigits } from "./digits";
 export { normalizeDigits, toArabicDigits } from "./digits";
 
 const DISPLAY_NAME_MAX = 40;
+/** Raw name input longer than this is refused or cut before cleaning; the cleaned name is far shorter. */
+export const DISPLAY_NAME_INPUT_MAX = 1000;
 const KHATMA_NAME_MAX = 60;
 
 // Invisible characters that render as blank but are not whitespace or \p{Cf}:

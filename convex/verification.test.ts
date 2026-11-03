@@ -96,12 +96,18 @@ function status(t: T, v: Started) {
   });
 }
 
-function claim(t: T, v: Started, deviceLabel = "iPhone Safari") {
+function claim(
+  t: T,
+  v: Started,
+  deviceLabel = "iPhone Safari",
+  displayName?: string,
+) {
   return t.action(api.verification.claim, {
     verificationId: v.verificationId,
     secret: v.secret,
     deviceLabel,
     timeZone: "Asia/Dubai",
+    ...(displayName === undefined ? {} : { displayName }),
   });
 }
 
@@ -253,9 +259,14 @@ test("start over HTTP: CORS preflight, origins, and error codes", async () => {
       body: typeof body === "string" ? body : JSON.stringify(body),
     });
 
-  const blank = await post({ displayName: "   ", clientKey: "c1" });
-  expect(blank.status).toBe(400);
-  expect(await blank.json()).toEqual({ error: "invalid_name" });
+  // A new number gives its name when it claims, so start needs none.
+  expect((await post({ clientKey: "c1" })).status).toBe(200);
+  expect((await post({ displayName: "   ", clientKey: "c1" })).status).toBe(
+    200,
+  );
+  const unusable = await post({ displayName: "!!! 🙂", clientKey: "c1" });
+  expect(unusable.status).toBe(400);
+  expect(await unusable.json()).toEqual({ error: "invalid_name" });
 
   const garbage = await post("{not json");
   expect(garbage.status).toBe(400);
@@ -429,6 +440,80 @@ test("a client refused by its IP's limit keeps its own budget", async () => {
   expect(await go("k-retry", "198.51.100.1")).toEqual({
     error: "rate_limited",
   });
+});
+
+test("new number without a name at start gives it with the claim", async () => {
+  const t = convexTest(schema, modules);
+  const v = await start(t, "");
+  await send(t, v.message);
+  expect((await status(t, v)).status).toBe("matched");
+
+  const res = await claim(t, v, "iPhone Safari", "  أم أحمد ");
+  if (!("sessionToken" in res)) throw new Error(JSON.stringify(res));
+  expect(
+    await t.query(api.sessions.me, { sessionToken: res.sessionToken }),
+  ).toMatchObject({ displayName: "أم أحمد" });
+});
+
+test("a claim with no name anywhere, or one that cleans to nothing, keeps the attempt open", async () => {
+  const t = convexTest(schema, modules);
+  const v = await start(t, "");
+  await send(t, v.message);
+
+  expect(await claim(t, v)).toEqual({ error: "name_required" });
+  expect(await claim(t, v, "iPhone Safari", "   ")).toEqual({
+    error: "name_required",
+  });
+  expect(await claim(t, v, "iPhone Safari", "!!! 🙂")).toEqual({
+    error: "invalid_name",
+  });
+  expect((await status(t, v)).status).toBe("matched");
+  expect(await t.run((ctx) => ctx.db.query("people").collect())).toEqual([]);
+  expect(await sessionCount(t)).toBe(0);
+
+  expect(await claim(t, v, "iPhone Safari", "علي")).toHaveProperty(
+    "sessionToken",
+  );
+});
+
+test("a name sent with the claim wins over one sent with the start", async () => {
+  const t = convexTest(schema, modules);
+  const v = await start(t, "قديم");
+  await send(t, v.message);
+  const res = await claim(t, v, "iPhone Safari", "جديد");
+  if (!("sessionToken" in res)) throw new Error(JSON.stringify(res));
+  expect(
+    await t.query(api.sessions.me, { sessionToken: res.sessionToken }),
+  ).toMatchObject({ displayName: "جديد" });
+});
+
+test("a returning number signs in without a name and keeps its own", async () => {
+  const t = convexTest(schema, modules);
+  await addPerson(t);
+  const v = await start(t, "");
+  await send(t, v.message);
+  expect((await status(t, v)).status).toBe("needs_pin");
+
+  const res = await confirmPin(t, v, pinsSent()[0]!);
+  if (!("sessionToken" in res)) throw new Error(JSON.stringify(res));
+  expect(
+    await t.query(api.sessions.me, { sessionToken: res.sessionToken }),
+  ).toMatchObject({ displayName: "سعيد" });
+});
+
+test("a PIN for an account deleted meanwhile, with no name to start a new one, has expired", async () => {
+  const t = convexTest(schema, modules);
+  const personId = await addPerson(t);
+  const v = await start(t, "");
+  await send(t, v.message);
+  await t.run((ctx) => ctx.db.delete(personId));
+
+  const pin = pinsSent()[0]!;
+  expect(await confirmPin(t, v, pin)).toEqual({ error: "expired" });
+  expect((await status(t, v)).status).toBe("expired");
+  expect(await confirmPin(t, v, pin)).toEqual({ error: "expired" });
+  expect(await t.run((ctx) => ctx.db.query("people").collect())).toEqual([]);
+  expect(await sessionCount(t)).toBe(0);
 });
 
 test("new number: start → message → matched → claim → session", async () => {

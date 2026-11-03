@@ -17,7 +17,6 @@ export type VerifyIntent =
 export type Progress = {
   verificationId: string;
   secret: string;
-  displayName: string;
   expiresAt: number;
   /** The prefilled wa.me link (it carries the one-time code only), so a reload can reopen WhatsApp. */
   waUrl?: string;
@@ -104,7 +103,6 @@ export function loadProgress(): Progress | null {
       typeof p === "object" &&
       typeof p.verificationId === "string" &&
       typeof p.secret === "string" &&
-      typeof p.displayName === "string" &&
       typeof p.expiresAt === "number" &&
       p.expiresAt > Date.now()
     ) {
@@ -112,7 +110,6 @@ export function loadProgress(): Progress | null {
       return {
         verificationId: p.verificationId,
         secret: p.secret,
-        displayName: p.displayName,
         expiresAt: p.expiresAt,
         ...(typeof p.waUrl === "string" ? { waUrl: p.waUrl } : {}),
         ...(intent ? { intent } : {}),

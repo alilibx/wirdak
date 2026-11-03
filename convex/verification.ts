@@ -30,7 +30,12 @@ import { refreshPhone } from "./lib/directory";
 import { getSetting } from "./lib/settings";
 import { bumpCounter, dubaiDay, signInKey } from "./lib/stats";
 import { insertSession } from "./sessions";
-import { cleanDisplayName, maskPhone, normalizeDigits } from "./lib/text";
+import {
+  cleanDisplayName,
+  DISPLAY_NAME_INPUT_MAX,
+  maskPhone,
+  normalizeDigits,
+} from "./lib/text";
 import {
   env,
   isDev,
@@ -169,13 +174,13 @@ async function toAdminNeedsPin(
 
 async function insertPerson(
   ctx: MutationCtx,
-  doc: Doc<"verifications">,
+  displayName: string,
   phone: string,
   timeZone: string,
 ): Promise<Id<"people">> {
   const personId = await ctx.db.insert("people", {
     phone,
-    displayName: doc.displayName,
+    displayName,
     verifiedAt: Date.now(),
     timeZone,
     lastSeenAt: Date.now(),
@@ -241,9 +246,12 @@ export const startInternal = internalAction({
     if (!isDev() && !whatsappConfigured()) {
       return { error: "whatsapp_not_configured" };
     }
-    // An admin sign-in has no display name: it never creates a person.
+    // An admin sign-in has no display name: it never creates a person. A member
+    // sign-in may leave it empty too: a new number gives it when it claims.
     const displayName =
-      args.surface === "admin" ? "" : cleanDisplayName(args.displayName);
+      args.surface === "admin" || args.displayName.trim() === ""
+        ? ""
+        : cleanDisplayName(args.displayName);
     if (displayName === null) return { error: "invalid_name" };
 
     const candidates = Array.from({ length: CODE_CANDIDATES }, () =>
@@ -562,7 +570,14 @@ type SignInResult =
       alertOn: boolean;
     }
   | { kind: "needs_pin"; phone: string | null }
-  | { kind: "expired" | "wrong_pin" | "too_many_attempts" };
+  | {
+      kind:
+        | "expired"
+        | "wrong_pin"
+        | "too_many_attempts"
+        | "name_required"
+        | "invalid_name";
+    };
 
 async function alertSignIn(
   res: Extract<SignInResult, { kind: "ok" }>,
@@ -583,7 +598,12 @@ const signInArgs = {
 };
 
 export const claimInternal = internalMutation({
-  args: { ...signInArgs, pinHash: v.string() },
+  args: {
+    ...signInArgs,
+    pinHash: v.string(),
+    /** The new person's name, asked once WhatsApp shows the number is new. */
+    displayName: v.optional(v.string()),
+  },
   handler: async (ctx, args): Promise<SignInResult> => {
     const doc = await loadWithSecretHash(
       ctx,
@@ -606,7 +626,22 @@ export const claimInternal = internalMutation({
       });
       return { kind: "needs_pin", phone: doc.phone };
     }
-    const personId = await insertPerson(ctx, doc, doc.phone, args.timeZone);
+    // A name sent with the claim wins; an older client sent it with the start.
+    // A missing or unusable name keeps the attempt open, so the person can fix
+    // it and claim again.
+    let displayName = doc.displayName;
+    if (args.displayName !== undefined && args.displayName.trim() !== "") {
+      const cleaned = cleanDisplayName(args.displayName);
+      if (cleaned === null) return { kind: "invalid_name" };
+      displayName = cleaned;
+    }
+    if (displayName === "") return { kind: "name_required" };
+    const personId = await insertPerson(
+      ctx,
+      displayName,
+      doc.phone,
+      args.timeZone,
+    );
     await completeSignIn(ctx, doc, personId, args);
     await bumpCounter(ctx, signInKey(dubaiDay(Date.now()), "completed"));
     return {
@@ -648,8 +683,15 @@ export const confirmPinInternal = internalMutation({
       const now = Date.now();
       await ctx.db.patch(existing._id, { verifiedAt: now, lastSeenAt: now });
     }
+    // The account was deleted since the message came. Without a name to start
+    // a new one, the person begins again and goes the new-number way.
+    if (!existing && doc.displayName === "") {
+      await ctx.db.patch(doc._id, { status: "expired", pinHash: undefined });
+      return { kind: "expired" };
+    }
     const personId =
-      existing?._id ?? (await insertPerson(ctx, doc, doc.phone, args.timeZone));
+      existing?._id ??
+      (await insertPerson(ctx, doc.displayName, doc.phone, args.timeZone));
     const sessionId = await completeSignIn(ctx, doc, personId, args);
     await bumpCounter(ctx, signInKey(dubaiDay(Date.now()), "completed"));
     const sessions = await ctx.db
@@ -672,11 +714,15 @@ export const claim = action({
     secret: v.string(),
     deviceLabel: v.string(),
     timeZone: v.string(),
+    displayName: v.optional(v.string()),
   },
   handler: async (
     ctx,
     args,
-  ): Promise<{ sessionToken: string } | { error: "expired" | "needs_pin" }> => {
+  ): Promise<
+    | { sessionToken: string }
+    | { error: "expired" | "needs_pin" | "name_required" | "invalid_name" }
+  > => {
     const tokens = await newSessionTokens();
     const pin = randomPin();
     const deviceLabel = cleanDeviceLabel(args.deviceLabel);
@@ -688,6 +734,9 @@ export const claim = action({
       pinHash: await sha256Hex(pin),
       deviceLabel,
       timeZone: cleanTimeZone(args.timeZone),
+      ...(args.displayName === undefined
+        ? {}
+        : { displayName: args.displayName.slice(0, DISPLAY_NAME_INPUT_MAX) }),
     });
     switch (res.kind) {
       case "ok":
@@ -696,6 +745,9 @@ export const claim = action({
       case "needs_pin":
         if (res.phone) await sendPin(res.phone, pin);
         return { error: "needs_pin" };
+      case "name_required":
+      case "invalid_name":
+        return { error: res.kind };
       default:
         return { error: "expired" };
     }

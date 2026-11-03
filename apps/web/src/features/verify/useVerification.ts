@@ -21,7 +21,7 @@ import {
 } from "./progress";
 
 export type Step =
-  "name" | "waiting" | "confirm" | "pin" | "devices" | "done" | "error";
+  "start" | "waiting" | "confirm" | "pin" | "devices" | "done" | "error";
 
 type ErrorCode = keyof typeof t.verify.errors;
 type Phase = null | "pin" | "devices" | "done" | "error";
@@ -34,7 +34,6 @@ const PIN_LENGTH = 6;
 const NO_RETRY: ReadonlySet<ErrorCode> = new Set(["whatsapp_not_configured"]);
 
 const START_ERRORS: ReadonlySet<string> = new Set([
-  "invalid_name",
   "rate_limited",
   "maintenance",
   "whatsapp_not_configured",
@@ -96,7 +95,7 @@ export function useVerification(intent?: VerifyIntent) {
   if (phase === "done" || phase === "devices" || phase === "error") {
     step = phase;
   } else if (!saved) {
-    step = "name";
+    step = "start";
   } else if (live === undefined) {
     step = phase === "pin" ? "pin" : "waiting";
   } else if (live.status === "expired" || live.status === "rejected") {
@@ -168,13 +167,9 @@ export function useVerification(intent?: VerifyIntent) {
     setPhase(otherSessions > 0 ? "devices" : "done");
   }
 
-  async function start(name: string): Promise<void> {
+  /** No name yet: only a new number needs one, and WhatsApp tells us which it is. */
+  async function start(): Promise<void> {
     if (busyRef.current) return;
-    const displayName = name.trim();
-    if (!displayName) {
-      setErrorCode("nameRequired");
-      return;
-    }
     const win = openBlankWindow();
     const closeBlank = () => {
       if (win && !win.closed) win.close();
@@ -188,7 +183,6 @@ export function useVerification(intent?: VerifyIntent) {
           headers: { "Content-Type": "application/json" },
           // The WhatsApp reply links back to this page, where the sheet resumes.
           body: JSON.stringify({
-            displayName,
             clientKey: getClientKey(),
             returnPath: window.location.pathname,
           }),
@@ -209,7 +203,6 @@ export function useVerification(intent?: VerifyIntent) {
       ) {
         closeBlank();
         const reason = body?.error ?? "";
-        if (reason === "invalid_name") return setErrorCode("invalid_name");
         return fail(
           START_ERRORS.has(reason) ? (reason as ErrorCode) : "generic",
         );
@@ -222,7 +215,6 @@ export function useVerification(intent?: VerifyIntent) {
       const progress: Progress = {
         verificationId: body.verificationId,
         secret: body.secret,
-        displayName,
         expiresAt: Date.now() + TTL_MS,
         waUrl,
         ...(intentRef.current ? { intent: intentRef.current } : {}),
@@ -236,8 +228,14 @@ export function useVerification(intent?: VerifyIntent) {
   // A thrown call keeps the attempt and its step; the user taps again.
   const keepStep = () => setErrorCode("network");
 
-  async function confirm(): Promise<void> {
-    if (!saved) return;
+  /** A new number's name goes with the claim, which creates the account. */
+  async function confirm(name: string): Promise<void> {
+    if (!saved || busyRef.current) return;
+    const displayName = name.trim();
+    if (!displayName) {
+      setErrorCode("nameRequired");
+      return;
+    }
     await run(
       "claim",
       async () => {
@@ -247,9 +245,13 @@ export function useVerification(intent?: VerifyIntent) {
           secret: saved.secret,
           deviceLabel: deviceLabel(navigator.userAgent),
           timeZone: timeZone(),
+          displayName,
         });
         if ("sessionToken" in res) return finish(res.sessionToken, 0);
         if (res.error === "needs_pin") return setPhase("pin");
+        // The attempt stays open: the person fixes the name and taps again.
+        if (res.error === "name_required") return setErrorCode("nameRequired");
+        if (res.error === "invalid_name") return setErrorCode("invalid_name");
         fail("expired");
       },
       keepStep,
@@ -326,7 +328,7 @@ export function useVerification(intent?: VerifyIntent) {
     setOpened(true);
   }
 
-  /** Back to the name step, forgetting the current attempt. */
+  /** Back to the start step, forgetting the current attempt. */
   function reset(): void {
     clearProgress();
     setSaved(null);
@@ -344,7 +346,6 @@ export function useVerification(intent?: VerifyIntent) {
     errorCode: code,
     canRetry: step === "error" && code !== null && !NO_RETRY.has(code),
     busy: busy !== null,
-    displayName: saved?.displayName ?? "",
     waUrl: saved?.waUrl ?? null,
     opened,
     start,

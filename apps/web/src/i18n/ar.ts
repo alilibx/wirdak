@@ -355,7 +355,7 @@ export const ar = {
     waitingHint: "اضغط «إرسال» في واتساب ثم ارجع إلى هنا. سنكمل تلقائياً.",
     openWhatsApp: "افتح واتساب",
     reopenWhatsApp: "افتح واتساب مرة أخرى",
-    confirmTitle: (name: string) => `تمّ التحقق، أهلاً ${name}`,
+    confirmTitle: "تمّ التحقق، أهلاً بك في وِردك",
     yourNumber: "رقمك:",
     yes: "نعم، هذا رقمي",
     notMe: "ليس رقمي",
