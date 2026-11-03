@@ -16,12 +16,15 @@ const addErrors: Record<string, string> = t.rota.addErrors;
 export function AddPersonForm({
   inviteCode,
   juz,
+  phoneExample,
   variant = "ghost",
   onStart,
   onAdded,
 }: {
   inviteCode: string;
   juz?: number;
+  /** A local number from the organizer's country, shown in the hint. */
+  phoneExample: string | null;
   variant?: "ghost" | "primary";
   /** Called when the organizer presses add, before the call. */
   onStart?: () => void;
@@ -88,7 +91,7 @@ export function AddPersonForm({
         className={`${fieldClass} text-right`}
       />
       <p id={`${ids}-hint`} className="mt-1 text-base text-ink-soft">
-        {t.rota.phoneHint}
+        {t.rota.phoneHint(phoneExample)}
       </p>
       <ErrorLine error={error} />
       {question ?? (

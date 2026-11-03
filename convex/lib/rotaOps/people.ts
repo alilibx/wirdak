@@ -21,7 +21,13 @@ import { khatmaJoinLink } from "../rotaJoin";
 import { slotRowsByJuz, targetDay, type RotaConfig } from "../rotaPlace";
 import { NEW_MEMBER_NAME } from "../rotaTemplates";
 import { getSetting } from "../settings";
-import { cleanDisplayName, maskPhone, normalizePhone } from "../text";
+import {
+  cleanDisplayName,
+  localPhoneExample,
+  maskPhone,
+  normalizePhone,
+  phoneCountry,
+} from "../text";
 import { localMinutes } from "../wakingTime";
 import { khatmaTitle } from "../whatsappTemplates";
 
@@ -129,7 +135,14 @@ export type PeopleView = {
   } & PersonState)[];
   freeJuz: number[];
   maxSlots: number;
+  /** A local number from the organizer's country, for the phone field's hint. */
+  phoneExample: string | null;
 };
+
+/** A number typed without a country code is one from the organizer's country. */
+function homeCountry(organizer: Doc<"people"> | null) {
+  return organizer ? phoneCountry(organizer.phone) : undefined;
+}
 
 function personState(
   p: Doc<"rotaParticipants">,
@@ -179,6 +192,7 @@ export async function people(
       )
       .collect()
   ).sort((a, b) => a.createdAt - b.createdAt);
+  const organizer = await ctx.db.get(khatma.creatorPersonId);
   return {
     title: khatmaTitle(khatma),
     archived: isArchived(khatma),
@@ -223,6 +237,7 @@ export async function people(
       (juz) => !byJuz.has(juz),
     ),
     maxSlots: await getSetting(ctx, "rotaMaxSlotsPerPerson"),
+    phoneExample: localPhoneExample(homeCountry(organizer)),
   };
 }
 
@@ -328,7 +343,8 @@ export async function addParticipant(
 > {
   const name = cleanDisplayName(args.name);
   if (name === null) return { error: "bad_name" };
-  const phone = normalizePhone(args.phone);
+  const organizer = await ctx.db.get(khatma.creatorPersonId);
+  const phone = normalizePhone(args.phone, homeCountry(organizer));
   if (phone === null) return { error: "bad_phone" };
   const same = await ctx.db
     .query("rotaParticipants")
@@ -349,7 +365,6 @@ export async function addParticipant(
     { readsToday: args.readsToday },
   );
   if ("error" in placed) return placed;
-  const organizer = await ctx.db.get(khatma.creatorPersonId);
   if (organizer) {
     await saveContact(ctx, organizer, {
       name,

@@ -27,6 +27,7 @@ function view(name: string | null) {
   return {
     requests: [{ id: "r1", name, phoneMasked: "+971 50 ••• 2233" }],
     freeJuz: [4, 5],
+    phoneExample: null,
   } as never;
 }
 

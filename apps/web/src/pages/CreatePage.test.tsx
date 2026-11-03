@@ -255,7 +255,6 @@ describe("CreatePage", () => {
       JSON.stringify({
         verificationId: "v1",
         secret: "sec",
-        displayName: "علي",
         expiresAt: Date.now() + 5 * 60_000,
         intent: { kind: "create", name: "ختمة الجمعة", schedule: "daily" },
       }),
@@ -282,7 +281,6 @@ describe("CreatePage", () => {
       JSON.stringify({
         verificationId: "v1",
         secret: "sec",
-        displayName: "علي",
         expiresAt: Date.now() + 5 * 60_000,
         intent: { kind: "take", inviteCode: "CODE", juz: 3 },
       }),
@@ -417,7 +415,6 @@ describe("CreatePage", () => {
         JSON.stringify({
           verificationId: "v1",
           secret: "sec",
-          displayName: "علي",
           expiresAt: Date.now() + 5 * 60_000,
           intent: { kind: "create", name: "ختمة الجمعة", schedule: "daily" },
         }),

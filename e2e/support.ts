@@ -158,8 +158,9 @@ export async function blockExternal(context: BrowserContext): Promise<void> {
 }
 
 /**
- * Runs the open verification sheet to the end as a new number: types the name, reads the
- * ready-made message from the "open WhatsApp" link, sends it as `phone`, and confirms.
+ * Runs the open verification sheet to the end as a new number: reads the
+ * ready-made message from the "open WhatsApp" link, sends it as `phone`, then types the name and
+ * confirms.
  * `whileInWhatsApp` runs between reading the message and sending it, e.g. to reload the tab.
  */
 export async function verifyInSheet(
@@ -169,7 +170,6 @@ export async function verifyInSheet(
   whileInWhatsApp?: () => Promise<void>,
 ): Promise<void> {
   const sheet = page.getByRole("dialog");
-  await sheet.getByLabel(t.verify.nameLabel).fill(displayName);
   await sheet.getByRole("button", { name: t.verify.start }).click();
 
   // The link is the page's only copy of the message; "open again" also matches this name.
@@ -182,9 +182,9 @@ export async function verifyInSheet(
   await whileInWhatsApp?.();
   await simulateIncoming(phone, message ?? "");
 
-  await expect(
-    sheet.getByText(t.verify.confirmTitle(displayName)),
-  ).toBeVisible();
+  // A new number gives its name only now, once WhatsApp showed it is new.
+  await expect(sheet.getByText(t.verify.confirmTitle)).toBeVisible();
+  await sheet.getByLabel(t.verify.nameLabel).fill(displayName);
   await sheet.getByRole("button", { name: t.verify.yes }).click();
 }
 

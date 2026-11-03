@@ -54,6 +54,7 @@ function makeView() {
       },
     ],
     freeJuz: [2, 3],
+    phoneExample: null,
     maxSlots: 2,
   };
 }
