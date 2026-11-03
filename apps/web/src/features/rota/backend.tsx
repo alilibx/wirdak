@@ -18,6 +18,7 @@ const organizerFunctions = {
   finishSetup: api.rota.finishSetup,
   addParticipant: api.rota.addParticipant,
   giveJuz: api.rota.giveJuz,
+  spreadFreeJuz: api.rota.spreadFreeJuz,
   moveJuz: api.rota.moveJuz,
   freeJuz: api.rota.freeJuz,
   renameParticipant: api.rota.renameParticipant,

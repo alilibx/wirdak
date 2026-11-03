@@ -573,6 +573,14 @@ export const giveJuz = sessionMutation({
   },
 });
 
+export const spreadFreeJuz = sessionMutation({
+  args: { inviteCode: v.string() },
+  handler: async (ctx, args): ReturnType<typeof ops.spreadFreeJuz> => {
+    const { khatma } = await requireRotaOrganizer(ctx, args.inviteCode);
+    return ops.spreadFreeJuz(ctx, khatma);
+  },
+});
+
 export const moveJuz = sessionMutation({
   args: {
     inviteCode: v.string(),

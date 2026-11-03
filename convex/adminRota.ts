@@ -286,6 +286,19 @@ export const giveJuz = adminMutation({
   },
 });
 
+export const spreadFreeJuz = adminMutation({
+  args: { khatmaId: v.id("khatmas") },
+  handler: async (ctx, args): ReturnType<typeof ops.spreadFreeJuz> => {
+    const { khatma } = await requireLiveRota(ctx, args.khatmaId);
+    return audited(
+      ctx,
+      args,
+      "spreadFreeJuz",
+      await ops.spreadFreeJuz(ctx, khatma),
+    );
+  },
+});
+
 export const moveJuz = adminMutation({
   args: {
     khatmaId: v.id("khatmas"),

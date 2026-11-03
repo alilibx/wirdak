@@ -143,9 +143,7 @@ describe("VerifySheet", () => {
     m.claim.mockResolvedValue({ sessionToken: "tok" });
     ui();
     await signInStart(user);
-    expect(
-      await screen.findByText(t.verify.confirmTitle),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(t.verify.confirmTitle)).toBeInTheDocument();
     const phone = screen.getByText("+971 50 ••• 1234");
     expect(phone).toHaveAttribute("dir", "ltr");
     await user.type(screen.getByLabelText(t.verify.nameLabel), "علي");

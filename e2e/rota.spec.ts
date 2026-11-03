@@ -11,8 +11,12 @@ import {
 
 const KHATMA_NAME = "ختمة التناوب";
 
+/** The ajza' from `first` to `last`. */
+const range = (first: number, last: number) =>
+  Array.from({ length: last - first + 1 }, (_, i) => first + i);
+
 // A rotating khatma from start to a first day: A signs in, an admin-style switch lets A create one,
-// A makes it daily from today, adds two people, reassigns an unread juz' to themselves, records it
+// A makes it daily from today, adds two people, spreads the leftover ajza' over the three, reassigns an unread juz' to themselves, records it
 // as read, and then pauses the khatma. The run moves the default day time to one that has passed
 // (e2e/global-setup.ts), so the first day starts as soon as A taps «تمّ», at any hour.
 test("rota: create, place people, run a day", async ({ page }) => {
@@ -52,6 +56,12 @@ test("rota: create, place people, run a day", async ({ page }) => {
     await expect(people.getByText(name)).toBeVisible();
   }
   await expect(people.getByRole("listitem")).toHaveCount(3);
+
+  // One press gives the leftover ajza' out in turn, up to three each: juz' 30 stays free.
+  await expect(page.getByText(t.rota.leftover(range(4, 30)))).toBeVisible();
+  await page.getByRole("button", { name: t.rota.spread }).click();
+  await expect(page.getByText(t.rota.leftover(range(10, 30)))).toBeVisible();
+  await expect(people.getByText(t.rota.juzOf([1, 4, 7]))).toBeVisible();
   await page.getByRole("button", { name: t.rota.done, exact: true }).click();
 
   // --- Today ---------------------------------------------------------------------------------

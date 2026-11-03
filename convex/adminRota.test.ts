@@ -397,6 +397,28 @@ test("a change writes one audit row naming it, and a refused one writes none", a
   expect(await auditRows(t)).toHaveLength(before + 1);
 });
 
+test("spreadFreeJuz gives the free ajza' out and writes one audit row", async () => {
+  const t = convexTest(schema, modules);
+  const { khatmaId, readerId } = await running(t);
+  const before = (await auditRows(t)).length;
+  expect(
+    await t.mutation(api.adminRota.spreadFreeJuz, { adminToken, khatmaId }),
+  ).toEqual({ ok: true, given: 4, left: 24 });
+  // The organizer (on juz' 1, added first) and the reader take turns.
+  const view = await t.query(api.adminRota.people, { adminToken, khatmaId });
+  expect(view?.participants.find((p) => p.id === readerId)?.juz).toEqual([
+    3, 5, 8,
+  ]);
+  const rows = await auditRows(t);
+  expect(rows).toHaveLength(before + 1);
+  expect(rows.at(-1)).toMatchObject({ note: "spreadFreeJuz" });
+
+  expect(
+    await t.mutation(api.adminRota.spreadFreeJuz, { adminToken, khatmaId }),
+  ).toEqual({ error: "no_room" });
+  expect(await auditRows(t)).toHaveLength(before + 1);
+});
+
 test("nobody but an admin reaches them", async () => {
   const t = convexTest(schema, modules);
   const { khatmaId } = await running(t);
@@ -904,6 +926,8 @@ test("every admin rota mutation refuses anyone but an admin, and is on this list
         ...participant,
         juz: 9,
       }),
+    spreadFreeJuz: () =>
+      t.mutation(api.adminRota.spreadFreeJuz, { adminToken: "nope", khatmaId }),
     moveJuz: () =>
       t.mutation(api.adminRota.moveJuz, {
         adminToken: "nope",
