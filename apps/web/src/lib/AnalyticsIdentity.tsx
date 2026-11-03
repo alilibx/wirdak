@@ -18,6 +18,9 @@ export function AnalyticsIdentity() {
   useEffect(() => {
     if (me) {
       if (posthog.get_distinct_id() !== me.analyticsId) {
+        // Someone else's id is still stored (a hand-off signs in without a sign-out first):
+        // start fresh, so the two people are never merged.
+        if (posthog._isIdentified()) posthog.reset();
         posthog.identify(me.analyticsId);
       }
     } else if (sessionToken === undefined && posthog._isIdentified()) {

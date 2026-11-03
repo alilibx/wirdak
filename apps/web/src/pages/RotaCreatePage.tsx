@@ -13,6 +13,7 @@ import { ReadingDaysField } from "../features/rota/ReadingDaysField";
 import { StepBar } from "../features/rota/StepBar";
 import { useEarliestStart } from "../features/rota/useEarliestStart";
 import { t } from "../i18n/ar";
+import { captureCreateBlocked } from "../lib/createBlocked";
 import { errorCode } from "../lib/errors";
 import { posthogLog } from "../lib/posthogLogs";
 import { getSessionToken, useSessionToken } from "../lib/session";
@@ -188,10 +189,7 @@ export function RotaCreatePage() {
               ...details,
             }));
           } catch (caught) {
-            const code = errorCode(caught);
-            if (code !== null) {
-              posthog.capture("khatma_create_blocked", { kind: "rota", code });
-            }
+            captureCreateBlocked("rota", errorCode(caught));
             throw caught;
           }
           const created = rotaCreatedProperties(details);

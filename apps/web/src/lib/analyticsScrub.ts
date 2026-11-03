@@ -2,7 +2,8 @@ import type { CaptureResult, Properties } from "posthog-js";
 
 // `/j/<inviteCode>` anywhere in a string. Replacing `/j/:inviteCode` again changes nothing.
 const INVITE_PATH_RE = /\/j\/[^/?#\s"']+/g;
-const URL_OR_PATH_RE = /^(?:[a-z][a-z\d+.-]*:\/\/|\/)/i;
+// A whole string that is one URL or path: free text that only starts like one keeps its `?`.
+const URL_OR_PATH_RE = /^(?:[a-z][a-z\d+.-]*:\/\/|\/)\S*$/i;
 
 /**
  * A URL or path without what is private in it: the query string and fragment go (the home-screen
@@ -28,7 +29,8 @@ function scrubValue(value: unknown): unknown {
 function scrubProperties(properties: Properties): Properties {
   const out: Properties = {};
   for (const [key, value] of Object.entries(properties)) {
-    out[key] = scrubValue(value);
+    // Keys too: `$heatmap_data` is keyed by page URL.
+    out[scrubUrl(key)] = scrubValue(value);
   }
   return out;
 }

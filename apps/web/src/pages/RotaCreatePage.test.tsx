@@ -360,6 +360,15 @@ describe("RotaCreatePage (step 1)", () => {
     },
   );
 
+  it("sends no blocked event for a dead sign-in", async () => {
+    m.create.mockRejectedValue(new ConvexError({ code: "not_signed_in" }));
+    const user = userEvent.setup();
+    renderCreate();
+    await user.click(screen.getByRole("button", { name: "التالي" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(m.capture).not.toHaveBeenCalled();
+  });
+
   it("shows the network message when the call itself fails, and sends no blocked event", async () => {
     m.create.mockRejectedValue(new Error("offline"));
     const user = userEvent.setup();

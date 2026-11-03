@@ -10,6 +10,7 @@ import { GraceField } from "../components/GraceField";
 import { pendingIntent } from "../features/verify/progress";
 import { VerifySheet } from "../features/verify/VerifySheet";
 import { t } from "../i18n/ar";
+import { captureCreateBlocked } from "../lib/createBlocked";
 import { errorCode } from "../lib/errors";
 import { formatDate } from "../lib/format";
 import { posthogLog } from "../lib/posthogLogs";
@@ -108,9 +109,7 @@ export function CreatePage() {
         setVerifying(true);
         return;
       }
-      if (code !== null) {
-        posthog.capture("khatma_create_blocked", { kind: "pool", code });
-      }
+      captureCreateBlocked("pool", code);
       setError(
         code === null
           ? t.create.errors.network

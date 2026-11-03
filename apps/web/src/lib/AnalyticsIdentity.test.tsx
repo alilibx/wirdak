@@ -43,6 +43,19 @@ describe("AnalyticsIdentity", () => {
     expect(m.reset).not.toHaveBeenCalled();
   });
 
+  it("resets first when someone else's id is still stored, so two people never merge", () => {
+    m.token = "tok";
+    m.me = ME;
+    m.distinctId = "hash-of-someone-else";
+    m.identified = true;
+    render(<AnalyticsIdentity />);
+    expect(m.reset).toHaveBeenCalledTimes(1);
+    expect(m.identify).toHaveBeenCalledWith("hash-of-person");
+    expect(m.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      m.identify.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
   it("does not identify again when PostHog already knows them", () => {
     m.token = "tok";
     m.me = ME;

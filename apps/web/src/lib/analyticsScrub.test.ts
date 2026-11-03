@@ -25,6 +25,13 @@ describe("scrubUrl", () => {
     expect(scrubUrl("rota")).toBe("rota");
     expect(scrubUrl("what? yes")).toBe("what? yes");
   });
+
+  it("keeps free text that only starts like a URL whole", () => {
+    expect(scrubUrl("https://wirdak.app failed, retry? (3)")).toBe(
+      "https://wirdak.app failed, retry? (3)",
+    );
+    expect(scrubUrl("/ is the home page? yes")).toBe("/ is the home page? yes");
+  });
 });
 
 describe("scrubEvent", () => {
@@ -69,6 +76,20 @@ describe("scrubEvent", () => {
       $initial_current_url: "https://wirdak.app/",
     });
     expect(JSON.stringify(scrubbed)).not.toMatch(/SECRET|ABC123/);
+  });
+
+  it("scrubs keys too: heatmap data is keyed by page URL", () => {
+    const scrubbed = scrubEvent(
+      event({
+        event: "$$heatmap",
+        properties: {
+          $heatmap_data: { "https://wirdak.app/j/ABC123?h=SECRET": [{ x: 1 }] },
+        },
+      }),
+    );
+    expect(scrubbed.properties).toEqual({
+      $heatmap_data: { "https://wirdak.app/j/:inviteCode": [{ x: 1 }] },
+    });
   });
 
   it("adds no $set when the event has none", () => {
