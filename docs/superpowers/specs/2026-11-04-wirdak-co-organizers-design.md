@@ -79,13 +79,13 @@ Rota khatmas already let the organizer mark any juz' of the day done or not done
 
 - **Pool khatma:** any active member who isn't the owner.
 - **Rotating khatma:** any participant who isn't the owner. A participant without a Wirdak account (WhatsApp-only) can be named. The role takes effect when someone signs in on the website with that participant's number **[builder's call]**. Until then the list shows «لم يسجّل الدخول بعد» (hasn't signed in yet) next to their name. A participant whose number the owner can't see (imported from a pool khatma, `phoneHidden`) already has an account, so they can be named the same way.
-- At most `maxCoOrganizers` co-organizers per khatma, a new admin setting in `settingSpecs`, default 5, range 1 to 20 **[builder's call]**.
+- At most `maxCoOrganizers` co-organizers per khatma (section 6).
 - Someone who leaves the khatma stops being a co-organizer: a pool member who is removed, blocked, or becomes former, and a rota participant who is removed. Coming back doesn't restore the role.
 - Only the owner can remove, block, or free the slots of a co-organizer. A co-organizer with People can't do it to another co-organizer, because that would change who else is a co-organizer (anti-goal). On the people pages, those rows show no remove control to co-organizers **[builder's call]**.
 
 ### 4.3 Permissions
 
-Three switches, all on when someone is first named, so "all functionalities" is the default and one tap turns any of them off. The owner can change them at any time.
+Three switches. When someone is first named, they start with the admin's default permissions (section 6), which are all three on, so "all functionalities" is the default and one tap turns any of them off. Only the owner sets them, and can change them at any time (4.4a).
 
 | Permission | Pool khatma | Rotating khatma |
 | --- | --- | --- |
@@ -108,6 +108,16 @@ Seeing a tab follows its permission: a co-organizer without People doesn't see t
 
 A co-organizer never sees these controls. The server refuses them with `forbidden`, whatever the client sends.
 
+### 4.4a The owner manages co-organizers
+
+Ali: the owner (the main organizer) manages co-organizers' permissions. They sit in the khatma's settings, in a section only the owner sees, «المنظّمون المساعدون»:
+
+- The list shows each co-organizer's name and which of the three permissions they have, in words («القراءة والمشاركون»).
+- «أضف منظّماً مساعداً» opens a sheet that picks a person (4.2), then shows the three switches, already set to the admin's defaults. «حفظ» names them.
+- Tapping a co-organizer opens the same switches, plus «أزل من المنظّمين المساعدين». A change takes effect at once: the co-organizer's screens update live, and the next call they make is checked against the new permissions.
+- Turning all three switches off is allowed. The person stays named but can do nothing extra, and the list says «بلا صلاحيات» **[builder's call]**.
+- Admins can do the same from the admin panel (4.7).
+
 ### 4.5 Transferring ownership
 
 Today's "hand over" (`organizer.handOver`) becomes «انقل ملكية الختمة» (transfer ownership).
@@ -122,7 +132,7 @@ Today's "hand over" (`organizer.handOver`) becomes «انقل ملكية الخ�
 ### 4.6 Notes and messages
 
 - **Named or removed.** The person named gets a new note kind, «أصبحت منظّماً مساعداً في <khatma>», in the app and by push. Removal sends nothing **[builder's call]**. Neither goes on WhatsApp: a new template needs Meta's approval, and this message isn't urgent **[builder's call]**.
-- **Organizer notes** in a rotating khatma (unread list, day summary, join requests, silence notes, «أوقف الرسائل»): the owner gets them as today. Co-organizers whose permission covers the note get them in the app and by push, never on WhatsApp, so a khatma with five co-organizers doesn't send five paid messages **[builder's call]**. Readings covers the unread list and the day summary. People covers join requests, silence notes, and «أوقف الرسائل».
+- **Organizer notes** in a rotating khatma (unread list, day summary, join requests, silence notes, «أوقف الرسائل»): the owner gets them as today. Co-organizers whose permission covers the note get them in the app and by push (`coOrganizerNotesOn`). They don't get them on WhatsApp unless an admin turns on `coOrganizerWhatsAppOn`, so a khatma with five co-organizers doesn't send five paid messages by default **[builder's call]**. Readings covers the unread list and the day summary. People covers join requests, silence notes, and «أوقف الرسائل».
 - **The pool khatma's open-for-help alert** (plan 2) goes to the owner, and to co-organizers with Readings in the app and by push **[builder's call]**.
 - **Members** see nothing new. Members have no members list today, so the «منظّم مساعد» label appears only on the organizer pages that the owner and co-organizers see **[builder's call]**.
 
@@ -130,7 +140,7 @@ Today's "hand over" (`organizer.handOver`) becomes «انقل ملكية الخ�
 
 - The khatma view lists the owner and the co-organizers with their permissions.
 - Admins can name and remove co-organizers, change their permissions, and transfer ownership, like every other organizer control (Ali's admin-full-access rule). Every change goes in the audit log.
-- `maxCoOrganizers` sits in the limits group of settings.
+- The new settings are in section 6.
 
 ## 5. Two readers on one juz' (rotating khatma)
 
@@ -174,15 +184,39 @@ Ali: "the done reading should be done once because the goal is for the juz' to b
 - Typed replies work as today. «تم» from either reader marks the juz' done.
 - Button payloads still identify the reading day and the slot. A tap from either reader of the slot is valid.
 
-## 6. Constraints
+## 6. Admin settings
+
+Ali: everything has a setting. Every feature here has an admin switch, and every number is an admin setting, in `settingSpecs` with its kind, bounds, and group. They show on the admin settings page with plain explanations, like the existing ones, and every change goes in the audit log.
+
+| Setting | Kind | Default | Bounds | Group | What it does |
+| --- | --- | --- | --- | --- | --- |
+| `markDoneForOthersOn` | bool | on | | switches | Organizers can mark a pool juz' done for someone (3.1). Off hides the control. The rota Today tab keeps its existing mark-done, which predates this. |
+| `markDoneNameOn` | bool | on | | switches | The «قرأه:» picker shows (3.1, 3.2). Off records every organizer mark as «لا أعرف». |
+| `organizerLateMarkOn` | bool | on | | rota | Organizers can mark done during the late window after midnight (3.2). The window's length stays `rotaLateTapMs`. |
+| `namedCountsAsReplyOn` | bool | on | | rota | Naming a rota reader counts as their reply for the silence rule (3.2). |
+| `coOrganizersOn` | bool | on | | switches | Owners can name co-organizers. Off hides «المنظّمون المساعدون», and existing co-organizers keep their role but get no new ones **[builder's call]**. |
+| `maxCoOrganizers` | int | 5 | 1 to 20 | limits | Co-organizers per khatma (4.2). |
+| `coOrganizerDefaultReadings` | bool | on | | switches | The Readings switch's starting value when someone is named (4.3). |
+| `coOrganizerDefaultPeople` | bool | on | | switches | The People switch's starting value. |
+| `coOrganizerDefaultSettings` | bool | on | | switches | The Settings switch's starting value. |
+| `coOrganizerNotesOn` | bool | on | | notifications | Co-organizers get the organizer notes their permissions cover, in the app and by push (4.6). |
+| `coOrganizerWhatsAppOn` | bool | off | | notifications | Co-organizers also get those notes on WhatsApp, if they turned WhatsApp notes on. Off by default, because each copy is a paid message (4.6). |
+| `handoverToCoOrganizerOn` | bool | on | | switches | The automatic handover tries co-organizers first, and hands rotating khatmas to them (4.5). Off keeps today's rule. |
+| `oldOwnerStaysOn` | bool | on | | switches | After a transfer, the old owner stays as a co-organizer with all permissions (4.5). |
+| `rotaSharedSlotsOn` | bool | on | | rota | Organizers can add a second reader to a rota juz' (5.1). Off hides the control. Shared slots that already exist carry on **[builder's call]**. |
+| `rotaHalfCountsAsSlot` | bool | on | | rota | A half counts as a slot in `rotaMaxSlotsPerPerson` (5.1). |
+
+The organizer-side controls are the owner's own: the per-co-organizer permission switches (4.4a). There's no per-khatma switch for shared slots: an organizer who doesn't want them doesn't add a second reader.
+
+## 7. Constraints
 
 - The pool khatma's member experience doesn't change, apart from the done tiles that organizers record (3.1).
 - One owner per khatma, always. The server enforces every permission. The client only hides controls.
 - Existing khatmas keep working with no migration step that an organizer has to do: every khatma starts with its current organizer as owner, no co-organizers, and only whole slots.
 - No new WhatsApp templates unless 5.5 needs them.
-- `bun run typecheck`, `bun run lint`, and `bun run test` pass. Unit tests cover each permission against each control (allowed and refused), the owner-only controls refusing co-organizers, transfer and automatic handover with co-organizers, co-organizer roles ending when people leave, marking done for a named person and for nobody in a pool khatma (including counts and pace), undo, the rota late window for organizers, shared-slot rotation, done-once with two readers, the silence rule for a partner, and making a reader whole again. The e2e suite covers naming a co-organizer and using a permission, and adding a second reader to a juz'.
+- `bun run typecheck`, `bun run lint`, and `bun run test` pass. Unit tests cover each admin setting in section 6 (on and off), each permission against each control (allowed and refused), the owner-only controls refusing co-organizers, transfer and automatic handover with co-organizers, co-organizer roles ending when people leave, marking done for a named person and for nobody in a pool khatma (including counts and pace), undo, the rota late window for organizers, shared-slot rotation, done-once with two readers, the silence rule for a partner, and making a reader whole again. The e2e suite covers naming a co-organizer and using a permission, and adding a second reader to a juz'.
 
-## 7. Test on staging
+## 8. Test on staging
 
 1. Create a pool khatma as Ali. Have a second test number join and take a juz'. Name it co-organizer with only Readings. Check it can mark the juz' done and can't see People, Settings, archive, delete, or transfer.
 2. Mark an open juz' done for nobody and another for a named member. Check the counts, then undo one.
@@ -190,7 +224,7 @@ Ali: "the done reading should be done once because the goal is for the juz' to b
 4. In a rotating khatma with Ali's number on a slot, add a second reader to that slot. Check both get the half in the juz' message. Tap «أتممت» from one and check the juz' is done, the other gets no reminder, and a later tap from the other gets the thanks reply.
 5. Remove one reader of the shared slot and check the other reads the whole juz' from the next khatma.
 
-## 8. Left to the builder
+## 9. Left to the builder
 
 - The data model: where co-organizers and their permissions live (a table keyed by khatma and person, or by phone for a rota participant without an account), how a pool assignment records "done for nobody", how a slot holds a second reader, and how a day's read records who marked it.
 - How the permission check replaces `requireOrganizer`, `organizerOf`, and the rota's `requireRotaOrganizer` and `organizerRota`, and the `isOrganizer` checks on the website.
