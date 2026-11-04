@@ -211,11 +211,12 @@ describe("PeoplePage", () => {
     renderPage();
     expect(screen.getByRole("link", { name: "سارة" })).toBeInTheDocument();
     const row = screen.getByText("زهرة").closest("tr")!;
-    expect(
-      within(row).getByText(t.people.whatsappReader),
-    ).toBeInTheDocument();
+    expect(within(row).getByText(t.people.whatsappReader)).toBeInTheDocument();
     expect(within(row).getByText(t.people.numberHidden)).toBeInTheDocument();
     expect(within(row).queryByRole("link")).toBeNull();
+    expect(
+      within(row).getByText(`${t.people.lastReply}: ${t.people.noReply}`),
+    ).toBeInTheDocument();
   });
 
   it("switches to the blocked list, which says who has no account", async () => {

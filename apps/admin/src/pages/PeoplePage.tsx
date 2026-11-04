@@ -198,7 +198,7 @@ const EVERYONE_COLUMNS: Column<EveryoneRow, PeopleSort>[] = [
     cell: (row) =>
       row.kind === "person"
         ? dateOr(row.lastSeenAt, t.lookup.neverSeen)
-        : t.lookup.neverSeen,
+        : `${t.people.lastReply}: ${row.lastReplyAt === null ? t.people.noReply : formatDate(row.lastReplyAt)}`,
   },
   {
     key: "joined",
@@ -242,8 +242,7 @@ function EveryoneList({ search }: { search: string }) {
           <Phone value={everyonePhone(row)} />
           {row.kind === "person" && (
             <span className="text-muted-foreground">
-              {t.lookup.lastSeen}:{" "}
-              {dateOr(row.lastSeenAt, t.lookup.neverSeen)}
+              {t.lookup.lastSeen}: {dateOr(row.lastSeenAt, t.lookup.neverSeen)}
             </span>
           )}
         </>

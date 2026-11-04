@@ -284,7 +284,10 @@ type EveryonePage = {
   continueCursor: string;
 };
 
-type Source = (cursor: string | null, numItems: number) => Promise<EveryonePage>;
+type Source = (
+  cursor: string | null,
+  numItems: number,
+) => Promise<EveryonePage>;
 
 /**
  * Pages through `first` to its end, then through `second`, topping up the
@@ -333,7 +336,10 @@ export const everyone = adminQuery({
     });
     const asReader = async (
       r: Doc<"readerDirectory">,
-    ): Promise<EveryoneRow> => ({ kind: "reader", ...(await readerRow(ctx, r)) });
+    ): Promise<EveryoneRow> => ({
+      kind: "reader",
+      ...(await readerRow(ctx, r)),
+    });
 
     if (search !== null) {
       const people: Source = async (cursor, numItems) => {
@@ -352,7 +358,7 @@ export const everyone = adminQuery({
       };
       // A search finds at most a few hundred, so readers page by offset.
       const readers: Source = async (cursor, numItems) => {
-        const offset = Number(cursor ?? 0);
+        const offset = Math.max(0, Number.parseInt(cursor ?? "0", 10) || 0);
         const found = await readersQuery(ctx, "created", order, search).take(
           offset + numItems,
         );
