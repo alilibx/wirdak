@@ -1,5 +1,6 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
+import { mergedStream, stream } from "convex-helpers/server/stream";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { dayProgress, memberCount } from "./adminLookup";
@@ -11,6 +12,7 @@ import { lastRotaDay } from "./lib/rotaPlace";
 import { foldText } from "./lib/searchFold";
 import { getSetting } from "./lib/settings";
 import { maskPhone } from "./lib/text";
+import schema from "./schema";
 
 const orderValidator = v.union(v.literal("asc"), v.literal("desc"));
 type Order = "asc" | "desc";
@@ -219,6 +221,33 @@ function readersQuery(
   }
 }
 
+/** A WhatsApp reader's row: masked, and nothing at all of a hidden number. */
+async function readerRow(ctx: QueryCtx, r: Doc<"readerDirectory">) {
+  const rows = await ctx.db
+    .query("rotaParticipants")
+    .withIndex("by_phone", (q) => q.eq("phone", r.phone))
+    .collect();
+  const khatmas = await Promise.all(
+    rows
+      .filter((p) => p.removedAt === null)
+      .map(async (p) => ({
+        khatmaId: p.khatmaId,
+        name: (await ctx.db.get(p.khatmaId))?.name ?? null,
+      })),
+  );
+  return {
+    readerId: r._id,
+    name: r.name,
+    // A number imported from a pool khatma stays hidden, even masked.
+    phoneMasked: r.phoneHidden === true ? null : maskPhone(r.phone),
+    khatmaCount: r.khatmaCount,
+    khatmas,
+    lastReplyAt: r.lastReplyAt,
+    createdAt: r._creationTime,
+    blocked: await isBlocked(ctx, r.phone),
+  };
+}
+
 /** Who reads in a rotating khatma on WhatsApp with no account (spec 6). */
 export const readers = adminQuery({
   args: {
@@ -240,34 +269,144 @@ export const readers = adminQuery({
     ).paginate(args.paginationOpts);
     return {
       ...result,
-      page: await Promise.all(
-        result.page.map(async (r) => {
-          const rows = await ctx.db
-            .query("rotaParticipants")
-            .withIndex("by_phone", (q) => q.eq("phone", r.phone))
-            .collect();
-          const khatmas = await Promise.all(
-            rows
-              .filter((p) => p.removedAt === null)
-              .map(async (p) => ({
-                khatmaId: p.khatmaId,
-                name: (await ctx.db.get(p.khatmaId))?.name ?? null,
-              })),
-          );
-          return {
-            readerId: r._id,
-            name: r.name,
-            // A number imported from a pool khatma stays hidden, even masked.
-            phoneMasked: r.phoneHidden === true ? null : maskPhone(r.phone),
-            khatmaCount: r.khatmaCount,
-            khatmas,
-            lastReplyAt: r.lastReplyAt,
-            createdAt: r._creationTime,
-            blocked: await isBlocked(ctx, r.phone),
-          };
-        }),
-      ),
+      page: await Promise.all(result.page.map((r) => readerRow(ctx, r))),
     };
+  },
+});
+
+type EveryoneRow =
+  | ({ kind: "person" } & Awaited<ReturnType<typeof personRow>>)
+  | ({ kind: "reader" } & Awaited<ReturnType<typeof readerRow>>);
+
+type EveryonePage = {
+  page: EveryoneRow[];
+  isDone: boolean;
+  continueCursor: string;
+};
+
+type Source = (cursor: string | null, numItems: number) => Promise<EveryonePage>;
+
+/**
+ * Pages through `first` to its end, then through `second`, topping up the
+ * page where `first` runs out. The cursor says which one it's in. Only `first`
+ * may run a Convex paginated query: a function gets one.
+ */
+async function oneThenOther(
+  first: Source,
+  second: Source,
+  opts: { cursor: string | null; numItems: number },
+): Promise<EveryonePage> {
+  const inner = opts.cursor === null ? null : opts.cursor.slice(2) || null;
+  if (opts.cursor?.startsWith("2:")) {
+    const result = await second(inner, opts.numItems);
+    return { ...result, continueCursor: `2:${result.continueCursor}` };
+  }
+  const result = await first(inner, opts.numItems);
+  if (!result.isDone) {
+    return { ...result, continueCursor: `1:${result.continueCursor}` };
+  }
+  const room = opts.numItems - result.page.length;
+  if (room <= 0) return { ...result, isDone: false, continueCursor: "2:" };
+  const rest = await second(null, room);
+  return {
+    page: [...result.page, ...rest.page],
+    isDone: rest.isDone,
+    continueCursor: `2:${rest.continueCursor}`,
+  };
+}
+
+/**
+ * The "all" tab: everyone with an account and every WhatsApp reader, in one
+ * list. Name and created interleave the two. Readers have never signed in, so
+ * for last seen and joined they sit where a never-seen person would, and a
+ * search lists matching people before matching readers.
+ */
+export const everyone = adminQuery({
+  args: listArgs,
+  handler: async (ctx, args): Promise<EveryonePage> => {
+    const { sort, order } = args;
+    const search = searchText(args.search);
+    const db = stream(ctx.db, schema);
+    const asPerson = async (p: Doc<"people">): Promise<EveryoneRow> => ({
+      kind: "person",
+      ...(await personRow(ctx, p)),
+    });
+    const asReader = async (
+      r: Doc<"readerDirectory">,
+    ): Promise<EveryoneRow> => ({ kind: "reader", ...(await readerRow(ctx, r)) });
+
+    if (search !== null) {
+      const people: Source = async (cursor, numItems) => {
+        const result = await peopleQuery(
+          ctx,
+          undefined,
+          sort,
+          order,
+          search,
+        ).paginate({ cursor, numItems });
+        return {
+          page: await Promise.all(result.page.map(asPerson)),
+          isDone: result.isDone,
+          continueCursor: result.continueCursor,
+        };
+      };
+      // A search finds at most a few hundred, so readers page by offset.
+      const readers: Source = async (cursor, numItems) => {
+        const offset = Number(cursor ?? 0);
+        const found = await readersQuery(ctx, "created", order, search).take(
+          offset + numItems,
+        );
+        return {
+          page: await Promise.all(found.slice(offset).map(asReader)),
+          isDone: found.length < offset + numItems,
+          continueCursor: String(offset + numItems),
+        };
+      };
+      return oneThenOther(people, readers, args.paginationOpts);
+    }
+
+    const readerStream = db.query("readerDirectory").order(order);
+    if (sort === "name" || sort === "created") {
+      const people =
+        sort === "name"
+          ? db.query("people").withIndex("by_searchName").order(order)
+          : db.query("people").order(order);
+      const readers =
+        sort === "name"
+          ? db.query("readerDirectory").withIndex("by_searchName").order(order)
+          : readerStream;
+      const result = await mergedStream(
+        [people.map(asPerson), readers.map(asReader)],
+        [sort === "name" ? "searchName" : "_creationTime"],
+      ).paginate(args.paginationOpts);
+      return {
+        page: result.page,
+        isDone: result.isDone,
+        continueCursor: result.continueCursor,
+      };
+    }
+
+    const peopleStream = db
+      .query("people")
+      .withIndex(sort === "lastSeen" ? "by_lastSeenAt" : "by_verifiedAt")
+      .order(order)
+      .map(asPerson);
+    const fromStream =
+      (s: typeof peopleStream): Source =>
+      async (cursor, numItems) => {
+        const result = await s.paginate({ cursor, numItems });
+        return {
+          page: result.page,
+          isDone: result.isDone,
+          continueCursor: result.continueCursor,
+        };
+      };
+    const people = fromStream(peopleStream);
+    const readers = fromStream(readerStream.map(asReader));
+    // Ascending, a never-seen reader comes before everyone who was seen.
+    return order === "asc"
+      ? oneThenOther(readers, people, args.paginationOpts)
+      : oneThenOther(people, readers, args.paginationOpts);
   },
 });
 

@@ -535,6 +535,7 @@ export const ar = {
     lastReply: "آخر رد",
     noReply: "لم يردّ بعد",
     numberHidden: "رقم مخفي",
+    whatsappReader: "قارئ واتساب",
   },
   khatmas: {
     title: "الختمات",

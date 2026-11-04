@@ -2,8 +2,10 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { formatDate } from "@web/lib/format";
 import { usePaginatedQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { useId } from "react";
 import { Link } from "react-router";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ListSearch, ListTable, type Column } from "../components/ListTable";
@@ -110,7 +112,7 @@ function PeopleList({
   tab,
   search,
 }: {
-  tab: Exclude<Tab, "organizers" | "readers">;
+  tab: Exclude<Tab, "all" | "organizers" | "readers">;
   search: string;
 }) {
   const adminToken = useAdminToken() ?? "";
@@ -121,7 +123,7 @@ function PeopleList({
       adminToken,
       sort: sorting.sort,
       order: sorting.order,
-      ...(tab !== "all" ? { tab } : {}),
+      tab,
       ...(search !== "" ? { search } : {}),
     },
     { initialNumItems: LIST_PAGE },
@@ -141,6 +143,109 @@ function PeopleList({
           <span className="text-muted-foreground">
             {t.lookup.lastSeen}: {dateOr(row.lastSeenAt, t.lookup.neverSeen)}
           </span>
+        </>
+      )}
+    />
+  );
+}
+
+type EveryoneRow = FunctionReturnType<
+  typeof api.adminLists.everyone
+>["page"][number];
+
+function EveryoneName({ row }: { row: EveryoneRow }) {
+  if (row.kind === "person") return <PersonName row={row} />;
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <span className="font-medium">{row.name}</span>
+      <Badge variant="outline">{t.people.whatsappReader}</Badge>
+      {row.blocked && <StatusBadge status="blocked" />}
+    </span>
+  );
+}
+
+const everyonePhone = (row: EveryoneRow) =>
+  row.phoneMasked ?? t.people.numberHidden;
+
+const EVERYONE_COLUMNS: Column<EveryoneRow, PeopleSort>[] = [
+  {
+    key: "name",
+    header: t.lists.name,
+    sort: "name",
+    cell: (row) => <EveryoneName row={row} />,
+  },
+  {
+    key: "phone",
+    header: t.people.phone,
+    cell: (row) => <Phone value={everyonePhone(row)} />,
+  },
+  {
+    key: "organizes",
+    header: t.people.organizes,
+    cell: (row) =>
+      row.kind === "person" ? formatCount(row.organizesCount) : "—",
+  },
+  {
+    key: "memberOf",
+    header: t.people.memberOf,
+    cell: (row) =>
+      formatCount(row.kind === "person" ? row.memberOfCount : row.khatmaCount),
+  },
+  {
+    key: "lastSeen",
+    header: t.lookup.lastSeen,
+    sort: "lastSeen",
+    cell: (row) =>
+      row.kind === "person"
+        ? dateOr(row.lastSeenAt, t.lookup.neverSeen)
+        : t.lookup.neverSeen,
+  },
+  {
+    key: "joined",
+    header: t.lookup.joined,
+    sort: "joined",
+    cell: (row) => (row.kind === "person" ? dateOr(row.verifiedAt, "—") : "—"),
+  },
+  {
+    key: "created",
+    header: t.lists.created,
+    sort: "created",
+    cell: (row) => formatDate(row.createdAt),
+  },
+];
+
+/** The "all" tab: people with an account and WhatsApp readers, in one list. */
+function EveryoneList({ search }: { search: string }) {
+  const adminToken = useAdminToken() ?? "";
+  const sorting = useListSort(PEOPLE_SORTS, "created");
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.adminLists.everyone,
+    {
+      adminToken,
+      sort: sorting.sort,
+      order: sorting.order,
+      ...(search !== "" ? { search } : {}),
+    },
+    { initialNumItems: LIST_PAGE },
+  );
+  return (
+    <ListTable
+      rows={results}
+      rowKey={(row) => (row.kind === "person" ? row.personId : row.readerId)}
+      columns={EVERYONE_COLUMNS}
+      sorting={search === "" ? sorting : undefined}
+      status={status}
+      onMore={() => loadMore(LIST_PAGE)}
+      card={(row) => (
+        <>
+          <EveryoneName row={row} />
+          <Phone value={everyonePhone(row)} />
+          {row.kind === "person" && (
+            <span className="text-muted-foreground">
+              {t.lookup.lastSeen}:{" "}
+              {dateOr(row.lastSeenAt, t.lookup.neverSeen)}
+            </span>
+          )}
         </>
       )}
     />
@@ -320,6 +425,8 @@ export function PeoplePage() {
         <OrganizersTab search={search} />
       ) : tab === "readers" ? (
         <ReadersList search={search} />
+      ) : tab === "all" ? (
+        <EveryoneList search={search} />
       ) : (
         <PeopleList tab={tab} search={search} />
       )}

@@ -449,7 +449,109 @@ test("a hidden number gives no part of itself to the readers list", async () => 
   expect(JSON.stringify(res)).not.toContain("1234");
 });
 
-const khatmas = (t: T, over: object = {}) =>
+const everyone = (t: T, over: object = {}) =>
+  t.query(api.adminLists.everyone, {
+    adminToken,
+    paginationOpts: pages,
+    sort: "created",
+    order: "desc",
+    ...over,
+  });
+const allNames = (r: { page: ({ displayName: string } | { name: string })[] }) =>
+  r.page.map((row) => ("displayName" in row ? row.displayName : row.name));
+
+async function rotaWithReaders(t: T) {
+  const organizer = await person(t, "بدر");
+  const k = await khatma(t, organizer, "ختمة", {
+    kind: "rota",
+    rota: ROTA,
+    schedule: "none",
+  });
+  vi.setSystemTime(NOW + 1000);
+  await reader(t, k, "ألفت", "+971507772001");
+  vi.setSystemTime(NOW + 2000);
+  await person(t, "جميلة");
+  vi.setSystemTime(NOW + 3000);
+  await reader(t, k, "تقى", "+971507772002", { phoneHidden: true });
+  vi.setSystemTime(NOW);
+  return k;
+}
+
+test("everyone lists people and WhatsApp readers together, by created and name", async () => {
+  const { t } = await setup();
+  await rotaWithReaders(t);
+  expect(allNames(await everyone(t))).toEqual(["تقى", "جميلة", "ألفت", "بدر"]);
+  expect(allNames(await everyone(t, { sort: "name", order: "asc" }))).toEqual([
+    "ألفت",
+    "بدر",
+    "تقى",
+    "جميلة",
+  ]);
+});
+
+test("everyone pages across people and readers without losing anyone", async () => {
+  const { t } = await setup();
+  await rotaWithReaders(t);
+  const pageThrough = async (over: object) => {
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < 10; i++) {
+      const res = await everyone(t, {
+        ...over,
+        paginationOpts: { numItems: 1, cursor },
+      });
+      seen.push(...allNames(res));
+      if (res.isDone) break;
+      cursor = res.continueCursor;
+    }
+    return seen;
+  };
+  expect(await pageThrough({})).toEqual(["تقى", "جميلة", "ألفت", "بدر"]);
+  for (const sort of ["name", "lastSeen", "joined"]) {
+    for (const order of ["asc", "desc"]) {
+      const seen = await pageThrough({ sort, order });
+      expect(seen.sort()).toEqual(["ألفت", "بدر", "تقى", "جميلة"].sort());
+    }
+  }
+  expect((await pageThrough({ search: "تقي" })).sort()).toEqual(["تقى"]);
+});
+
+test("everyone puts readers where a never-seen person goes for last seen and joined", async () => {
+  const { t } = await setup();
+  await rotaWithReaders(t);
+  for (const sort of ["lastSeen", "joined"]) {
+    const desc = allNames(await everyone(t, { sort, order: "desc" }));
+    expect(desc.slice(2)).toEqual(["تقى", "ألفت"]);
+    const asc = allNames(await everyone(t, { sort, order: "asc" }));
+    expect(asc.slice(0, 2)).toEqual(["ألفت", "تقى"]);
+  }
+});
+
+test("everyone searches people and readers", async () => {
+  const { t } = await setup();
+  const k = await rotaWithReaders(t);
+  await person(t, "تقى سالم");
+  await reader(t, k, "أحمد", "+971507772003");
+  const found = allNames(await everyone(t, { search: "تقي" }));
+  expect(found.sort()).toEqual(["تقى", "تقى سالم"]);
+});
+
+test("a reader's row in everyone says what it is and hides a hidden number", async () => {
+  const { t } = await setup();
+  await rotaWithReaders(t);
+  const res = await everyone(t, { sort: "name", order: "asc" });
+  expect(res.page[0]).toMatchObject({
+    kind: "reader",
+    name: "ألفت",
+    phoneMasked: "+971 50 ••• 2001",
+    khatmaCount: 1,
+  });
+  expect(res.page[1]).toMatchObject({ kind: "person", displayName: "بدر" });
+  expect(res.page[2]).toMatchObject({ kind: "reader", phoneMasked: null });
+  expect(JSON.stringify(res)).not.toContain("2002");
+});
+
+const khatmas =(t: T, over: object = {}) =>
   t.query(api.adminLists.khatmas, {
     adminToken,
     paginationOpts: pages,
