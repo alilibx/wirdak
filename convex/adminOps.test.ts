@@ -48,7 +48,7 @@ async function person(t: T, phone: string, name = "سارة", sessions = 1) {
     const personId = await ctx.db.insert("people", {
       phone,
       displayName: name,
-      verifiedAt: 0,
+      verifiedAt: NOW,
       timeZone: "Asia/Dubai",
       lastSeenAt: 0,
     });
@@ -550,6 +550,8 @@ test("a transfer ends the wait for an owner an admin set a rota khatma up for", 
   const t = convexTest(schema, modules);
   await admin(t);
   const ali = await person(t, "+971500000001", "علي");
+  // the admin set ali up; they haven't signed in
+  await t.run((ctx) => ctx.db.patch(ali, { verifiedAt: 0, lastSeenAt: 0 }));
   const sara = await person(t, "+971500000002", "سارة");
   const { khatmaId, saraParticipant } = await t.run(async (ctx) => {
     const khatmaId = await ctx.db.insert("khatmas", {

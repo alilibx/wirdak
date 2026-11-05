@@ -29,7 +29,9 @@ export async function organizerRecipients(
       .query("people")
       .withIndex("by_phone", (q) => q.eq("phone", row.phone))
       .first();
-    if (!person || person._id === khatma.creatorPersonId) continue;
+    // An admin's placeholder for someone who hasn't signed in is no account.
+    if (!person || person.verifiedAt <= 0) continue;
+    if (person._id === khatma.creatorPersonId) continue;
     if (!allows(await roleIn(ctx, khatma, person), permission)) continue;
     recipients.push({ personId: person._id, whatsappOff });
   }

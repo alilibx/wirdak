@@ -6,7 +6,7 @@ import {
   coOrganizerDefaults,
   coOrganizersOf,
   openCandidates,
-  personByPhone,
+  accountByPhone,
 } from "./coOrganizers";
 import { adminQuery } from "./lib/adminSession";
 import { isBlocked } from "./lib/blocked";
@@ -161,7 +161,7 @@ async function handOverCandidates(
   for (const p of rows) {
     if (p.removedAt !== null) continue;
     if (p.personId === k.creatorPersonId || p.phone === owner?.phone) continue;
-    if (!(await personByPhone(ctx, p.phone))) continue;
+    if (!(await accountByPhone(ctx, p.phone))) continue;
     found.push({ participantId: p._id, name: p.name });
   }
   return found;

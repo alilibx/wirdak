@@ -34,7 +34,7 @@ async function signedIn(t: T, displayName: string) {
     const id = await ctx.db.insert("people", {
       phone,
       displayName,
-      verifiedAt: 0,
+      verifiedAt: NOW,
       timeZone: "Asia/Dubai",
       lastSeenAt: NOW,
       rotaAllowed: true,

@@ -681,10 +681,12 @@ export const confirmPinInternal = internalMutation({
     // The PIN went to this phone, so its holder owns whichever account has
     // the number now.
     const existing = await personByPhone(ctx, doc.phone);
-    // An organizer an admin set up has only now signed in.
+    // An organizer an admin set up has only now signed in, and now has an
+    // account for any rota co-organizer role on the number.
     if (existing?.verifiedAt === 0) {
       const now = Date.now();
       await ctx.db.patch(existing._id, { verifiedAt: now, lastSeenAt: now });
+      await linkCoOrganizerRoles(ctx, (await ctx.db.get(existing._id))!);
     }
     // The account was deleted since the message came. Without a name to start
     // a new one, the person begins again and goes the new-number way.

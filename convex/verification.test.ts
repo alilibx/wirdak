@@ -1372,9 +1372,9 @@ test("a blocked number gets 'no code found' and the code stays unused", async ()
   expect((await status(t, v)).status).toBe("pending");
 });
 
-test("a new account on a number named as a rota co-organizer joins that khatma's home list", async () => {
-  const t = convexTest(schema, modules);
-  const khatmaId = await t.run(async (ctx) => {
+/** A rota khatma whose owner hasn't signed in, with E164 a participant named co-organizer. */
+async function namedInRota(t: T): Promise<Id<"khatmas">> {
+  return await t.run(async (ctx) => {
     const ownerId = await ctx.db.insert("people", {
       phone: "+971500000001",
       displayName: "المنظم",
@@ -1425,6 +1425,11 @@ test("a new account on a number named as a rota co-organizer joins that khatma's
     });
     return khatmaId;
   });
+}
+
+test("a new account on a number named as a rota co-organizer joins that khatma's home list", async () => {
+  const t = convexTest(schema, modules);
+  const khatmaId = await namedInRota(t);
   const v = await start(t, "أم أحمد");
   await send(t, v.message);
   const res = await claim(t, v);
@@ -1441,4 +1446,29 @@ test("a new account on a number named as a rota co-organizer joins that khatma's
       .unique(),
   );
   expect(member).toMatchObject({ status: "active", notificationsOn: true });
+});
+
+test("an organizer an admin set up, named a rota co-organizer, joins that khatma's home list once they sign in", async () => {
+  const t = convexTest(schema, modules);
+  // What adminRota leaves for a number that hasn't signed in: no account yet.
+  await addPerson(t, E164, "أم أحمد");
+  const khatmaId = await namedInRota(t);
+  expect(
+    await t.run((ctx) =>
+      ctx.db
+        .query("members")
+        .withIndex("by_khatma", (q) => q.eq("khatmaId", khatmaId))
+        .collect(),
+    ),
+  ).toEqual([]);
+
+  const v = await start(t, "");
+  await send(t, v.message);
+  const res = await confirmPin(t, v, pinsSent()[0]!);
+  if (!("sessionToken" in res)) throw new Error(JSON.stringify(res));
+  expect(
+    (await t.query(api.khatmas.mine, { sessionToken: res.sessionToken })).map(
+      (k) => k.inviteCode,
+    ),
+  ).toEqual(["rotacode"]);
 });

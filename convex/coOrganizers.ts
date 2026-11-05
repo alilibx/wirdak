@@ -53,6 +53,24 @@ export async function personByPhone(
     .first();
 }
 
+/**
+ * The account on this number, or null. A row an admin made for an organizer
+ * who hasn't signed in yet (`verifiedAt` 0) is no account: every "has this
+ * person signed in?" question about a co-organizer goes here.
+ */
+export async function accountByPhone(
+  ctx: QueryCtx,
+  phone: string,
+): Promise<Doc<"people"> | null> {
+  const person = await personByPhone(ctx, phone);
+  return person && hasAccount(person) ? person : null;
+}
+
+/** Whether this person has signed in (an admin's placeholder hasn't). */
+export function hasAccount(person: Doc<"people">): boolean {
+  return person.verifiedAt > 0;
+}
+
 export async function liveParticipant(
   ctx: QueryCtx,
   khatmaId: Id<"khatmas">,
@@ -147,7 +165,7 @@ export async function coOrganizersOf(
       readings: row.readings,
       people: row.people,
       settings: row.settings,
-      pending: person === null,
+      pending: person === null || !hasAccount(person),
     });
   }
   return coOrganizers;
@@ -335,7 +353,7 @@ export async function setCoOrganizer(
     ...switches,
     addedAt: Date.now(),
   });
-  const person = await personByPhone(ctx, phone);
+  const person = await accountByPhone(ctx, phone);
   if (person) {
     await ensureRotaMembership(ctx, khatma, person);
     await tellNamed(ctx, khatma, person);
@@ -425,12 +443,15 @@ export async function endCoOrganizer(
 
 /**
  * A new account on a number named in a rota khatma: it gets the membership
- * naming would have given it. Called where a `people` row is inserted.
+ * naming would have given it. Called where a `people` row is inserted, and
+ * when an organizer an admin set up signs in for the first time; an admin's
+ * placeholder that hasn't signed in gets nothing yet.
  */
 export async function linkCoOrganizerRoles(
   ctx: MutationCtx,
   person: Doc<"people">,
 ): Promise<void> {
+  if (!hasAccount(person)) return;
   const rows = await ctx.db
     .query("coOrganizers")
     .withIndex("by_phone", (q) => q.eq("phone", person.phone))

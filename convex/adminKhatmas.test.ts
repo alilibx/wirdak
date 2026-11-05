@@ -50,7 +50,7 @@ async function person(t: T, phone: string, name: string) {
     ctx.db.insert("people", {
       phone,
       displayName: name,
-      verifiedAt: 0,
+      verifiedAt: NOW,
       timeZone: "Asia/Dubai",
       lastSeenAt: 0,
     }),

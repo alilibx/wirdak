@@ -36,7 +36,7 @@ import {
   ensureRotaMembership,
   keepOldOwner,
   liveParticipant,
-  personByPhone,
+  accountByPhone,
 } from "./coOrganizers";
 import { activeMembership } from "./khatmas";
 import { clearNotes, notify } from "./notes";
@@ -484,7 +484,7 @@ export async function transferTarget(
   ) {
     return "self";
   }
-  const person = await personByPhone(ctx, participant.phone);
+  const person = await accountByPhone(ctx, participant.phone);
   if (!person) return "no_account";
   await ensureRotaMembership(ctx, khatma, person);
   return (await activeMembership(ctx, khatma._id, person._id)) ?? "not_member";
@@ -819,7 +819,7 @@ async function coOrganizerSuccessor(
       .collect()
   ).sort((a, b) => a.addedAt - b.addedAt || a._creationTime - b._creationTime);
   for (const row of rows) {
-    const person = await personByPhone(ctx, row.phone);
+    const person = await accountByPhone(ctx, row.phone);
     if (!person || person._id === khatma.creatorPersonId) continue;
     if (person.lastSeenAt < activeSince) continue;
     if (!(await roleIn(ctx, khatma, person))) continue;

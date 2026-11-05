@@ -35,7 +35,7 @@ async function signedIn(t: T, displayName: string, lastSeenAt = NOW) {
     const personId = await ctx.db.insert("people", {
       phone: `+97157000${String(seq).padStart(4, "0")}`,
       displayName,
-      verifiedAt: 0,
+      verifiedAt: NOW,
       timeZone: TZ,
       lastSeenAt,
     });

@@ -5,6 +5,7 @@ import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { linkCoOrganizerRoles } from "./coOrganizers";
 import { sha256Hex } from "./lib/crypto";
 import { roleIn } from "./lib/organizerAuth";
+import { organizerRecipients } from "./lib/organizerRecipients";
 import { blockMember } from "./organizer";
 import schema from "./schema";
 
@@ -36,7 +37,7 @@ async function signedIn(t: T, displayName: string) {
     const id = await ctx.db.insert("people", {
       phone,
       displayName,
-      verifiedAt: 0,
+      verifiedAt: NOW,
       timeZone: "Asia/Dubai",
       lastSeenAt: NOW,
       rotaAllowed: true,
@@ -718,4 +719,46 @@ test("a co-organizer named before signing in marks their own juz' as their reply
   const row = await t.run((ctx) => ctx.db.get(participantId));
   expect(row?.silentDays).toBe(0);
   expect(row?.lastReplyAt).toBeGreaterThanOrEqual(before);
+});
+
+test("someone an admin set up as an organizer, who hasn't signed in, has no account here", async () => {
+  const t = convexTest(schema, modules);
+  const { org, code, khatma } = await rotaSetup(t);
+  const phone = "+971505550009";
+  // what adminRota's organizerFor leaves for a number that hasn't signed in
+  await t.run((ctx) =>
+    ctx.db.insert("people", {
+      phone,
+      displayName: "ياسر",
+      verifiedAt: 0,
+      timeZone: "Asia/Dubai",
+      lastSeenAt: 0,
+    }),
+  );
+  const participantId = await addParticipant(t, code, org, "ياسر", phone);
+  expect(await name(t, code, org, `p:${participantId}`)).toEqual({ ok: true });
+
+  expect((await listed(t, code, org)).coOrganizers).toMatchObject([
+    { name: "ياسر", pending: true },
+  ]);
+  expect(
+    await t.mutation(api.organizer.handOver, {
+      sessionToken: org.token,
+      inviteCode: code,
+      participantId,
+    }),
+  ).toEqual({ ok: false, reason: "no_account" });
+  // nor does a note or a membership reach a row nobody signed in to
+  const { recipients, memberships } = await t.run(async (ctx) => {
+    const k = (await ctx.db.get(khatma._id))!;
+    return {
+      recipients: await organizerRecipients(ctx, k, "people"),
+      memberships: await ctx.db
+        .query("members")
+        .withIndex("by_khatma", (q) => q.eq("khatmaId", k._id))
+        .collect(),
+    };
+  });
+  expect(recipients).toEqual([{ personId: org.personId, whatsappOff: false }]);
+  expect(memberships.map((m) => m.personId)).toEqual([org.personId]);
 });
