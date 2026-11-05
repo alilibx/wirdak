@@ -640,3 +640,31 @@ test("a rota co-organizer with People cannot remove, free, or move the owner or 
     { phone: ali.phone },
   ]);
 });
+
+test("a People co-organizer never sees the number of someone in a pool khatma they run", async () => {
+  const t = convexTest(schema, modules);
+  const pool = await poolSetup(t);
+  const runsPool = pool.org;
+  const { org, code } = await rotaSetup(t);
+  const bakr = await signedIn(t, "بكر");
+  await join(t, pool.khatma._id, bakr);
+  const bakrP = await addParticipant(t, code, org, "بكر", bakr.phone);
+  const coP = await addParticipant(t, code, org, "منظم الحلقة", runsPool.phone);
+  await name(t, code, org, `p:${coP}`, {
+    readings: false,
+    people: true,
+    settings: false,
+  });
+
+  const view = (who: Who) =>
+    t.query(api.rota.people, { sessionToken: who.token, inviteCode: code });
+  const phoneOf = async (who: Who) => {
+    const v = await view(who);
+    return v!.participants.find((p) => p.id === bakrP)!.phone;
+  };
+  // the owner sees what they saw before
+  expect(await phoneOf(org)).toBe(bakr.phone);
+  // the pool's organizer, helping here, does not
+  expect(await phoneOf(runsPool)).toBeNull();
+  expect(JSON.stringify(await view(runsPool))).not.toContain(bakr.phone);
+});

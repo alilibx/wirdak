@@ -103,7 +103,8 @@ function isJuz(juz: number): boolean {
 
 /**
  * What the organizer sees of one participant; the phone is the one they typed,
- * and null for someone imported from a pool khatma (the organizer never sees it).
+ * and null for someone imported from a pool khatma (the organizer never sees it),
+ * or, to a co-organizer, for someone in a pool khatma that co-organizer runs.
  */
 type PersonState = {
   phone: string | null;
@@ -194,16 +195,51 @@ function personState(
   khatma: Doc<"khatmas">,
   owner: Doc<"people"> | null,
   coOrganizerPhones: ReadonlySet<string>,
+  hiddenFromViewer: ReadonlySet<Id<"rotaParticipants">>,
 ): PersonState {
   const isOrganizer = isOwnerRow(p, khatma, owner);
   return {
     isOrganizer,
     isCoOrganizer: !isOrganizer && coOrganizerPhones.has(p.phone),
-    phone: p.phoneHidden === true ? null : p.phone,
+    phone:
+      p.phoneHidden === true || hiddenFromViewer.has(p._id) ? null : p.phone,
     joined: p.joinedAt != null,
     stopped: p.stoppedAt != null,
     silenced: p.silencedAt != null,
   };
+}
+
+/**
+ * The participants whose number stays hidden from a co-organizer looking at
+ * the khatma, beyond the ones hidden from everyone (`phoneHidden`): those in a
+ * pool khatma the viewer runs, or who came to the viewer from one. The owner,
+ * and an admin (no `personId`), see what the row says.
+ */
+async function hiddenFromViewer(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  participants: Doc<"rotaParticipants">[],
+  actor: Actor,
+): Promise<Set<Id<"rotaParticipants">>> {
+  const hidden = new Set<Id<"rotaParticipants">>();
+  const viewer = actor.personId;
+  if (viewer === null || viewer === khatma.creatorPersonId) return hidden;
+  for (const p of participants) {
+    if (p.phoneHidden === true) continue;
+    const personId =
+      p.personId ??
+      (
+        await ctx.db
+          .query("people")
+          .withIndex("by_phone", (q) => q.eq("phone", p.phone))
+          .first()
+      )?._id ??
+      null;
+    if (personId !== null && (await numberHiddenFrom(ctx, viewer, personId))) {
+      hidden.add(p._id);
+    }
+  }
+  return hidden;
 }
 
 /** Everyone in the khatma and who holds which juz' of the next day to start. */
@@ -251,6 +287,7 @@ export async function people(
         .collect()
     ).map((row) => row.phone),
   );
+  const hidden = await hiddenFromViewer(ctx, khatma, participants, actor);
   return {
     title: khatmaTitle(khatma),
     archived: isArchived(khatma),
@@ -279,7 +316,7 @@ export async function people(
               name: holder.name,
               isMe: isActor(holder, actor),
               slots: heldBy.get(holder._id)?.length ?? 0,
-              ...personState(holder, khatma, owner, coOrganizerPhones),
+              ...personState(holder, khatma, owner, coOrganizerPhones, hidden),
             }
           : null,
       };
@@ -289,7 +326,7 @@ export async function people(
       name: p.name,
       isMe: isActor(p, actor),
       juz: heldBy.get(p._id) ?? [],
-      ...personState(p, khatma, owner, coOrganizerPhones),
+      ...personState(p, khatma, owner, coOrganizerPhones, hidden),
     })),
     freeJuz: freeJuzOf(byJuz),
     maxSlots: await getSetting(ctx, "rotaMaxSlotsPerPerson"),
