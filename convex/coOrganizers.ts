@@ -247,6 +247,8 @@ async function candidatePhone(
  * A rota co-organizer with an account gets an active membership with
  * notifications on, so the khatma is on their home list and push reaches
  * them. Rota participants have none otherwise. A pool co-organizer is a member already.
+ * An existing membership is left as it is, except a `former` one, which comes
+ * back: an active one keeps its mute choice, a blocked one stays blocked.
  * Their participant row, added by phone before the account, gets the account
  * too, so Today knows it is them ("me", and their own juz' marked is their reply).
  */
@@ -267,7 +269,9 @@ export async function ensureRotaMembership(
     )
     .first();
   if (existing) {
-    if (existing.status !== "active" || !existing.notificationsOn) {
+    // An active row keeps its mute choice and a blocked one stays blocked;
+    // only someone who left (`former`) comes back, with notifications on.
+    if (existing.status === "former") {
       await ctx.db.patch(existing._id, {
         status: "active",
         notificationsOn: true,

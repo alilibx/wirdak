@@ -762,3 +762,64 @@ test("someone an admin set up as an organizer, who hasn't signed in, has no acco
   expect(recipients).toEqual([{ personId: org.personId, whatsappOff: false }]);
   expect(memberships.map((m) => m.personId)).toEqual([org.personId]);
 });
+
+test("a rota co-organizer who muted the khatma stays muted when their role is linked again", async () => {
+  const t = convexTest(schema, modules);
+  const { org, code, khatma } = await rotaSetup(t);
+  const ali = await signedIn(t, "علي");
+  const participantId = await addParticipant(t, code, org, "علي", ali.phone);
+  expect(await name(t, code, org, `p:${participantId}`)).toEqual({ ok: true });
+  const memberOf = () =>
+    t.run((ctx) =>
+      ctx.db
+        .query("members")
+        .withIndex("by_khatma_person", (q) =>
+          q.eq("khatmaId", khatma._id).eq("personId", ali.personId),
+        )
+        .unique(),
+    );
+  const member = await memberOf();
+  expect(member).toMatchObject({ status: "active", notificationsOn: true });
+  await t.run((ctx) => ctx.db.patch(member!._id, { notificationsOn: false }));
+
+  await t.run(async (ctx) => {
+    await linkCoOrganizerRoles(ctx, (await ctx.db.get(ali.personId))!);
+  });
+  expect(await memberOf()).toMatchObject({
+    status: "active",
+    notificationsOn: false,
+  });
+});
+
+test("naming or linking a blocked member does not bring them back, and a hand-over to them is refused", async () => {
+  const t = convexTest(schema, modules);
+  const { org, code, khatma } = await rotaSetup(t);
+  const ali = await signedIn(t, "علي");
+  const participantId = await addParticipant(t, code, org, "علي", ali.phone);
+  const member = await t.run((ctx) =>
+    ctx.db.insert("members", {
+      khatmaId: khatma._id,
+      personId: ali.personId,
+      joinedAt: NOW,
+      status: "blocked",
+      notificationsOn: false,
+      lastNudgeAt: null,
+      lastCelebratedRound: 0,
+    }),
+  );
+  expect(await name(t, code, org, `p:${participantId}`)).toEqual({ ok: true });
+  await t.run(async (ctx) => {
+    await linkCoOrganizerRoles(ctx, (await ctx.db.get(ali.personId))!);
+  });
+  expect(await t.run((ctx) => ctx.db.get(member))).toMatchObject({
+    status: "blocked",
+    notificationsOn: false,
+  });
+  expect(
+    await t.mutation(api.organizer.handOver, {
+      sessionToken: org.token,
+      inviteCode: code,
+      participantId,
+    }),
+  ).toEqual({ ok: false, reason: "not_member" });
+});
