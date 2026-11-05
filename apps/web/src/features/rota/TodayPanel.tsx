@@ -228,7 +228,9 @@ function StartKhatma({
   const { busy, error, run } = useRotaCall(t.rota.errors);
   return (
     <div className="rounded-ui border-2 border-line bg-card p-4">
-      <p className="text-xl leading-relaxed">{t.rota.setupNotDone}</p>
+      <p className="text-xl leading-relaxed">
+        {canStart ? t.rota.setupNotDone : t.rota.setupNotDoneViewer}
+      </p>
       {canStart && (
         <div className="mt-4">
           <Button

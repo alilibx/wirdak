@@ -771,7 +771,8 @@ describe("a co-organizer", () => {
       next: { number: 1, date: "2026-11-10" },
     });
     renderAt();
-    expect(screen.getByText(t.rota.setupNotDone)).toBeInTheDocument();
+    expect(screen.getByText(t.rota.setupNotDoneViewer)).toBeInTheDocument();
+    expect(screen.queryByText(t.rota.setupNotDone)).toBeNull();
     expect(
       screen.queryByRole("button", { name: t.rota.startKhatma }),
     ).toBeNull();
