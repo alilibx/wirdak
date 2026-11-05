@@ -5,6 +5,7 @@ import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { linkCoOrganizerRoles } from "./coOrganizers";
 import { alertOrganizer } from "./grace";
 import { sha256Hex } from "./lib/crypto";
+import { joinText } from "./lib/rotaJoin";
 import { organizerRecipients } from "./lib/organizerRecipients";
 import type { Permission } from "./lib/organizerAuth";
 import schema from "./schema";
@@ -379,4 +380,71 @@ test("signing in on a named number sends coOrganizerNow once the account exists"
   });
   const got = await notesOf(t, { personId } as Who, khatma._id);
   expect(got.map((n) => n.kind)).toEqual(["coOrganizerNow"]);
+});
+
+test("notes about how people are doing reach co-organizers with People, never those with only Readings", async () => {
+  const t = convexTest(schema, modules);
+  await setSetting(t, "rotaSilenceNoticeDays", 3);
+  await setSetting(t, "rotaSilenceStopDays", 7);
+  const { org, code, khatma } = await rotaSetup(t);
+  const withReadings = await participant(t, code, org, "علي", ONLY("readings"));
+  const withPeople = await participant(t, code, org, "سارة", ONLY("people"));
+  const quiet = await participant(t, code, org, "خالد", null);
+  const quieter = await participant(t, code, org, "منى", null);
+  const leaving = await participant(t, code, org, "هدى", null);
+  // joined a while ago; one about to be noticed, one about to be silenced
+  await t.run(async (ctx) => {
+    for (const [who, silentDays] of [
+      [quiet, 2],
+      [quieter, 6],
+      [leaving, 0],
+    ] as const) {
+      const row = await ctx.db
+        .query("rotaParticipants")
+        .withIndex("by_khatma_phone", (q) =>
+          q.eq("khatmaId", khatma._id).eq("phone", who.phone),
+        )
+        .first();
+      await ctx.db.patch(row!._id, {
+        joinedAt: MORNING - 7 * 86_400_000,
+        silentDays,
+      });
+    }
+  });
+
+  // day 1 starts, and a week later closes with no reply from either
+  vi.setSystemTime(MORNING);
+  await t.mutation(internal.rotaDays.tick, { khatmaId: khatma._id });
+  vi.setSystemTime(MORNING + 7 * 86_400_000);
+  await t.mutation(internal.rotaDays.tick, { khatmaId: khatma._id });
+  // someone not on the list asks to join, and a participant sends «إيقاف»
+  await t.mutation(internal.rotaInbound.handle, {
+    phone: "+971505559999",
+    text: joinText("ختمة", khatma.joinCode!),
+    profileName: "زائر",
+    now: Date.now(),
+  });
+  await t.mutation(internal.rotaInbound.handle, {
+    phone: leaving.phone,
+    text: "إيقاف",
+    now: Date.now(),
+  });
+
+  const ABOUT_PEOPLE = [
+    "rotaSilent",
+    "rotaSilenced",
+    "rotaJoinRequest",
+    "rotaStopped",
+  ];
+  const kinds = async (who: Who) =>
+    [
+      ...new Set(
+        (await notesOf(t, who, khatma._id))
+          .map((n) => n.kind)
+          .filter((k) => ABOUT_PEOPLE.includes(k)),
+      ),
+    ].sort();
+  expect(await kinds(org)).toEqual([...ABOUT_PEOPLE].sort());
+  expect(await kinds(withPeople)).toEqual([...ABOUT_PEOPLE].sort());
+  expect(await kinds(withReadings)).toEqual([]);
 });
