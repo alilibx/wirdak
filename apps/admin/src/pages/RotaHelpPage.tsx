@@ -54,7 +54,12 @@ function Panels({
           />
         )}
         {tab === "people" && (
-          <PeoplePanel inviteCode={khatmaId} archived={today.archived} />
+          // An admin may do everything the owner may.
+          <PeoplePanel
+            inviteCode={khatmaId}
+            archived={today.archived}
+            viewerIsOwner
+          />
         )}
         {tab === "settings" && (
           <div className="mt-6">
