@@ -365,8 +365,8 @@ export async function setCoOrganizer(
  * The old owner after a transfer: a co-organizer with every switch, past
  * `maxCoOrganizers` if need be (spec 4.5). Only someone still in the khatma
  * stays on: an active member, and in a rota khatma a live participant too. No
- * `coOrganizerNow` note: the transfer's own notes say what happened. Whether
- * they hold the role now.
+ * `coOrganizerNow` note: the transfer's own notes say what happened. Returns
+ * whether they hold the role now.
  */
 export async function keepOldOwner(
   ctx: MutationCtx,
