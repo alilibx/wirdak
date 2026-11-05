@@ -1177,6 +1177,88 @@ test("auto handover hands a rota khatma only to a co-organizer, and does nothing
   expect((await memberOf(t, khatma._id, bob)).status).toBe("active");
 });
 
+/** The rota owner's own participant row, found by their phone. */
+async function ownerRow(t: T, khatmaId: Id<"khatmas">, owner: Who) {
+  const phone = await phoneOf(t, owner);
+  const row = await t.run((ctx) =>
+    ctx.db
+      .query("rotaParticipants")
+      .withIndex("by_khatma_phone", (q) =>
+        q.eq("khatmaId", khatmaId).eq("phone", phone),
+      )
+      .first(),
+  );
+  if (!row) throw new Error("no owner row");
+  return row;
+}
+
+test("a rota owner who replies on WhatsApp keeps the khatma though the website hasn't seen them", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  const bob = await rotaPerson(t, "بلال", "+971505550012");
+  const bobId = await addParticipant(
+    t,
+    code,
+    org,
+    "بلال",
+    await phoneOf(t, bob),
+  );
+  await nameCo(t, code, org, `p:${bobId}`);
+  const row = await ownerRow(t, khatma._id, org);
+  await t.run(async (ctx) => {
+    await ctx.db.patch(org.personId, { lastSeenAt: NOW - 31 * DAY });
+    await ctx.db.patch(row._id, { lastReplyAt: NOW - DAY });
+  });
+
+  await sweep(t);
+
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(org.personId);
+  expect(await notesOf(t, bob, "nowOrganizer")).toHaveLength(0);
+});
+
+test("a rota owner an admin set up who never signed in or replied keeps the khatma", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  const bob = await rotaPerson(t, "بلال", "+971505550012");
+  const bobId = await addParticipant(
+    t,
+    code,
+    org,
+    "بلال",
+    await phoneOf(t, bob),
+  );
+  await nameCo(t, code, org, `p:${bobId}`);
+  await t.run((ctx) =>
+    ctx.db.patch(org.personId, { lastSeenAt: 0, verifiedAt: 0 }),
+  );
+
+  await sweep(t);
+
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(org.personId);
+  expect(await notesOf(t, bob, "nowOrganizer")).toHaveLength(0);
+});
+
+test("a rota owner away from the website and silent on WhatsApp goes to an active co-organizer", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  const bob = await rotaPerson(t, "بلال", "+971505550012");
+  const bobId = await addParticipant(
+    t,
+    code,
+    org,
+    "بلال",
+    await phoneOf(t, bob),
+  );
+  await nameCo(t, code, org, `p:${bobId}`);
+  const row = await ownerRow(t, khatma._id, org);
+  await t.run(async (ctx) => {
+    await ctx.db.patch(org.personId, { lastSeenAt: NOW - 31 * DAY });
+    await ctx.db.patch(row._id, { lastReplyAt: NOW - 31 * DAY });
+  });
+
+  await sweep(t);
+
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(bob.personId);
+  expect(await notesOf(t, bob, "nowOrganizer")).toHaveLength(1);
+});
+
 test("handoverToCoOrganizerOn off keeps today's rule and still skips rota", async () => {
   const { t, org, code, khatma } = await setup();
   await setSetting(t, "handoverToCoOrganizerOn", false);

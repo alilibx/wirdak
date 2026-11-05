@@ -704,6 +704,33 @@ export const handOver = sessionMutation({
 });
 
 /**
+ * Whether `khatma`'s owner has been away longer than `organizerInactiveMs`,
+ * so the khatma may be handed over. A pool owner is seen on the website. A
+ * rota owner may run it from WhatsApp alone, so their own participant row's
+ * last reply counts too: a reply within `successorActiveMs` keeps the khatma,
+ * and otherwise the later of the two times is their last sighting. A rota
+ * owner never seen at all (an admin set it up and they haven't signed in)
+ * never loses it this way.
+ */
+async function organizerAway(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  owner: Doc<"people"> | null,
+  now: number,
+): Promise<boolean> {
+  if (!owner) return true;
+  const inactiveSince = now - (await getSetting(ctx, "organizerInactiveMs"));
+  if (khatma.kind !== "rota") return owner.lastSeenAt < inactiveSince;
+  const row = await liveParticipant(ctx, khatma._id, owner.phone);
+  const repliedAt = row?.lastReplyAt ?? 0;
+  if (repliedAt >= now - (await getSetting(ctx, "successorActiveMs"))) {
+    return false;
+  }
+  if (owner.lastSeenAt === 0) return false;
+  return Math.max(owner.lastSeenAt, repliedAt) < inactiveSince;
+}
+
+/**
  * Daily: pages through every khatma and schedules a handover check for each
  * one not archived whose organizer has been away longer than `organizerInactiveMs`.
  * Rota khatmas are skipped while `handoverToCoOrganizerOn` is off.
@@ -715,14 +742,14 @@ export const autoHandoverSweep = internalMutation({
     const page = await ctx.db
       .query("khatmas")
       .paginate({ numItems: SWEEP_PAGE, cursor: args.cursor ?? null });
-    const cutoff = Date.now() - (await getSetting(ctx, "organizerInactiveMs"));
+    const now = Date.now();
     const toCoOrganizers = await getSetting(ctx, "handoverToCoOrganizerOn");
     for (const khatma of page.page) {
       if (isArchived(khatma)) continue;
       // Without co-organizers to take it, a rota khatma keeps its organizer.
       if (khatma.kind === "rota" && !toCoOrganizers) continue;
       const organizer = await ctx.db.get(khatma.creatorPersonId);
-      if (organizer && organizer.lastSeenAt >= cutoff) continue;
+      if (!(await organizerAway(ctx, khatma, organizer, now))) continue;
       await ctx.scheduler.runAfter(0, internal.organizer.autoHandover, {
         khatmaId: khatma._id,
       });
@@ -751,13 +778,7 @@ export const autoHandover = internalMutation({
     if (khatma.kind === "rota" && !toCoOrganizers) return;
     const now = Date.now();
     const organizer = await ctx.db.get(khatma.creatorPersonId);
-    if (
-      organizer &&
-      organizer.lastSeenAt >=
-        now - (await getSetting(ctx, "organizerInactiveMs"))
-    ) {
-      return;
-    }
+    if (!(await organizerAway(ctx, khatma, organizer, now))) return;
 
     const activeSince = now - (await getSetting(ctx, "successorActiveMs"));
     if (toCoOrganizers) {
