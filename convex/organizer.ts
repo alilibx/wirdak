@@ -8,7 +8,6 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
-import { activeMembership } from "./khatmas";
 import {
   cheerConfigValidator,
   cheerSetting,
@@ -17,6 +16,12 @@ import {
 } from "./lib/cheer";
 import { randomToken } from "./lib/crypto";
 import { nameFields, refreshPerson } from "./lib/directory";
+import {
+  allows,
+  roleIn,
+  type Need,
+  type OrganizerRole,
+} from "./lib/organizerAuth";
 import { graceValidator, isValidGrace, type Grace } from "./lib/grace";
 import { isArchived, khatmaByInviteCode } from "./lib/khatma";
 import { scheduleValidator, type Schedule } from "./lib/schedule";
@@ -52,27 +57,41 @@ export type OrganizerSettings = {
 // Authority
 
 /**
- * The khatma behind `inviteCode` when `person` is its organizer and still an
- * active member of it; otherwise `null`. A removed organizer holds no controls.
+ * The khatma behind `inviteCode` when `person` holds a role in it that meets
+ * `need`; otherwise `null`. The default `"owner"` is the owner alone, and a
+ * removed owner holds no controls.
  */
 export async function organizerOf(
   ctx: QueryCtx,
   inviteCode: string,
   person: Doc<"people"> | null,
-): Promise<{ person: Doc<"people">; khatma: Doc<"khatmas"> } | null> {
+  need: Need = "owner",
+): Promise<{
+  person: Doc<"people">;
+  khatma: Doc<"khatmas">;
+  role: OrganizerRole;
+} | null> {
   if (!person) return null;
   const khatma = await khatmaByInviteCode(ctx, inviteCode);
-  if (!khatma || khatma.creatorPersonId !== person._id) return null;
-  if (!(await activeMembership(ctx, khatma._id, person._id))) return null;
-  return { person, khatma };
+  if (!khatma) return null;
+  const role = await roleIn(ctx, khatma, person);
+  if (!role || !allows(role, need)) return null;
+  return { person, khatma, role };
 }
 
-/** The caller and their khatma, or `forbidden` unless they are its active organizer. */
+type Organizer = {
+  person: Doc<"people">;
+  khatma: Doc<"khatmas">;
+  role: OrganizerRole;
+};
+
+/** The caller and their khatma, or `forbidden` unless their role meets `need`. */
 export async function requireOrganizer(
   ctx: QueryCtx & SessionContext,
   inviteCode: string,
-): Promise<{ person: Doc<"people">; khatma: Doc<"khatmas"> }> {
-  const found = await organizerOf(ctx, inviteCode, ctx.person);
+  need: Need = "owner",
+): Promise<Organizer> {
+  const found = await organizerOf(ctx, inviteCode, ctx.person, need);
   if (!found) throw new ConvexError({ code: "forbidden" });
   return found;
 }
@@ -89,8 +108,9 @@ function refuseArchived(khatma: Doc<"khatmas">): void {
 async function requireLiveOrganizer(
   ctx: QueryCtx & SessionContext,
   inviteCode: string,
-): Promise<{ person: Doc<"people">; khatma: Doc<"khatmas"> }> {
-  const found = await requireOrganizer(ctx, inviteCode);
+  need: Need = "owner",
+): Promise<Organizer> {
+  const found = await requireOrganizer(ctx, inviteCode, need);
   refuseArchived(found.khatma);
   return found;
 }
@@ -102,8 +122,9 @@ async function requireLiveOrganizer(
 async function requirePoolOrganizer(
   ctx: QueryCtx & SessionContext,
   inviteCode: string,
-): Promise<{ person: Doc<"people">; khatma: Doc<"khatmas"> }> {
-  const found = await requireLiveOrganizer(ctx, inviteCode);
+  need: Need = "owner",
+): Promise<Organizer> {
+  const found = await requireLiveOrganizer(ctx, inviteCode, need);
   if (found.khatma.kind === "rota") {
     throw new ConvexError({ code: "forbidden" });
   }
