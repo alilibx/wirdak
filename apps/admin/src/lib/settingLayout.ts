@@ -22,7 +22,11 @@ export type SettingSection =
   | "rotaTimes"
   | "rotaLimits"
   | "rotaDay"
-  | "rotaSilence";
+  | "rotaSilence"
+  | "markDone"
+  | "coOrganizers"
+  | "coOrganizerNotes"
+  | "sharedReading";
 
 /**
  * Where each setting sits on the settings page. A missing group is a type
@@ -40,6 +44,18 @@ export const SETTING_LAYOUT: Record<
         "maintenanceMessage",
         "announcement",
         "minClientVersion",
+      ],
+    },
+    { section: "markDone", keys: ["markDoneForOthersOn", "markDoneNameOn"] },
+    {
+      section: "coOrganizers",
+      keys: [
+        "coOrganizersOn",
+        "coOrganizerDefaultReadings",
+        "coOrganizerDefaultPeople",
+        "coOrganizerDefaultSettings",
+        "handoverToCoOrganizerOn",
+        "oldOwnerStaysOn",
       ],
     },
   ],
@@ -78,6 +94,10 @@ export const SETTING_LAYOUT: Record<
       ],
     },
     { section: "admins", keys: ["summaryHour", "milestonePushSpacingMs"] },
+    {
+      section: "coOrganizerNotes",
+      keys: ["coOrganizerNotesOn", "coOrganizerWhatsAppOn"],
+    },
   ],
   help: [
     {
@@ -103,6 +123,7 @@ export const SETTING_LAYOUT: Record<
         "newMembersPerKhatmaPerHour",
         "poolActionsPerPersonPerMinute",
         "nameChangesPerPersonPerHour",
+        "maxCoOrganizers",
       ],
     },
     {
@@ -159,6 +180,15 @@ export const SETTING_LAYOUT: Record<
     {
       section: "rotaSilence",
       keys: ["rotaSilenceNoticeDays", "rotaSilenceStopDays"],
+    },
+    {
+      section: "sharedReading",
+      keys: [
+        "organizerLateMarkOn",
+        "namedCountsAsReplyOn",
+        "rotaSharedSlotsOn",
+        "rotaHalfCountsAsSlot",
+      ],
     },
   ],
 };

@@ -105,6 +105,34 @@ export const SETTING_DEFAULTS = {
   rotaSilenceNoticeDays: 3,
   /** days a participant sends no reply before their messages stop */
   rotaSilenceStopDays: 7,
+  /** organizers can mark a pool juz' done for someone else */
+  markDoneForOthersOn: true,
+  /** the «قرأه:» picker shows; off records every organizer mark as «لا أعرف» */
+  markDoneNameOn: true,
+  /** organizers can mark done during the late window after midnight */
+  organizerLateMarkOn: true,
+  /** naming a rota reader counts as their reply for the silence rule */
+  namedCountsAsReplyOn: true,
+  /** owners can name co-organizers */
+  coOrganizersOn: true,
+  /** co-organizers per khatma */
+  maxCoOrganizers: 5,
+  /** starting values of the permission switches when someone is named */
+  coOrganizerDefaultReadings: true,
+  coOrganizerDefaultPeople: true,
+  coOrganizerDefaultSettings: true,
+  /** co-organizers get the organizer notes their permissions cover, in the app and by push */
+  coOrganizerNotesOn: true,
+  /** and on WhatsApp too; off because each copy is a paid message */
+  coOrganizerWhatsAppOn: false,
+  /** automatic handover tries co-organizers first */
+  handoverToCoOrganizerOn: true,
+  /** after a transfer the old owner stays as a co-organizer with all permissions */
+  oldOwnerStaysOn: true,
+  /** organizers can add a second reader to a rota juz' */
+  rotaSharedSlotsOn: true,
+  /** a half counts as a slot in rotaMaxSlotsPerPerson */
+  rotaHalfCountsAsSlot: true,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

@@ -74,6 +74,21 @@ const labels: Record<SettingKey, string> = {
   rotaMaxSlotsPerPerson: "أقصى عدد أجزاء لكل قارئ في الختمة بالتناوب",
   rotaSilenceNoticeDays: "أيام صمت المشارك قبل تنبيه المنظّم",
   rotaSilenceStopDays: "أيام صمت المشارك قبل إيقاف رسائله",
+  markDoneForOthersOn: "تسجيل المنظّم جزءاً مقروءاً لغيره",
+  markDoneNameOn: "اختيار اسم القارئ عند التسجيل",
+  organizerLateMarkOn: "تسجيل المنظّم بعد منتصف الليل",
+  namedCountsAsReplyOn: "تسمية القارئ تُحسب رداً منه",
+  coOrganizersOn: "المنظّمون المساعدون مفعّلون",
+  maxCoOrganizers: "أقصى عدد منظّمين مساعدين في الختمة",
+  coOrganizerDefaultReadings: "صلاحية القراءات للمنظّم المساعد الجديد",
+  coOrganizerDefaultPeople: "صلاحية الأعضاء للمنظّم المساعد الجديد",
+  coOrganizerDefaultSettings: "صلاحية الإعدادات للمنظّم المساعد الجديد",
+  coOrganizerNotesOn: "وصول ملاحظات المنظّم إلى المساعدين",
+  coOrganizerWhatsAppOn: "وصول ملاحظات المنظّم إلى المساعدين في واتساب",
+  handoverToCoOrganizerOn: "التسليم التلقائي يبدأ بالمنظّمين المساعدين",
+  oldOwnerStaysOn: "بقاء المالك السابق منظّماً مساعداً بعد النقل",
+  rotaSharedSlotsOn: "قارئ ثانٍ لجزء في الختمة بالتناوب",
+  rotaHalfCountsAsSlot: "النصف يُحسب جزءاً في حدّ القارئ",
 };
 
 const groups: Record<SettingGroup, string> = {
