@@ -50,6 +50,7 @@ import type * as lib_khatma from "../lib/khatma.js";
 import type * as lib_milestones from "../lib/milestones.js";
 import type * as lib_noteText from "../lib/noteText.js";
 import type * as lib_organizerAuth from "../lib/organizerAuth.js";
+import type * as lib_organizerRecipients from "../lib/organizerRecipients.js";
 import type * as lib_pace from "../lib/pace.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_rota from "../lib/rota.js";
@@ -141,6 +142,7 @@ declare const fullApi: ApiFromModules<{
   "lib/milestones": typeof lib_milestones;
   "lib/noteText": typeof lib_noteText;
   "lib/organizerAuth": typeof lib_organizerAuth;
+  "lib/organizerRecipients": typeof lib_organizerRecipients;
   "lib/pace": typeof lib_pace;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/rota": typeof lib_rota;
