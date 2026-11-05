@@ -605,6 +605,11 @@ const ROTA_ROWS: Row<RotaCtx>[] = [
   },
   // Settings
   {
+    fn: "rota.finishSetup",
+    need: "settings",
+    call: (c, who) => c.t.mutation(api.rota.finishSetup, rotaArgs(c, who)),
+  },
+  {
     fn: "rota.settings",
     need: "settings",
     call: (c, who) => c.t.query(api.rota.settings, rotaArgs(c, who)),
@@ -643,11 +648,6 @@ const ROTA_ROWS: Row<RotaCtx>[] = [
 ];
 
 const ROTA_OWNER_ROWS: Row<RotaCtx>[] = [
-  {
-    fn: "rota.finishSetup",
-    need: "owner",
-    call: (c, who) => c.t.mutation(api.rota.finishSetup, rotaArgs(c, who)),
-  },
   {
     fn: "rota.startAgain",
     need: "owner",

@@ -312,6 +312,7 @@ export function RotaKhatmaPage({
                   view={today}
                   dayAt={today.dayAt}
                   timeZone={today.timeZone}
+                  canStart={organizer.settings}
                 />
               </>
             ) : (

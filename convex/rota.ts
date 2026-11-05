@@ -550,13 +550,14 @@ async function organizerRota(
 // ---------------------------------------------------------------------------
 // People
 
+/** The owner, and a co-organizer with Settings: starting the khatma's days is a setting. */
 export const finishSetup = sessionMutation({
   args: { inviteCode: v.string() },
   handler: async (ctx, args): ReturnType<typeof ops.finishSetup> => {
     const { khatma, rota } = await requireRotaOrganizer(
       ctx,
       args.inviteCode,
-      "owner",
+      "settings",
     );
     return ops.finishSetup(ctx, khatma, rota);
   },

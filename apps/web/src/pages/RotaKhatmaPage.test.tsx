@@ -761,6 +761,36 @@ describe("a co-organizer", () => {
     expect(screen.queryByRole("tab", { name: "المشاركون" })).toBeNull();
   });
 
+  it("without Settings is told setup isn't done but isn't offered to start the khatma", () => {
+    m.access = coOrganizer({ readings: true });
+    m.settings = null;
+    m.today = todayView({
+      day: null,
+      tiles: [],
+      setupDone: false,
+      next: { number: 1, date: "2026-11-10" },
+    });
+    renderAt();
+    expect(screen.getByText(t.rota.setupNotDone)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: t.rota.startKhatma }),
+    ).toBeNull();
+  });
+
+  it("with Settings starts the khatma", async () => {
+    m.access = coOrganizer({ readings: true, settings: true });
+    m.today = todayView({
+      day: null,
+      tiles: [],
+      setupDone: false,
+      next: { number: 1, date: "2026-11-10" },
+    });
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole("button", { name: t.rota.startKhatma }));
+    expect(m.fns.finishSetup).toHaveBeenCalledWith(args);
+  });
+
   it("with no switch on sees the member page", () => {
     m.access = coOrganizer({});
     m.today = null;

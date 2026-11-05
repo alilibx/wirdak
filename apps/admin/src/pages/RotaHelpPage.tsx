@@ -50,6 +50,7 @@ function Panels({
             view={today}
             dayAt={settings.messages.dayAt}
             timeZone={settings.timeZone}
+            canStart
           />
         )}
         {tab === "people" && (

@@ -212,22 +212,33 @@ function nextLine(view: TodayView, dayAt: number, timeZone: string) {
   );
 }
 
-/** Setup was left unfinished: no day starts until the organizer starts the khatma here. */
-function StartKhatma({ inviteCode }: { inviteCode: string }) {
+/**
+ * Setup was left unfinished: no day starts until the organizer starts the khatma here. Only
+ * someone with Settings may start it; anyone else is only told.
+ */
+function StartKhatma({
+  inviteCode,
+  canStart,
+}: {
+  inviteCode: string;
+  canStart: boolean;
+}) {
   const backend = useRotaBackend(inviteCode);
   const finishSetup = useMutation(backend.finishSetup);
   const { busy, error, run } = useRotaCall(t.rota.errors);
   return (
     <div className="rounded-ui border-2 border-line bg-card p-4">
       <p className="text-xl leading-relaxed">{t.rota.setupNotDone}</p>
-      <div className="mt-4">
-        <Button
-          disabled={busy}
-          onClick={() => void run(() => finishSetup(backend.authArgs()))}
-        >
-          {t.rota.startKhatma}
-        </Button>
-      </div>
+      {canStart && (
+        <div className="mt-4">
+          <Button
+            disabled={busy}
+            onClick={() => void run(() => finishSetup(backend.authArgs()))}
+          >
+            {t.rota.startKhatma}
+          </Button>
+        </div>
+      )}
       <ErrorLine error={error} />
     </div>
   );
@@ -239,12 +250,15 @@ export function TodayPanel({
   view,
   dayAt,
   timeZone,
+  canStart,
 }: {
   inviteCode: string;
   view: TodayView;
   /** When the next day's message goes out, minutes after midnight. */
   dayAt: number;
   timeZone: string;
+  /** Whether the viewer may start an unfinished khatma: the owner, Settings, or an admin. */
+  canStart: boolean;
 }) {
   const [openRead, setOpenRead] = useState<Id<"rotaReads"> | null>(null);
   const { day } = view;
@@ -263,7 +277,7 @@ export function TodayPanel({
         : t.rota.ended;
   const noDay =
     !view.setupDone && !view.archived ? (
-      <StartKhatma inviteCode={inviteCode} />
+      <StartKhatma inviteCode={inviteCode} canStart={canStart} />
     ) : (
       before && (
         <p className="rounded-ui border-2 border-line bg-card p-4 text-xl leading-relaxed">
