@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   rota: null as unknown,
   archived: false,
   blockedMember: false,
+  handOverCandidates: [{ memberId: "m2", name: "سارة" }] as unknown[],
 }));
 vi.mock("convex/react", async () => {
   const { getFunctionName } = await import("convex/server");
@@ -43,6 +44,26 @@ vi.mock("convex/react", async () => {
           status: m.blockedMember ? "blocked" : "active",
         },
       ],
+      coOrganizers: [
+        {
+          coOrganizerId: "c1",
+          name: "خالد",
+          readings: true,
+          people: false,
+          settings: true,
+          pending: false,
+        },
+        {
+          coOrganizerId: "c2",
+          name: "نور",
+          readings: false,
+          people: false,
+          settings: false,
+          pending: true,
+        },
+      ],
+      coOrganizerCandidates: [{ candidateId: "m:m2", name: "سارة" }],
+      handOverCandidates: m.handOverCandidates,
       round: { number: 3, startedAt: 0, free: 20, taken: 4, finished: 6 },
       openHelpRequests: 1,
     }),
@@ -61,6 +82,7 @@ beforeEach(() => {
   m.rota = null;
   m.archived = false;
   m.blockedMember = false;
+  m.handOverCandidates = [{ memberId: "m2", name: "سارة" }];
   m.mutation.mockReset().mockResolvedValue({ ok: true });
   m.reset.mockReset().mockResolvedValue({ inviteCode: "newCode00001" });
   m.handOver.mockReset().mockResolvedValue({ ok: true });
@@ -393,5 +415,107 @@ describe("KhatmaAdminPage", () => {
     m.rota = { ...running, joinLink: null };
     renderPage();
     expect(screen.queryByRole("button", { name: t.rota.copy })).toBeNull();
+  });
+});
+
+describe("KhatmaAdminPage co-organizers", () => {
+  it("lists co-organizers with their permissions in words", () => {
+    renderPage();
+    expect(
+      screen.getByRole("heading", { name: t.coOrganizers.title }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("خالد")).toBeInTheDocument();
+    expect(
+      screen.getByText(t.coOrganizers.permissions("القراءة، الإعدادات")),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        t.coOrganizers.permissions(t.coOrganizers.noPermissions),
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(t.coOrganizers.pending)),
+    ).toBeInTheDocument();
+  });
+
+  it("names a co-organizer with the three switches and a note", async () => {
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: t.coOrganizers.add }),
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText(t.coOrganizers.pick),
+      "m:m2",
+    );
+    await userEvent.click(
+      screen.getByRole("switch", { name: t.coOrganizers.people }),
+    );
+    await userEvent.type(screen.getByLabelText(t.ops.noteLabel), "طلب");
+    await userEvent.click(
+      screen.getByRole("button", { name: t.coOrganizers.save }),
+    );
+    expect(m.mutation).toHaveBeenCalledWith("adminKhatmas:setCoOrganizer", {
+      adminToken: "tok",
+      khatmaId: "k1",
+      candidateId: "m:m2",
+      readings: true,
+      people: false,
+      settings: true,
+      note: "طلب",
+    });
+  });
+
+  it("edits the switches of one already named, and removes another", async () => {
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: t.coOrganizers.editOf("خالد") }),
+    );
+    await userEvent.click(
+      screen.getByRole("switch", { name: t.coOrganizers.people }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: t.coOrganizers.save }),
+    );
+    expect(m.mutation).toHaveBeenCalledWith("adminKhatmas:setCoOrganizer", {
+      adminToken: "tok",
+      khatmaId: "k1",
+      coOrganizerId: "c1",
+      readings: true,
+      people: true,
+      settings: true,
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: t.coOrganizers.removeOf("نور") }),
+    );
+    await userEvent.click(
+      screen.getAllByRole("button", { name: t.coOrganizers.remove }).at(-1)!,
+    );
+    expect(m.mutation).toHaveBeenCalledWith("adminKhatmas:removeCoOrganizer", {
+      adminToken: "tok",
+      khatmaId: "k1",
+      coOrganizerId: "c2",
+    });
+  });
+
+  it("hands a rota khatma to a participant by participantId, and says when they have no account", async () => {
+    m.handOverCandidates = [{ participantId: "r1", name: "هدى" }];
+    m.handOver.mockResolvedValue({ error: "no_account" });
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: t.ops.handOver }));
+    await userEvent.selectOptions(
+      screen.getByLabelText(t.ops.pickMember),
+      "p:r1",
+    );
+    await userEvent.click(
+      screen.getAllByRole("button", { name: t.ops.handOver }).at(-1)!,
+    );
+    expect(m.handOver).toHaveBeenCalledWith({
+      adminToken: "tok",
+      khatmaId: "k1",
+      participantId: "r1",
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      t.ops.errors.no_account,
+    );
   });
 });

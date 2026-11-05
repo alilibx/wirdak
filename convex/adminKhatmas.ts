@@ -2,6 +2,12 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { cleanNote } from "./adminOps";
+import {
+  coOrganizersOf,
+  removeCoOrganizer as removeCoOrganizerShared,
+  setCoOrganizer as setCoOrganizerShared,
+  type SetResult,
+} from "./coOrganizers";
 import { archiveKhatma, deleteKhatma, restoreKhatma } from "./khatmaLifecycle";
 import { adminMutation } from "./lib/adminSession";
 import { writeAudit } from "./lib/audit";
@@ -225,5 +231,90 @@ export const unblockMember = adminMutation({
       note: cleanNote(args.note),
     });
     return { ok: true };
+  },
+});
+
+/** The switches of each co-organizer, for the audit log (no names, no phones). */
+async function switchesOf(ctx: QueryCtx, khatma: Doc<"khatmas">) {
+  return (await coOrganizersOf(ctx, khatma)).map(
+    ({ coOrganizerId, readings, people, settings }) => ({
+      coOrganizerId,
+      readings,
+      people,
+      settings,
+    }),
+  );
+}
+
+/**
+ * An admin names a co-organizer or changes their switches, on either kind of
+ * khatma. Admins ignore `coOrganizersOn` and `maxCoOrganizers`.
+ */
+export const setCoOrganizer = adminMutation({
+  args: {
+    khatmaId: v.id("khatmas"),
+    candidateId: v.optional(v.string()),
+    coOrganizerId: v.optional(v.id("coOrganizers")),
+    readings: v.boolean(),
+    people: v.boolean(),
+    settings: v.boolean(),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<SetResult | { error: "not_found" }> => {
+    const khatma = await ctx.db.get(args.khatmaId);
+    if (!khatma) return { error: "not_found" };
+    const before = await switchesOf(ctx, khatma);
+    const res = await setCoOrganizerShared(
+      ctx,
+      khatma,
+      {
+        candidateId: args.candidateId,
+        coOrganizerId: args.coOrganizerId,
+        readings: args.readings,
+        people: args.people,
+        settings: args.settings,
+      },
+      { ignoreLimits: true },
+    );
+    if ("error" in res) return res;
+    await writeAudit(ctx, {
+      actor: ctx.admin,
+      action: "khatma.coOrganizerSet",
+      targetKind: "khatma",
+      targetId: khatma._id,
+      before,
+      after: await switchesOf(ctx, khatma),
+      note: cleanNote(args.note),
+    });
+    return res;
+  },
+});
+
+/** An admin takes a co-organizer's role away. The person stays in the khatma. */
+export const removeCoOrganizer = adminMutation({
+  args: {
+    khatmaId: v.id("khatmas"),
+    coOrganizerId: v.id("coOrganizers"),
+    note: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: true } | { error: "not_found" }> => {
+    const khatma = await ctx.db.get(args.khatmaId);
+    if (!khatma) return { error: "not_found" };
+    const before = await switchesOf(ctx, khatma);
+    const res = await removeCoOrganizerShared(ctx, khatma, args.coOrganizerId);
+    if ("error" in res) return res;
+    await writeAudit(ctx, {
+      actor: ctx.admin,
+      action: "khatma.coOrganizerRemove",
+      targetKind: "khatma",
+      targetId: khatma._id,
+      before,
+      after: await switchesOf(ctx, khatma),
+      note: cleanNote(args.note),
+    });
+    return res;
   },
 });

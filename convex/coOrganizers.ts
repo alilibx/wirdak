@@ -121,6 +121,40 @@ async function nameOf(
   return person?.displayName ?? "";
 }
 
+/** Who helps run the khatma, oldest first, with their switches. */
+export async function coOrganizersOf(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+): Promise<CoOrganizersView["coOrganizers"]> {
+  const rows = (await rowsOf(ctx, khatma._id)).sort(
+    (a, b) => a.addedAt - b.addedAt || a._creationTime - b._creationTime,
+  );
+  const coOrganizers: CoOrganizersView["coOrganizers"] = [];
+  for (const row of rows) {
+    const person = await personByPhone(ctx, row.phone);
+    coOrganizers.push({
+      coOrganizerId: row._id,
+      name: await nameOf(ctx, khatma, row.phone, person),
+      readings: row.readings,
+      people: row.people,
+      settings: row.settings,
+      pending: person === null,
+    });
+  }
+  return coOrganizers;
+}
+
+/** Who could still be named: candidates who aren't co-organizers yet. */
+export async function openCandidates(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+): Promise<CoOrganizersView["candidates"]> {
+  const named = new Set((await rowsOf(ctx, khatma._id)).map((r) => r.phone));
+  return (await candidatesOf(ctx, khatma))
+    .filter((c) => !named.has(c.phone))
+    .map(({ candidateId, name }) => ({ candidateId, name }));
+}
+
 /** Owner only: who helps run the khatma, and who could. */
 export const list = sessionQuery({
   args: { inviteCode: v.string() },
@@ -132,25 +166,8 @@ export const list = sessionQuery({
     if (!found) return { forbidden: true };
     const { khatma } = found;
 
-    const rows = (await rowsOf(ctx, khatma._id)).sort(
-      (a, b) => a.addedAt - b.addedAt || a._creationTime - b._creationTime,
-    );
-    const named = new Set(rows.map((r) => r.phone));
-    const coOrganizers: CoOrganizersView["coOrganizers"] = [];
-    for (const row of rows) {
-      const person = await personByPhone(ctx, row.phone);
-      coOrganizers.push({
-        coOrganizerId: row._id,
-        name: await nameOf(ctx, khatma, row.phone, person),
-        readings: row.readings,
-        people: row.people,
-        settings: row.settings,
-        pending: person === null,
-      });
-    }
-    const candidates = (await candidatesOf(ctx, khatma))
-      .filter((c) => !named.has(c.phone))
-      .map(({ candidateId, name }) => ({ candidateId, name }));
+    const coOrganizers = await coOrganizersOf(ctx, khatma);
+    const candidates = await openCandidates(ctx, khatma);
 
     return {
       max: await getSetting(ctx, "maxCoOrganizers"),

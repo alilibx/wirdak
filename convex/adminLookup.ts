@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { normalizeAdminPhone } from "./admins";
+import { coOrganizersOf, openCandidates, personByPhone } from "./coOrganizers";
 import { adminQuery } from "./lib/adminSession";
 import { isBlocked } from "./lib/blocked";
 import { isArchived } from "./lib/khatma";
@@ -121,6 +122,47 @@ export const findPerson = adminQuery({
 });
 
 /**
+ * Who an admin may hand ownership to: an active member of a pool khatma, or a
+ * live participant of a rota khatma who has an account (by `participantId`,
+ * since they may have no membership yet). No phone leaves here.
+ */
+async function handOverCandidates(
+  ctx: QueryCtx,
+  k: Doc<"khatmas">,
+  members: {
+    memberId: Id<"members">;
+    personId: Id<"people">;
+    displayName: string;
+    status: string;
+  }[],
+): Promise<
+  {
+    memberId?: Id<"members">;
+    participantId?: Id<"rotaParticipants">;
+    name: string;
+  }[]
+> {
+  if (k.kind !== "rota") {
+    return members
+      .filter((m) => m.status === "active" && m.personId !== k.creatorPersonId)
+      .map((m) => ({ memberId: m.memberId, name: m.displayName }));
+  }
+  const owner = await ctx.db.get(k.creatorPersonId);
+  const rows = await ctx.db
+    .query("rotaParticipants")
+    .withIndex("by_khatma", (q) => q.eq("khatmaId", k._id))
+    .collect();
+  const found = [];
+  for (const p of rows) {
+    if (p.removedAt !== null) continue;
+    if (p.personId === k.creatorPersonId || p.phone === owner?.phone) continue;
+    if (!(await personByPhone(ctx, p.phone))) continue;
+    found.push({ participantId: p._id, name: p.name });
+  }
+  return found;
+}
+
+/**
  * A khatma for an admin who's helping it: facts, members, and the round's
  * pool as counts. Never who holds which juz', and no paces (spec 8).
  */
@@ -184,6 +226,9 @@ export const khatma = adminQuery({
         ? { personId: organizer._id, displayName: organizer.displayName }
         : null,
       members,
+      coOrganizers: await coOrganizersOf(ctx, k),
+      coOrganizerCandidates: await openCandidates(ctx, k),
+      handOverCandidates: await handOverCandidates(ctx, k, members),
       round: pool,
       openHelpRequests: help.filter((r) => r.khatmaId === k._id).length,
     };

@@ -10,6 +10,7 @@ import { useId, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ConfirmSheet } from "../components/ConfirmSheet";
 import { DetailList } from "../components/DetailList";
+import { CoOrganizerSheet } from "../components/CoOrganizerSheet";
 import { KhatmaEditSheet } from "../components/KhatmaEditSheet";
 import { t } from "../i18n/ar";
 import { useAdminToken } from "../lib/adminSession";
@@ -18,6 +19,10 @@ import { formatReadingDays } from "../lib/formatReadingDays";
 import { opsError, withNote } from "../lib/opsError";
 
 type Sheet = "reset" | "handOver" | "edit" | "archive" | "restore" | "delete";
+
+/** The co-organizer sheet that is open: naming someone new, or one already named. */
+type CoOrganizerOp =
+  { op: "add" } | { op: "edit" | "remove"; coOrganizerId: Id<"coOrganizers"> };
 
 type MemberOp = {
   op: "removeMember" | "unblockMember";
@@ -37,10 +42,13 @@ export function KhatmaAdminPage() {
   const remove = useMutation(api.adminKhatmas.remove);
   const removeMember = useMutation(api.adminKhatmas.removeMember);
   const unblockMember = useMutation(api.adminKhatmas.unblockMember);
+  const setCoOrganizer = useMutation(api.adminKhatmas.setCoOrganizer);
+  const removeCoOrganizer = useMutation(api.adminKhatmas.removeCoOrganizer);
   const navigate = useNavigate();
   const pickId = useId();
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [memberOp, setMemberOp] = useState<MemberOp | null>(null);
+  const [coOp, setCoOp] = useState<CoOrganizerOp | null>(null);
   const [pick, setPick] = useState<string>("");
   const [message, setMessage] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -49,9 +57,11 @@ export function KhatmaAdminPage() {
   if (deleting || k === undefined) return null;
   if (k === null) return <p>{t.lookup.notFound}</p>;
 
-  const candidates = k.members.filter(
-    (m) => m.status === "active" && m.personId !== k.organizer?.personId,
-  );
+  const candidates = k.handOverCandidates;
+  const editing =
+    coOp && coOp.op !== "add"
+      ? k.coOrganizers.find((c) => c.coOrganizerId === coOp.coOrganizerId)
+      : undefined;
 
   const joinLink = k.rota?.joinLink;
 
@@ -67,6 +77,7 @@ export function KhatmaAdminPage() {
   async function run(call: () => Promise<object>) {
     setSheet(null);
     setMemberOp(null);
+    setCoOp(null);
     try {
       const res = await call();
       setMessage("error" in res ? opsError(String(res.error)) : t.ops.done);
@@ -258,6 +269,80 @@ export function KhatmaAdminPage() {
         </ul>
       </section>
 
+      <section>
+        <h2 className="mb-2 font-semibold">{t.coOrganizers.title}</h2>
+        {k.coOrganizers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t.coOrganizers.empty}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {k.coOrganizers.map((c) => {
+              const given = (["readings", "people", "settings"] as const)
+                .filter((key) => c[key])
+                .map((key) => t.coOrganizers[key]);
+              return (
+                <li
+                  key={c.coOrganizerId}
+                  className="flex flex-wrap items-center justify-between gap-x-3 text-sm"
+                >
+                  <span>
+                    {c.name}
+                    {c.pending && (
+                      <span className="text-muted-foreground">
+                        {" · "}
+                        {t.coOrganizers.pending}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t.coOrganizers.permissions(
+                      given.length > 0
+                        ? given.join("، ")
+                        : t.coOrganizers.noPermissions,
+                    )}
+                  </span>
+                  <span className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={t.coOrganizers.editOf(c.name)}
+                      onClick={() =>
+                        setCoOp({ op: "edit", coOrganizerId: c.coOrganizerId })
+                      }
+                    >
+                      {t.coOrganizers.edit}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={t.coOrganizers.removeOf(c.name)}
+                      onClick={() =>
+                        setCoOp({
+                          op: "remove",
+                          coOrganizerId: c.coOrganizerId,
+                        })
+                      }
+                    >
+                      {t.coOrganizers.remove}
+                    </Button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {k.coOrganizerCandidates.length > 0 && (
+          <Button
+            className="mt-2"
+            variant="outline"
+            onClick={() => setCoOp({ op: "add" })}
+          >
+            {t.coOrganizers.add}
+          </Button>
+        )}
+      </section>
+
       {message && <p role="status">{message}</p>}
       {!k.rota && !k.archived && (
         <Button variant="outline" onClick={() => setSheet("edit")}>
@@ -325,6 +410,72 @@ export function KhatmaAdminPage() {
           onClose={() => setSheet(null)}
         />
       )}
+      {coOp?.op === "add" && (
+        <CoOrganizerSheet
+          title={t.coOrganizers.add}
+          body={t.coOrganizers.addBody}
+          people={k.coOrganizerCandidates}
+          initial={{ readings: true, people: true, settings: true }}
+          onSave={({ candidateId, ...switches }, note) =>
+            void run(() =>
+              setCoOrganizer(
+                withNote(
+                  { adminToken, khatmaId, candidateId, ...switches },
+                  note,
+                ),
+              ),
+            )
+          }
+          onClose={() => setCoOp(null)}
+        />
+      )}
+      {coOp?.op === "edit" && editing && (
+        <CoOrganizerSheet
+          title={t.coOrganizers.editOf(editing.name)}
+          body={t.coOrganizers.editBody}
+          initial={editing}
+          onSave={({ readings, people, settings }, note) =>
+            void run(() =>
+              setCoOrganizer(
+                withNote(
+                  {
+                    adminToken,
+                    khatmaId,
+                    coOrganizerId: editing.coOrganizerId,
+                    readings,
+                    people,
+                    settings,
+                  },
+                  note,
+                ),
+              ),
+            )
+          }
+          onClose={() => setCoOp(null)}
+        />
+      )}
+      {coOp?.op === "remove" && (
+        <ConfirmSheet
+          title={t.coOrganizers.remove}
+          body={t.coOrganizers.removeBody}
+          confirmLabel={t.coOrganizers.remove}
+          onConfirm={(note) =>
+            void run(() =>
+              removeCoOrganizer(
+                withNote(
+                  {
+                    adminToken,
+                    khatmaId,
+                    coOrganizerId: coOp.coOrganizerId,
+                  },
+                  note,
+                ),
+              ),
+            )
+          }
+          onClose={() => setCoOp(null)}
+        />
+      )}
       {memberOp && (
         <ConfirmSheet
           title={t.ops[memberOp.op]}
@@ -364,7 +515,17 @@ export function KhatmaAdminPage() {
             void run(() =>
               handOver(
                 withNote(
-                  { adminToken, khatmaId, memberId: pick as Id<"members"> },
+                  {
+                    adminToken,
+                    khatmaId,
+                    ...(pick.startsWith("p:")
+                      ? {
+                          participantId: pick.slice(
+                            2,
+                          ) as Id<"rotaParticipants">,
+                        }
+                      : { memberId: pick.slice(2) as Id<"members"> }),
+                  },
                   note,
                 ),
               ),
@@ -382,11 +543,16 @@ export function KhatmaAdminPage() {
             className="mt-1 w-full rounded-lg border bg-card p-2"
           >
             <option value="" />
-            {candidates.map((m) => (
-              <option key={m.memberId} value={m.memberId}>
-                {m.displayName}
-              </option>
-            ))}
+            {candidates.map((c) => {
+              const value = c.participantId
+                ? `p:${c.participantId}`
+                : `m:${c.memberId}`;
+              return (
+                <option key={value} value={value}>
+                  {c.name}
+                </option>
+              );
+            })}
           </select>
         </ConfirmSheet>
       )}
