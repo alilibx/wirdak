@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { activeMembership } from "./khatmas";
 import { refreshPerson, refreshPhone } from "./lib/directory";
 import { notify } from "./notes";
 import { sessionMutation, sessionQuery } from "./lib/session";
@@ -318,28 +319,23 @@ export async function setCoOrganizer(
  * The old owner after a transfer: a co-organizer with every switch, past
  * `maxCoOrganizers` if need be (spec 4.5). Only someone still in the khatma
  * stays on: an active member, and in a rota khatma a live participant too. No
- * `coOrganizerNow` note: the transfer's own notes say what happened.
+ * `coOrganizerNow` note: the transfer's own notes say what happened. Whether
+ * they hold the role now.
  */
 export async function keepOldOwner(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
   person: Doc<"people">,
-): Promise<void> {
-  const membership = await ctx.db
-    .query("members")
-    .withIndex("by_khatma_person", (q) =>
-      q.eq("khatmaId", khatma._id).eq("personId", person._id),
-    )
-    .first();
-  if (membership?.status !== "active") return;
+): Promise<boolean> {
+  if (!(await activeMembership(ctx, khatma._id, person._id))) return false;
   if (
     khatma.kind === "rota" &&
     !(await liveParticipant(ctx, khatma._id, person.phone))
   ) {
-    return;
+    return false;
   }
   const rows = await rowsOf(ctx, khatma._id);
-  if (rows.some((r) => r.phone === person.phone)) return;
+  if (rows.some((r) => r.phone === person.phone)) return true;
   await ctx.db.insert("coOrganizers", {
     khatmaId: khatma._id,
     phone: person.phone,
@@ -348,6 +344,7 @@ export async function keepOldOwner(
     settings: true,
     addedAt: Date.now(),
   });
+  return true;
 }
 
 /** Takes the role away; the person stays in the khatma. The caller decides who may call. */

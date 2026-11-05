@@ -162,12 +162,38 @@ function homeCountry(organizer: Doc<"people"> | null) {
   return organizer ? phoneCountry(organizer.phone) : undefined;
 }
 
+/**
+ * Whether this participant is the khatma's owner: by account, or by the
+ * owner's number, since a participant added by phone has no `personId` (and
+ * ownership can move to one). Every "is this the owner?" test goes here.
+ */
+export function isOwnerRow(
+  p: Doc<"rotaParticipants">,
+  khatma: Doc<"khatmas">,
+  owner: Doc<"people"> | null,
+): boolean {
+  return (
+    p.personId === khatma.creatorPersonId ||
+    (owner !== null && p.phone === owner.phone)
+  );
+}
+
+/** `isOwnerRow`, reading the owner. */
+async function isOwnerParticipant(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  p: Doc<"rotaParticipants">,
+): Promise<boolean> {
+  return isOwnerRow(p, khatma, await ctx.db.get(khatma.creatorPersonId));
+}
+
 function personState(
   p: Doc<"rotaParticipants">,
   khatma: Doc<"khatmas">,
+  owner: Doc<"people"> | null,
 ): PersonState {
   return {
-    isOrganizer: p.personId === khatma.creatorPersonId,
+    isOrganizer: isOwnerRow(p, khatma, owner),
     phone: p.phoneHidden === true ? null : p.phone,
     joined: p.joinedAt != null,
     stopped: p.stoppedAt != null,
@@ -211,6 +237,7 @@ export async function people(
       .collect()
   ).sort((a, b) => a.createdAt - b.createdAt);
   const organizer = await ctx.db.get(savedOwner(khatma, actor));
+  const owner = await ctx.db.get(khatma.creatorPersonId);
   return {
     title: khatmaTitle(khatma),
     archived: isArchived(khatma),
@@ -239,7 +266,7 @@ export async function people(
               name: holder.name,
               isMe: isActor(holder, actor),
               slots: heldBy.get(holder._id)?.length ?? 0,
-              ...personState(holder, khatma),
+              ...personState(holder, khatma, owner),
             }
           : null,
       };
@@ -249,7 +276,7 @@ export async function people(
       name: p.name,
       isMe: isActor(p, actor),
       juz: heldBy.get(p._id) ?? [],
-      ...personState(p, khatma),
+      ...personState(p, khatma, owner),
     })),
     freeJuz: freeJuzOf(byJuz),
     maxSlots: await getSetting(ctx, "rotaMaxSlotsPerPerson"),
@@ -492,7 +519,7 @@ async function runsKhatma(
   khatma: Doc<"khatmas">,
   participant: Doc<"rotaParticipants">,
 ): Promise<boolean> {
-  if (participant.personId === khatma.creatorPersonId) return true;
+  if (await isOwnerParticipant(ctx, khatma, participant)) return true;
   const named = await ctx.db
     .query("coOrganizers")
     .withIndex("by_khatma_phone", (q) =>
@@ -612,7 +639,7 @@ export async function removeParticipant(
   if (!participant) return { error: "not_found" };
   const byOwner = caller === "admin" || caller.owner;
   // Not even an admin: a khatma keeps its organizer.
-  if (participant.personId === khatma.creatorPersonId) {
+  if (await isOwnerParticipant(ctx, khatma, participant)) {
     return { error: byOwner ? "is_me" : "is_organizer" };
   }
   if (!byOwner && (await runsKhatma(ctx, khatma, participant))) {

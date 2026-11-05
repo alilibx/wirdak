@@ -359,10 +359,32 @@ export async function handOverTo(
   });
   // After the patch, so a rota owner keeps the membership the role gave them.
   const owner = await ctx.db.get(member.personId);
-  if (owner) await endCoOrganizer(ctx, khatma._id, owner.phone);
+  if (owner) {
+    await endCoOrganizer(ctx, khatma._id, owner.phone);
+    if (khatma.kind === "rota") {
+      // A participant added by phone has no account on their row: the owner's
+      // own row must name them, or the owner checks miss them.
+      const row = await liveParticipant(ctx, khatma._id, owner.phone);
+      if (row && row.personId !== owner._id) {
+        await ctx.db.patch(row._id, { personId: owner._id });
+      }
+    }
+  }
   const oldOwner = await ctx.db.get(khatma.creatorPersonId);
-  if (oldOwner && (await getSetting(ctx, "oldOwnerStaysOn"))) {
-    await keepOldOwner(ctx, khatma, oldOwner);
+  if (oldOwner) {
+    const stays =
+      (await getSetting(ctx, "oldOwnerStaysOn")) &&
+      (await keepOldOwner(ctx, khatma, oldOwner));
+    if (!stays && khatma.kind === "rota") {
+      // A rota membership means owner or co-organizer, as `endCoOrganizer` keeps it.
+      const membership = await ctx.db
+        .query("members")
+        .withIndex("by_khatma_person", (q) =>
+          q.eq("khatmaId", khatma._id).eq("personId", oldOwner._id),
+        )
+        .first();
+      if (membership) await ctx.db.delete(membership._id);
+    }
   }
   await refreshPerson(ctx, khatma.creatorPersonId);
   await refreshPerson(ctx, member.personId);

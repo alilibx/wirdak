@@ -1005,6 +1005,111 @@ test("a rota khatma can be transferred to a participant with an account, not to 
   ]);
 });
 
+test("after a rota transfer to a participant added by phone, the owner checks find the new owner", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  const ali = await rotaPerson(t, "علي", "+971505550011");
+  // added by phone: the row names no account
+  const aliId = await addParticipant(
+    t,
+    code,
+    org,
+    "علي",
+    await phoneOf(t, ali),
+  );
+  expect((await t.run((ctx) => ctx.db.get(aliId)))?.personId).toBeNull();
+  expect(
+    await t.mutation(api.organizer.handOver, {
+      sessionToken: org.token,
+      inviteCode: code,
+      participantId: aliId,
+    }),
+  ).toEqual({ ok: true });
+  // the old owner stays on with every switch, People included
+  expect(await roleOf(t, khatma._id, org)).toEqual({ owner: false, ...ALL });
+
+  const aliRow = async () => {
+    const view = await t.query(api.rota.people, {
+      sessionToken: ali.token,
+      inviteCode: code,
+    });
+    return view!.participants.find((p) => p.id === aliId)!;
+  };
+  const guarded = async () => {
+    const row = await aliRow();
+    expect(row.isOrganizer).toBe(true);
+    expect(row.juz.length).toBeGreaterThan(0);
+    expect(
+      await t.mutation(api.rota.removeParticipant, {
+        sessionToken: org.token,
+        inviteCode: code,
+        participantId: aliId,
+      }),
+    ).toEqual({ error: "is_organizer" });
+    expect(
+      await t.mutation(api.rota.freeJuz, {
+        sessionToken: org.token,
+        inviteCode: code,
+        participantId: aliId,
+        juz: row.juz[0]!,
+      }),
+    ).toEqual({ error: "is_organizer" });
+    expect(
+      await t.mutation(api.rota.removeParticipant, {
+        sessionToken: ali.token,
+        inviteCode: code,
+        participantId: aliId,
+      }),
+    ).toEqual({ error: "is_me" });
+  };
+
+  // the transfer names the new owner on their row
+  expect((await t.run((ctx) => ctx.db.get(aliId)))?.personId).toBe(
+    ali.personId,
+  );
+  await guarded();
+  // and the checks match the owner's number even on a row without an account
+  await t.run((ctx) => ctx.db.patch(aliId, { personId: null }));
+  await guarded();
+});
+
+test("a rota old owner who doesn't stay on loses the membership the role gave", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  await setSetting(t, "oldOwnerStaysOn", false);
+  const ali = await rotaPerson(t, "علي", "+971505550011");
+  const aliId = await addParticipant(
+    t,
+    code,
+    org,
+    "علي",
+    await phoneOf(t, ali),
+  );
+  const mine = (who: Who) =>
+    t.query(api.khatmas.mine, { sessionToken: who.token });
+  expect((await mine(org)).map((k) => k.inviteCode)).toEqual([code]);
+
+  expect(
+    await t.mutation(api.organizer.handOver, {
+      sessionToken: org.token,
+      inviteCode: code,
+      participantId: aliId,
+    }),
+  ).toEqual({ ok: true });
+
+  expect(await coRows(t, khatma._id)).toEqual([]);
+  expect(await roleOf(t, khatma._id, org)).toBeNull();
+  const orgMembership = await t.run((ctx) =>
+    ctx.db
+      .query("members")
+      .withIndex("by_khatma_person", (q) =>
+        q.eq("khatmaId", khatma._id).eq("personId", org.personId),
+      )
+      .first(),
+  );
+  expect(orgMembership).toBeNull();
+  expect(await mine(org)).toEqual([]);
+  expect((await mine(ali)).map((k) => k.inviteCode)).toEqual([code]);
+});
+
 test("auto handover picks the longest-serving active co-organizer before the longest-standing member", async () => {
   const { t, org, code, khatma } = await setup();
   const early = await signedIn(t, "قديم");
