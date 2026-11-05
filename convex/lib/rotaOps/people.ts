@@ -115,6 +115,8 @@ type PersonState = {
   silenced: boolean;
   /** They run the khatma, so nobody can take them out of it. */
   isOrganizer: boolean;
+  /** The owner named them a co-organizer: only the owner can take them out. */
+  isCoOrganizer: boolean;
 };
 
 export type PeopleView = {
@@ -191,9 +193,12 @@ function personState(
   p: Doc<"rotaParticipants">,
   khatma: Doc<"khatmas">,
   owner: Doc<"people"> | null,
+  coOrganizerPhones: ReadonlySet<string>,
 ): PersonState {
+  const isOrganizer = isOwnerRow(p, khatma, owner);
   return {
-    isOrganizer: isOwnerRow(p, khatma, owner),
+    isOrganizer,
+    isCoOrganizer: !isOrganizer && coOrganizerPhones.has(p.phone),
     phone: p.phoneHidden === true ? null : p.phone,
     joined: p.joinedAt != null,
     stopped: p.stoppedAt != null,
@@ -238,6 +243,14 @@ export async function people(
   ).sort((a, b) => a.createdAt - b.createdAt);
   const organizer = await ctx.db.get(savedOwner(khatma, actor));
   const owner = await ctx.db.get(khatma.creatorPersonId);
+  const coOrganizerPhones = new Set(
+    (
+      await ctx.db
+        .query("coOrganizers")
+        .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
+        .collect()
+    ).map((row) => row.phone),
+  );
   return {
     title: khatmaTitle(khatma),
     archived: isArchived(khatma),
@@ -266,7 +279,7 @@ export async function people(
               name: holder.name,
               isMe: isActor(holder, actor),
               slots: heldBy.get(holder._id)?.length ?? 0,
-              ...personState(holder, khatma, owner),
+              ...personState(holder, khatma, owner, coOrganizerPhones),
             }
           : null,
       };
@@ -276,7 +289,7 @@ export async function people(
       name: p.name,
       isMe: isActor(p, actor),
       juz: heldBy.get(p._id) ?? [],
-      ...personState(p, khatma, owner),
+      ...personState(p, khatma, owner, coOrganizerPhones),
     })),
     freeJuz: freeJuzOf(byJuz),
     maxSlots: await getSetting(ctx, "rotaMaxSlotsPerPerson"),

@@ -225,6 +225,7 @@ test("settings lists names only, by join date", async () => {
   expect(s.archived).toBe(false);
   expect(Object.keys(s.members[0] ?? {}).sort()).toEqual([
     "displayName",
+    "isCoOrganizer",
     "isOrganizer",
     "memberId",
   ]);

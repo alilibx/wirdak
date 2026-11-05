@@ -1094,3 +1094,42 @@ test("a co-organizer's rename goes to their own saved list, not the owner's", as
   ).toEqual({ ok: true });
   expect(await savedBy(c.org)).toContain("سارة محمد");
 });
+
+test("the organizer pages mark who is a co-organizer, and Today carries its own times", async () => {
+  const pool = await poolWithCoOrganizer(ONLY("people"));
+  const shell = await pool.t.query(api.organizer.settings, {
+    sessionToken: pool.co.token,
+    inviteCode: pool.code,
+  });
+  if ("forbidden" in shell) throw new Error("forbidden");
+  expect(
+    shell.members.map((m) => [m.displayName, m.isOrganizer, m.isCoOrganizer]),
+  ).toEqual([
+    ["المنظم", true, false],
+    ["علي", false, true],
+    ["سارة", false, false],
+  ]);
+
+  const rota = await rotaWithCoOrganizer(ONLY("readings"));
+  const people = await rota.t.query(api.rota.people, rotaArgs(rota, rota.org));
+  expect(
+    people?.participants.map((p) => [p.name, p.isOrganizer, p.isCoOrganizer]),
+  ).toEqual([
+    ["المنظم", true, false],
+    ["علي", false, true],
+    ["سارة", false, false],
+  ]);
+  const held = people?.rows.find((r) => r.participant?.name === "علي");
+  expect(held?.participant?.isCoOrganizer).toBe(true);
+
+  // A co-organizer with only Readings has no settings, so Today says when the day starts.
+  expect(await rota.t.query(api.rota.settings, rotaArgs(rota, rota.co))).toBe(
+    null,
+  );
+  const today = await rota.t.query(api.rota.today, rotaArgs(rota, rota.co));
+  const khatma = await khatmaOf(rota.t, rota.code);
+  expect(today).toMatchObject({
+    dayAt: khatma.rota!.messages.dayAt,
+    timeZone: khatma.rota!.timeZone,
+  });
+});

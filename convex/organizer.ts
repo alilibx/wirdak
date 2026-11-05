@@ -56,6 +56,8 @@ export type OrganizerSettings = {
     memberId: Id<"members">;
     displayName: string;
     isOrganizer: boolean;
+    /** Named by the owner to help run the khatma. */
+    isCoOrganizer: boolean;
   }[];
   blocked: { memberId: Id<"members">; displayName: string }[];
   cheer: CheerSetting;
@@ -182,6 +184,14 @@ export const settings = sessionQuery({
 
     const members: OrganizerSettings["members"] = [];
     const blocked: OrganizerSettings["blocked"] = [];
+    const coOrganizerPhones = new Set(
+      (
+        await ctx.db
+          .query("coOrganizers")
+          .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
+          .collect()
+      ).map((row) => row.phone),
+    );
     for (const member of await membersByJoin(ctx, khatma._id)) {
       if (member.status === "former") continue;
       const person = await ctx.db.get(member.personId);
@@ -193,6 +203,9 @@ export const settings = sessionQuery({
           memberId: member._id,
           displayName: person.displayName,
           isOrganizer: member.personId === khatma.creatorPersonId,
+          isCoOrganizer:
+            member.personId !== khatma.creatorPersonId &&
+            coOrganizerPhones.has(person.phone),
         });
       }
     }
