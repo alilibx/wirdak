@@ -299,7 +299,13 @@ export const handOver = adminMutation({
   ): Promise<{ ok: true } | { error: "not_found" | "not_member" | "self" }> => {
     const khatma = await ctx.db.get(args.khatmaId);
     if (!khatma) return { error: "not_found" };
-    const member = await otherMember(ctx, khatma, args.memberId, "active");
+    const member = await otherMember(
+      ctx,
+      khatma,
+      args.memberId,
+      "active",
+      "admin",
+    );
     if (typeof member === "string") return { error: member };
     const previous = await ctx.db.get(khatma.creatorPersonId);
     await handOverTo(ctx, khatma, member, previous);

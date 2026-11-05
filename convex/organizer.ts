@@ -29,6 +29,7 @@ import type { SessionContext } from "./lib/session";
 import { sessionMutation, sessionQuery } from "./lib/session";
 import { getSetting } from "./lib/settings";
 import { cleanKhatmaName } from "./lib/text";
+import { endCoOrganizer } from "./coOrganizers";
 import { clearNotes, notify } from "./notes";
 import { heldAssignment, roundAssignments } from "./rounds";
 
@@ -105,7 +106,7 @@ function refuseArchived(khatma: Doc<"khatmas">): void {
  * `requireOrganizer` for a change to the khatma: `archived` once it is archived.
  * Reading it, archiving and deleting it use `requireOrganizer` instead.
  */
-async function requireLiveOrganizer(
+export async function requireLiveOrganizer(
   ctx: QueryCtx & SessionContext,
   inviteCode: string,
   need: Need = "owner",
@@ -366,18 +367,54 @@ export const resetInvite = action({
 // ---------------------------------------------------------------------------
 // Members
 
-/** A member of this khatma who is not the organizer, or the reason they aren't one. */
+/**
+ * A member of this khatma who is not the organizer, or the reason they aren't
+ * one. A `caller` who isn't the owner (a co-organizer) gets `is_organizer` for
+ * the owner and for every co-organizer: only the owner changes who else runs
+ * the khatma (spec 4.2). An admin passes `"admin"`.
+ */
 export async function otherMember(
   ctx: QueryCtx,
   khatma: Doc<"khatmas">,
   memberId: Id<"members">,
   status: Doc<"members">["status"],
-): Promise<Doc<"members"> | "self" | "not_member"> {
+  caller: { owner: true } | "admin",
+): Promise<Doc<"members"> | "self" | "not_member">;
+export async function otherMember(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  memberId: Id<"members">,
+  status: Doc<"members">["status"],
+  caller: OrganizerRole | "admin",
+): Promise<Doc<"members"> | "self" | "not_member" | "is_organizer">;
+export async function otherMember(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  memberId: Id<"members">,
+  status: Doc<"members">["status"],
+  caller: OrganizerRole | "admin",
+): Promise<Doc<"members"> | "self" | "not_member" | "is_organizer"> {
   const member = await ctx.db.get(memberId);
   if (!member || member.khatmaId !== khatma._id || member.status !== status) {
     return "not_member";
   }
-  return member.personId === khatma.creatorPersonId ? "self" : member;
+  const byOwner = caller === "admin" || caller.owner;
+  if (member.personId === khatma.creatorPersonId) {
+    return byOwner ? "self" : "is_organizer";
+  }
+  if (!byOwner) {
+    const person = await ctx.db.get(member.personId);
+    const named =
+      person &&
+      (await ctx.db
+        .query("coOrganizers")
+        .withIndex("by_khatma_phone", (q) =>
+          q.eq("khatmaId", khatma._id).eq("phone", person.phone),
+        )
+        .first());
+    if (named) return "is_organizer";
+  }
+  return member;
 }
 
 /**
@@ -391,16 +428,32 @@ export const removeMember = sessionMutation({
   handler: async (
     ctx,
     args,
-  ): Promise<{ ok: true } | { ok: false; reason: "self" | "not_member" }> => {
-    const { khatma } = await requireLiveOrganizer(ctx, args.inviteCode);
-    const member = await otherMember(ctx, khatma, args.memberId, "active");
+  ): Promise<
+    { ok: true } | { ok: false; reason: "self" | "not_member" | "is_organizer" }
+  > => {
+    // A rota khatma removes participants instead (`rota.removeParticipant`).
+    const { khatma, role } = await requirePoolOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    const member = await otherMember(
+      ctx,
+      khatma,
+      args.memberId,
+      "active",
+      role,
+    );
     if (typeof member === "string") return { ok: false, reason: member };
     await blockMember(ctx, khatma, member);
     return { ok: true };
   },
 });
 
-/** What removing a member does, for `removeMember` and the admin's own. */
+/**
+ * What removing a member does, for `removeMember` and the admin's own. A
+ * co-organizer's role ends with their place, and coming back doesn't restore it.
+ */
 export async function blockMember(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
@@ -411,6 +464,8 @@ export async function blockMember(
     shareToken: undefined,
   });
   await refreshPerson(ctx, member.personId);
+  const person = await ctx.db.get(member.personId);
+  if (person) await endCoOrganizer(ctx, khatma._id, person.phone);
 
   if (khatma.currentRoundId) {
     const held = heldAssignment(
@@ -475,7 +530,10 @@ export const handOver = sessionMutation({
     args,
   ): Promise<{ ok: true } | { ok: false; reason: "not_member" | "self" }> => {
     const { khatma } = await requirePoolOrganizer(ctx, args.inviteCode);
-    const member = await otherMember(ctx, khatma, args.memberId, "active");
+    // Only the owner gets here (the default need).
+    const member = await otherMember(ctx, khatma, args.memberId, "active", {
+      owner: true,
+    });
     if (typeof member === "string") return { ok: false, reason: member };
     // The organizer chose this, so they get no "moved" note.
     await handOverTo(ctx, khatma, member, null);

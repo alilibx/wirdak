@@ -168,7 +168,13 @@ export const removeMember = adminMutation({
   > => {
     const khatma = await livePool(ctx, args.khatmaId);
     if (typeof khatma === "string") return { error: khatma };
-    const member = await otherMember(ctx, khatma, args.memberId, "active");
+    const member = await otherMember(
+      ctx,
+      khatma,
+      args.memberId,
+      "active",
+      "admin",
+    );
     if (typeof member === "string") return { error: member };
     await blockMember(ctx, khatma, member);
     await writeAudit(ctx, {
@@ -200,7 +206,13 @@ export const unblockMember = adminMutation({
   > => {
     const khatma = await livePool(ctx, args.khatmaId);
     if (typeof khatma === "string") return { error: khatma };
-    const member = await otherMember(ctx, khatma, args.memberId, "blocked");
+    const member = await otherMember(
+      ctx,
+      khatma,
+      args.memberId,
+      "blocked",
+      "admin",
+    );
     if (typeof member === "string") return { error: member };
     await ctx.db.patch(member._id, { status: "former" });
     await writeAudit(ctx, {

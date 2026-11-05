@@ -14,6 +14,7 @@ import {
   resolveAdminSession,
   type AdminContext,
 } from "./lib/adminSession";
+import { linkCoOrganizerRoles } from "./coOrganizers";
 import { writeAudit } from "./lib/audit";
 import { isBlocked } from "./lib/blocked";
 import { cheerConfigValidator } from "./lib/cheer";
@@ -125,7 +126,10 @@ async function organizerFor(
     lastSeenAt: 0,
   });
   await refreshPhone(ctx, phone);
-  return (await ctx.db.get(personId))!;
+  const person = (await ctx.db.get(personId))!;
+  // A number named as a rota co-organizer before it had an account.
+  await linkCoOrganizerRoles(ctx, person);
+  return person;
 }
 
 /**
@@ -362,7 +366,7 @@ export const removeParticipant = adminMutation({
       ctx,
       args,
       "removeParticipant",
-      await ops.removeParticipant(ctx, khatma, rota, args),
+      await ops.removeParticipant(ctx, khatma, rota, args, "admin"),
     );
   },
 });

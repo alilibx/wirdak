@@ -25,6 +25,7 @@ import {
   shardedBucket,
   type RateLimitBucket,
 } from "./lib/rateLimit";
+import { linkCoOrganizerRoles } from "./coOrganizers";
 import { isBlocked } from "./lib/blocked";
 import { refreshPhone } from "./lib/directory";
 import { getSetting } from "./lib/settings";
@@ -186,6 +187,8 @@ async function insertPerson(
     lastSeenAt: Date.now(),
   });
   await refreshPhone(ctx, phone);
+  // A number named as a rota co-organizer before it had an account.
+  await linkCoOrganizerRoles(ctx, (await ctx.db.get(personId))!);
   return personId;
 }
 

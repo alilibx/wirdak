@@ -15,7 +15,9 @@ import {
   slotFor,
   type ReadingDaysKind,
 } from "../rota";
+import { endCoOrganizer } from "../../coOrganizers";
 import { refreshPhone } from "../directory";
+import type { OrganizerRole } from "../organizerAuth";
 import { isArchived } from "../khatma";
 import { khatmaJoinLink } from "../rotaJoin";
 import { slotRowsByJuz, targetDay, type RotaConfig } from "../rotaPlace";
@@ -525,21 +527,38 @@ export async function freeJuz(
   return { ok: true };
 }
 
+/**
+ * Takes someone out of the khatma: their slots go, and so does a co-organizer
+ * role (coming back doesn't restore it). A `caller` who isn't the owner (a
+ * co-organizer) gets `is_organizer` for the owner and for every co-organizer:
+ * only the owner changes who else runs the khatma. An admin passes `"admin"`.
+ */
 export async function removeParticipant(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
   _rota: RotaConfig,
   args: { participantId: Id<"rotaParticipants"> },
-): Promise<{ ok: true } | { error: "not_found" | "is_me" }> {
+  caller: OrganizerRole | "admin",
+): Promise<{ ok: true } | { error: "not_found" | "is_me" | "is_organizer" }> {
   const participant = await activeParticipant(
     ctx,
     khatma._id,
     args.participantId,
   );
   if (!participant) return { error: "not_found" };
+  const byOwner = caller === "admin" || caller.owner;
   // Not even an admin: a khatma keeps its organizer.
   if (participant.personId === khatma.creatorPersonId) {
-    return { error: "is_me" };
+    return { error: byOwner ? "is_me" : "is_organizer" };
+  }
+  if (!byOwner) {
+    const named = await ctx.db
+      .query("coOrganizers")
+      .withIndex("by_khatma_phone", (q) =>
+        q.eq("khatmaId", khatma._id).eq("phone", participant.phone),
+      )
+      .first();
+    if (named) return { error: "is_organizer" };
   }
   const slots = await ctx.db
     .query("rotaSlots")
@@ -548,6 +567,7 @@ export async function removeParticipant(
   for (const slot of slots) await ctx.db.delete(slot._id);
   // Today's reads keep their reader: only the slots go.
   await ctx.db.patch(participant._id, { removedAt: Date.now() });
+  await endCoOrganizer(ctx, khatma._id, participant.phone);
   await refreshPhone(ctx, participant.phone);
   return { ok: true };
 }

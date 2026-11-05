@@ -24,6 +24,7 @@ import {
   type ReadingDays,
   type RotaMessages,
 } from "./lib/rota";
+import type { Need, OrganizerRole } from "./lib/organizerAuth";
 import * as ops from "./lib/rotaOps";
 import { earliestFirstDate, type RotaConfig } from "./lib/rotaPlace";
 import type { SessionContext } from "./lib/session";
@@ -496,18 +497,24 @@ export async function ensureJoinCode(
 async function requireRotaOrganizer(
   ctx: MutationCtx & SessionContext,
   inviteCode: string,
+  need: Need = "owner",
 ): Promise<{
   person: Doc<"people">;
   khatma: Doc<"khatmas">;
   rota: RotaConfig;
+  role: OrganizerRole;
 }> {
-  const { person, khatma } = await requireOrganizer(ctx, inviteCode);
+  const { person, khatma, role } = await requireOrganizer(
+    ctx,
+    inviteCode,
+    need,
+  );
   const rota = khatma.rota;
   if (khatma.kind !== "rota" || !rota) {
     throw new ConvexError({ code: "forbidden" });
   }
   if (isArchived(khatma)) throw new ConvexError({ code: "archived" });
-  return { person, khatma, rota };
+  return { person, khatma, rota, role };
 }
 
 /** The organizer's rota khatma, to read: null for anyone else, and for a pool khatma. */
@@ -624,8 +631,12 @@ export const removeParticipant = sessionMutation({
     participantId: v.id("rotaParticipants"),
   },
   handler: async (ctx, args): ReturnType<typeof ops.removeParticipant> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
-    return ops.removeParticipant(ctx, khatma, rota, args);
+    const { khatma, rota, role } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    return ops.removeParticipant(ctx, khatma, rota, args, role);
   },
 });
 
