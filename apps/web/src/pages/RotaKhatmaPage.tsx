@@ -1,4 +1,5 @@
 import { api } from "@convex/_generated/api";
+import type { OrganizerAccess } from "@convex/lib/organizerAuth";
 import type { NoteView } from "@convex/notes";
 import { useMutation, useQuery } from "convex/react";
 import { useId, useState } from "react";
@@ -28,6 +29,13 @@ const TABS = [
   { id: "today", label: t.rota.tabs.today },
   { id: "people", label: t.rota.tabs.people },
 ] as const satisfies readonly { id: RotaTab; label: string }[];
+
+/** Whether this access opens the organizer's page: the owner, or a co-organizer with a switch on. */
+const runsKhatma = (
+  access: OrganizerAccess | null,
+): access is OrganizerAccess =>
+  access !== null &&
+  (access.owner || access.readings || access.people || access.settings);
 
 const pill =
   "inline-flex min-h-11 max-w-full items-center rounded-full border-2 border-green px-3.5 text-base font-semibold text-green";
@@ -136,12 +144,17 @@ function RotaNotes({ notes }: { notes: NoteView[] }) {
   );
 }
 
-/** A rotating khatma's page: the organizer's Today and People tabs, or the short WhatsApp page for anyone else. */
+/**
+ * A rotating khatma's page: the organizer's Today and People tabs, or the short WhatsApp page for
+ * anyone else. A co-organizer gets the tabs their switches open: Today with Readings, People with
+ * People, the settings link with Settings; with none on, the WhatsApp page like any member.
+ */
 export function RotaKhatmaPage({
   inviteCode,
   name,
   archived,
   joinLink,
+  access,
 }: {
   inviteCode: string;
   /** The khatma's name, which anyone can see. */
@@ -150,18 +163,34 @@ export function RotaKhatmaPage({
   archived: boolean;
   /** The wa.me link that joins the khatma, which anyone can use. */
   joinLink: string | null;
+  /** What the viewer may run here (from the khatma's view); null for anyone but an organizer. */
+  access: OrganizerAccess | null;
 }) {
   const sessionToken = useSessionToken();
   const [search, setSearch] = useSearchParams();
-  const tab: RotaTab = search.get("tab") === "people" ? "people" : "today";
   const ids = useId();
   const backend = useRotaBackend(inviteCode);
-  const today = useQuery(backend.today, backend.scope);
-  const settings = useQuery(backend.settings, today ? backend.scope : "skip");
+  const organizer = runsKhatma(access) ? access : null;
+  const today = useQuery(
+    backend.today,
+    organizer?.readings ? backend.scope : "skip",
+  );
+  const settings = useQuery(
+    backend.settings,
+    organizer?.settings ? backend.scope : "skip",
+  );
   const notes = useQuery(
     api.notes.forKhatma,
-    today ? { sessionToken, inviteCode } : "skip",
+    organizer ? { sessionToken, inviteCode } : "skip",
   );
+  const tabs = TABS.filter((item) =>
+    item.id === "today" ? organizer?.readings : organizer?.people,
+  );
+  const asked: RotaTab = search.get("tab") === "people" ? "people" : "today";
+  // A tab the viewer can't open falls back to the one they can.
+  const tab: RotaTab = tabs.some((item) => item.id === asked)
+    ? asked
+    : (tabs[0]?.id ?? "today");
   const mine = useQuery(api.khatmas.mine, { sessionToken });
   const me = useQuery(api.sessions.me, { sessionToken });
   const signIn = useSignInSheet();
@@ -180,13 +209,24 @@ export function RotaKhatmaPage({
       { replace: true },
     );
 
+  // Today and the settings know first; the khatma's own view says it for everyone else.
+  const isArchived = today?.archived ?? settings?.archived ?? archived;
+
   // Deleted from here: the queries are about to turn null, and this page must not show that.
   if (deleting) return <DeletingPage />;
-  if (today === undefined || (today !== null && settings === undefined)) {
+  if (
+    organizer &&
+    ((organizer.readings && today === undefined) ||
+      (organizer.settings && settings === undefined))
+  ) {
     return <Loading />;
   }
-  // Anyone but the organizer; also when the settings say so before today has caught up.
-  if (today === null || !settings) {
+  // Anyone but an organizer; also when a query refuses before the access has caught up.
+  if (
+    !organizer ||
+    (organizer.readings && !today) ||
+    (organizer.settings && !settings)
+  ) {
     // The sheet sits outside the page body so it survives the reload a new session token triggers.
     return (
       <>
@@ -228,15 +268,17 @@ export function RotaKhatmaPage({
         </header>
 
         <h1 className="min-w-0 font-display text-4xl leading-tight break-words text-green-deep">
-          {settings.name}
+          {settings?.name ?? name ?? t.app.name}
         </h1>
         <div className="mt-2 flex flex-wrap gap-2">
-          <Link
-            to={`/j/${encodeURIComponent(inviteCode)}/settings`}
-            className={pill}
-          >
-            {t.khatmaSettings.link}
-          </Link>
+          {organizer.settings && (
+            <Link
+              to={`/j/${encodeURIComponent(inviteCode)}/settings`}
+              className={pill}
+            >
+              {t.khatmaSettings.link}
+            </Link>
+          )}
           {mine !== undefined && canSwitch(mine, inviteCode) && (
             <button
               type="button"
@@ -248,28 +290,44 @@ export function RotaKhatmaPage({
           )}
         </div>
 
-        {today.archived && <ArchivedBanner />}
-        <KhatmaTabs tab={tab} onChange={setTab} idPrefix={ids} tabs={TABS} />
-        <section
-          role="tabpanel"
-          id={`${ids}-panel`}
-          aria-labelledby={`${ids}-tab-${tab}`}
-        >
-          {tab === "today" ? (
-            <>
-              <RotaNotes notes={notes ?? []} />
-              <TodayPanel
-                inviteCode={inviteCode}
-                view={today}
-                dayAt={settings.messages.dayAt}
-                timeZone={settings.timeZone}
-              />
-            </>
-          ) : (
-            <PeoplePanel inviteCode={inviteCode} archived={today.archived} />
-          )}
-        </section>
-        {today.archived && (
+        {isArchived && <ArchivedBanner />}
+        {tabs.length > 1 && (
+          <KhatmaTabs tab={tab} onChange={setTab} idPrefix={ids} tabs={tabs} />
+        )}
+        {tabs.length > 0 && (
+          <section
+            {...(tabs.length > 1
+              ? {
+                  role: "tabpanel",
+                  id: `${ids}-panel`,
+                  "aria-labelledby": `${ids}-tab-${tab}`,
+                }
+              : {})}
+          >
+            {tab === "today" && today ? (
+              <>
+                <RotaNotes notes={notes ?? []} />
+                <TodayPanel
+                  inviteCode={inviteCode}
+                  view={today}
+                  dayAt={today.dayAt}
+                  timeZone={today.timeZone}
+                />
+              </>
+            ) : (
+              <>
+                {/* Without Today, the notes their switches bring them sit here. */}
+                {!organizer.readings && <RotaNotes notes={notes ?? []} />}
+                <PeoplePanel
+                  inviteCode={inviteCode}
+                  archived={isArchived}
+                  viewerIsOwner={organizer.owner}
+                />
+              </>
+            )}
+          </section>
+        )}
+        {isArchived && organizer.owner && settings && (
           <ArchivedSection
             inviteCode={inviteCode}
             restart={{ days: settings.days, timeZone: settings.timeZone }}

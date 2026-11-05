@@ -33,6 +33,7 @@ const state = {
   stopped: false,
   silenced: false,
   isOrganizer: false,
+  isCoOrganizer: false,
 };
 const hidden = {
   id: "p1",
@@ -343,5 +344,136 @@ describe("PeoplePanel", () => {
     expect(
       within(other).getByRole("button", { name: t.rota.remove }),
     ).toBeInTheDocument();
+  });
+
+  describe("co-organizers", () => {
+    /** Saad owns the khatma, Muna helps run it, and Huda only reads. */
+    function runView() {
+      const view = makeView();
+      const owner = { ...hidden, isOrganizer: true };
+      const co = { ...shown, isCoOrganizer: true };
+      const huda = { ...shown, id: "p3", name: "هدى" };
+      view.rows[0] = { juz: 1, participant: { ...owner, slots: 1 } };
+      view.rows[1] = { juz: 2, participant: { ...co, slots: 1 } };
+      view.rows[2] = { juz: 3, participant: { ...huda, slots: 1 } };
+      view.participants = [
+        { ...owner, juz: [1] },
+        { ...co, juz: [2] },
+        { ...huda, juz: [3] },
+      ];
+      view.freeJuz = view.freeJuz.filter((j) => j !== 3);
+      return view;
+    }
+
+    it("labels a co-organizer «منظّم مساعد» in the list", () => {
+      m.view = runView();
+      render(<PeoplePanel inviteCode="CODE" archived={false} />);
+      expect(screen.getByRole("button", { name: /منى/ })).toHaveTextContent(
+        "منظّم مساعد",
+      );
+      expect(screen.getByRole("button", { name: /هدى/ })).not.toHaveTextContent(
+        "منظّم مساعد",
+      );
+      expect(screen.getByRole("button", { name: /سعد/ })).not.toHaveTextContent(
+        "منظّم مساعد",
+      );
+    });
+
+    it("a co-organizer with People sees no remove on the owner or another co-organizer", async () => {
+      m.view = runView();
+      const user = userEvent.setup();
+      render(
+        <PeoplePanel
+          inviteCode="CODE"
+          archived={false}
+          viewerIsOwner={false}
+        />,
+      );
+      for (const name of ["سعد", "منى"]) {
+        await user.click(
+          screen.getByRole("button", { name: new RegExp(name) }),
+        );
+        const sheet = screen.getByRole("dialog", { name });
+        expect(
+          within(sheet).queryByRole("button", { name: t.rota.remove }),
+        ).toBeNull();
+        await user.click(
+          within(sheet).getByRole("button", { name: t.sheet.close }),
+        );
+      }
+      await user.click(screen.getByRole("button", { name: /هدى/ }));
+      expect(
+        within(screen.getByRole("dialog", { name: "هدى" })).getByRole(
+          "button",
+          { name: t.rota.remove },
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("the owner can remove a co-organizer", async () => {
+      m.view = runView();
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} />);
+      await user.click(screen.getByRole("button", { name: /منى/ }));
+      expect(
+        within(screen.getByRole("dialog", { name: "منى" })).getByRole(
+          "button",
+          { name: t.rota.remove },
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("a co-organizer is not offered to stop reading their own ajza'", async () => {
+      const view = runView();
+      view.rows[1] = {
+        juz: 2,
+        participant: { ...shown, isCoOrganizer: true, isMe: true, slots: 1 },
+      };
+      view.participants[1] = {
+        ...shown,
+        isCoOrganizer: true,
+        isMe: true,
+        juz: [2],
+      };
+      m.view = view;
+      const user = userEvent.setup();
+      render(
+        <PeoplePanel
+          inviteCode="CODE"
+          archived={false}
+          viewerIsOwner={false}
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", { name: new RegExp(t.rota.me) }),
+      );
+      const sheet = screen.getByRole("dialog", { name: t.rota.me });
+      expect(
+        within(sheet).queryByRole("button", {
+          name: new RegExp(t.rota.stopReading),
+        }),
+      ).toBeNull();
+      expect(
+        within(sheet).queryByRole("button", { name: t.rota.remove }),
+      ).toBeNull();
+    });
+
+    it("says why a change to someone who runs the khatma was refused", async () => {
+      m.view = runView();
+      m.fns.moveJuz = vi.fn().mockResolvedValue({ error: "is_organizer" });
+      const user = userEvent.setup();
+      render(
+        <PeoplePanel
+          inviteCode="CODE"
+          archived={false}
+          viewerIsOwner={false}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: /منى/ }));
+      await user.click(screen.getByRole("button", { name: t.rota.move }));
+      expect(
+        await screen.findByText(t.rota.peopleErrors.is_organizer!),
+      ).toBeInTheDocument();
+    });
   });
 });
