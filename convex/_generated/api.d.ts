@@ -59,6 +59,7 @@ import type * as lib_rotaOps from "../lib/rotaOps.js";
 import type * as lib_rotaOps_people from "../lib/rotaOps/people.js";
 import type * as lib_rotaOps_settings from "../lib/rotaOps/settings.js";
 import type * as lib_rotaOps_today from "../lib/rotaOps/today.js";
+import type * as lib_rotaOwner from "../lib/rotaOwner.js";
 import type * as lib_rotaPayload from "../lib/rotaPayload.js";
 import type * as lib_rotaPlace from "../lib/rotaPlace.js";
 import type * as lib_rotaReplies from "../lib/rotaReplies.js";
@@ -151,6 +152,7 @@ declare const fullApi: ApiFromModules<{
   "lib/rotaOps/people": typeof lib_rotaOps_people;
   "lib/rotaOps/settings": typeof lib_rotaOps_settings;
   "lib/rotaOps/today": typeof lib_rotaOps_today;
+  "lib/rotaOwner": typeof lib_rotaOwner;
   "lib/rotaPayload": typeof lib_rotaPayload;
   "lib/rotaPlace": typeof lib_rotaPlace;
   "lib/rotaReplies": typeof lib_rotaReplies;

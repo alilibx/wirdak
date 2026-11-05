@@ -19,6 +19,7 @@ import { endCoOrganizer, hasAccount, personByPhone } from "../../coOrganizers";
 import { refreshPhone } from "../directory";
 import { allows, roleIn, type OrganizerRole } from "../organizerAuth";
 import { isArchived } from "../khatma";
+import { isOwnerRow } from "../rotaOwner";
 import { khatmaJoinLink } from "../rotaJoin";
 import { slotRowsByJuz, targetDay, type RotaConfig } from "../rotaPlace";
 import { NEW_MEMBER_NAME } from "../rotaTemplates";
@@ -165,22 +166,6 @@ export type PeopleView = {
 /** A number typed without a country code is one from the organizer's country. */
 function homeCountry(organizer: Doc<"people"> | null) {
   return organizer ? phoneCountry(organizer.phone) : undefined;
-}
-
-/**
- * Whether this participant is the khatma's owner: by account, or by the
- * owner's number, since a participant added by phone has no `personId` (and
- * ownership can move to one). Every "is this the owner?" test goes here.
- */
-export function isOwnerRow(
-  p: Doc<"rotaParticipants">,
-  khatma: Doc<"khatmas">,
-  owner: Doc<"people"> | null,
-): boolean {
-  return (
-    p.personId === khatma.creatorPersonId ||
-    (owner !== null && p.phone === owner.phone)
-  );
 }
 
 /** `isOwnerRow`, reading the owner. */

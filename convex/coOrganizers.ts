@@ -3,6 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeMembership } from "./khatmas";
 import { refreshPerson, refreshPhone } from "./lib/directory";
+import { isOwnerRow } from "./lib/rotaOwner";
 import { notify } from "./notes";
 import { sessionMutation, sessionQuery } from "./lib/session";
 import { getSetting } from "./lib/settings";
@@ -99,9 +100,7 @@ async function candidatesOf(
       .collect();
     for (const p of participants) {
       if (p.removedAt !== null) continue;
-      if (p.personId === khatma.creatorPersonId || p.phone === owner?.phone) {
-        continue;
-      }
+      if (isOwnerRow(p, khatma, owner)) continue;
       found.push({ candidateId: `p:${p._id}`, name: p.name, phone: p.phone });
     }
   } else {
@@ -232,12 +231,7 @@ async function candidatePhone(
     }
     if (participant.removedAt !== null) return "not_member";
     const owner = await ctx.db.get(khatma.creatorPersonId);
-    if (
-      participant.personId === khatma.creatorPersonId ||
-      participant.phone === owner?.phone
-    ) {
-      return "self";
-    }
+    if (isOwnerRow(participant, khatma, owner)) return "self";
     return participant.phone;
   }
   return "not_member";

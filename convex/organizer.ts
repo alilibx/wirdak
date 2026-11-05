@@ -29,6 +29,7 @@ import { isArchived, khatmaByInviteCode } from "./lib/khatma";
 import { scheduleValidator, type Schedule } from "./lib/schedule";
 import type { SessionContext } from "./lib/session";
 import { sessionMutation, sessionQuery } from "./lib/session";
+import { isOwnerRow } from "./lib/rotaOwner";
 import { getSetting } from "./lib/settings";
 import { cleanKhatmaName } from "./lib/text";
 import {
@@ -478,12 +479,7 @@ export async function transferTarget(
     return "not_member";
   }
   const owner = await ctx.db.get(khatma.creatorPersonId);
-  if (
-    participant.personId === khatma.creatorPersonId ||
-    participant.phone === owner?.phone
-  ) {
-    return "self";
-  }
+  if (isOwnerRow(participant, khatma, owner)) return "self";
   const person = await accountByPhone(ctx, participant.phone);
   if (!person) return "no_account";
   await ensureRotaMembership(ctx, khatma, person);
