@@ -201,6 +201,15 @@ const PURGE_STAGES: Purge[] = [
       .query("rotaJoinRequests")
       .withIndex("by_khatma_open", (q) => q.eq("khatmaId", khatmaId))
       .take(PURGE_BATCH),
+  // A co-organizer's number, hidden ones too, goes with the khatma. Only the
+  // `_id`: a role is no reading, so no phone needs refreshing.
+  async (ctx, khatmaId) =>
+    (
+      await ctx.db
+        .query("coOrganizers")
+        .withIndex("by_khatma", (q) => q.eq("khatmaId", khatmaId))
+        .take(PURGE_BATCH)
+    ).map((row) => ({ _id: row._id })),
 ];
 
 /**
