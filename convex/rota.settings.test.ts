@@ -199,6 +199,7 @@ test("settings shows the organizer everything, and nothing to anyone else", asyn
       },
     },
     archived: false,
+    access: { owner: true, readings: true, people: true, settings: true },
   });
 
   const stranger = await person(t);

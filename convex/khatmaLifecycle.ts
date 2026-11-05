@@ -99,7 +99,8 @@ export async function restoreKhatma(
 export const archive = sessionMutation({
   args: { inviteCode: v.string() },
   handler: async (ctx, args): Promise<{ ok: true }> => {
-    const { khatma } = await requireOrganizer(ctx, args.inviteCode);
+    // The owner alone (spec 4.4).
+    const { khatma } = await requireOrganizer(ctx, args.inviteCode, "owner");
     await archiveKhatma(ctx, khatma);
     return { ok: true };
   },
@@ -137,7 +138,8 @@ export const remove = sessionMutation({
     ctx,
     args,
   ): Promise<{ ok: true } | { error: "not_archived" }> => {
-    const { khatma } = await requireOrganizer(ctx, args.inviteCode);
+    // The owner alone (spec 4.4).
+    const { khatma } = await requireOrganizer(ctx, args.inviteCode, "owner");
     if (!isArchived(khatma)) return { error: "not_archived" };
     await deleteKhatma(ctx, khatma);
     return { ok: true };

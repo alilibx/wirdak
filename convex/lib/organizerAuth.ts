@@ -59,3 +59,31 @@ export function allows(role: OrganizerRole | null, need: Need): boolean {
   if (role.owner) return true;
   return need === "owner" ? false : role[need];
 }
+
+/** What a role may do, for the pages to hide controls; the server still checks every call. */
+export type OrganizerAccess = {
+  owner: boolean;
+  readings: boolean;
+  people: boolean;
+  settings: boolean;
+};
+
+/** The owner's access, and an admin's: everything. */
+export const OWNER_ACCESS: Readonly<OrganizerAccess> = {
+  owner: true,
+  readings: true,
+  people: true,
+  settings: true,
+};
+
+/** `role` as the pages read it: the owner has every switch; no role is `null`. */
+export function accessOf(role: OrganizerRole | null): OrganizerAccess | null {
+  if (!role) return null;
+  if (role.owner) return { ...OWNER_ACCESS };
+  return {
+    owner: false,
+    readings: role.readings,
+    people: role.people,
+    settings: role.settings,
+  };
+}

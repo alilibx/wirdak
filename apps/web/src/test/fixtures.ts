@@ -22,6 +22,7 @@ export function makeView(overrides: Partial<KhatmaView> = {}): KhatmaView {
     schedule: "weekly",
     grace: { value: 2, unit: "days" },
     isOrganizer: false,
+    organizerAccess: null,
     roundNumber: 12,
     targetEndAt: null,
     completedRounds: 0,

@@ -21,6 +21,7 @@ import { cheerConfigValidator } from "./lib/cheer";
 import { randomToken } from "./lib/crypto";
 import { refreshPhone } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
+import { OWNER_ACCESS, type OrganizerAccess } from "./lib/organizerAuth";
 import { readingDaysValidator, rotaMessagesValidator } from "./lib/rota";
 import { randomJoinCode } from "./lib/rotaJoin";
 import * as ops from "./lib/rotaOps";
@@ -268,7 +269,7 @@ export const addParticipant = adminMutation({
       ctx,
       args,
       "addParticipant",
-      await ops.addParticipant(ctx, khatma, rota, args),
+      await ops.addParticipant(ctx, khatma, rota, args, ADMIN),
     );
   },
 });
@@ -378,7 +379,7 @@ export const saved = adminQuery({
   args: { khatmaId: v.id("khatmas") },
   handler: async (ctx, args): Promise<ops.SavedContact[] | null> => {
     const found = await rotaKhatma(ctx, args.khatmaId);
-    return found && ops.saved(ctx, found.khatma);
+    return found && ops.saved(ctx, found.khatma, ADMIN);
   },
 });
 
@@ -395,7 +396,7 @@ export const addSaved = adminMutation({
       ctx,
       args,
       "addSaved",
-      await ops.addSaved(ctx, khatma, rota, args),
+      await ops.addSaved(ctx, khatma, rota, args, ADMIN),
     );
   },
 });
@@ -424,7 +425,7 @@ export const acceptJoinRequest = adminMutation({
   },
   handler: async (ctx, args): ReturnType<typeof ops.acceptJoinRequest> => {
     const { khatma, rota } = await requireLiveRota(ctx, args.khatmaId);
-    const result = await ops.acceptJoinRequest(ctx, khatma, rota, args);
+    const result = await ops.acceptJoinRequest(ctx, khatma, rota, args, ADMIN);
     // A number added meanwhile is an error to the caller, yet the request was
     // closed and the person welcomed: that is a change to record.
     if ("error" in result && result.error === "already_added") {
@@ -509,11 +510,19 @@ export const markNotDone = adminMutation({
 // ---------------------------------------------------------------------------
 // Settings
 
+/** The same view as the organizer's; an admin can do everything (`access` is the owner's). */
 export const settings = adminQuery({
   args: { khatmaId: v.id("khatmas") },
-  handler: async (ctx, args): Promise<ops.SettingsView | null> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<(ops.SettingsView & { access: OrganizerAccess }) | null> => {
     const found = await rotaKhatma(ctx, args.khatmaId);
-    return found && ops.settings(ctx, found.khatma, found.rota);
+    if (!found) return null;
+    return {
+      ...(await ops.settings(ctx, found.khatma, found.rota)),
+      access: { ...OWNER_ACCESS },
+    };
   },
 });
 

@@ -17,9 +17,11 @@ import {
 import { randomToken } from "./lib/crypto";
 import { nameFields, refreshPerson } from "./lib/directory";
 import {
+  accessOf,
   allows,
   roleIn,
   type Need,
+  type OrganizerAccess,
   type OrganizerRole,
 } from "./lib/organizerAuth";
 import { graceValidator, isValidGrace, type Grace } from "./lib/grace";
@@ -52,6 +54,8 @@ export type OrganizerSettings = {
   cheer: CheerSetting;
   /** An archived khatma can only be read, and deleted. */
   archived: boolean;
+  /** What the caller may do here, so the page shows only those controls. */
+  access: OrganizerAccess;
 };
 
 // ---------------------------------------------------------------------------
@@ -150,7 +154,8 @@ export async function membersByJoin(
 
 /**
  * What the organizer's settings sheet shows: names, never numbers (spec 6.1).
- * No phone, pace, or reading data leaves this query.
+ * No phone, pace, or reading data leaves this query. The owner and every
+ * co-organizer get it, with `access` saying which controls are theirs.
  */
 export const settings = sessionQuery({
   args: { inviteCode: v.string() },
@@ -158,9 +163,11 @@ export const settings = sessionQuery({
     ctx,
     args,
   ): Promise<OrganizerSettings | { forbidden: true }> => {
-    const found = await organizerOf(ctx, args.inviteCode, ctx.person);
-    if (!found) return { forbidden: true };
-    const { khatma } = found;
+    const khatma = ctx.person
+      ? await khatmaByInviteCode(ctx, args.inviteCode)
+      : null;
+    const access = khatma && accessOf(await roleIn(ctx, khatma, ctx.person));
+    if (!khatma || !access) return { forbidden: true };
 
     const members: OrganizerSettings["members"] = [];
     const blocked: OrganizerSettings["blocked"] = [];
@@ -187,6 +194,7 @@ export const settings = sessionQuery({
       blocked,
       cheer: await cheerSetting(ctx, khatma),
       archived: isArchived(khatma),
+      access,
     };
   },
 });
@@ -211,7 +219,11 @@ export const update = sessionMutation({
   ): Promise<
     { ok: true } | { ok: false; reason: "invalid_grace" | "invalid_cheer" }
   > => {
-    const { khatma } = await requirePoolOrganizer(ctx, args.inviteCode);
+    const { khatma } = await requirePoolOrganizer(
+      ctx,
+      args.inviteCode,
+      "settings",
+    );
     if (args.grace && !isValidGrace(args.grace)) {
       return { ok: false, reason: "invalid_grace" };
     }
@@ -238,7 +250,7 @@ export const activeMemberCount = internalQuery({
   args: { personId: v.id("people"), inviteCode: v.string() },
   handler: async (ctx, args): Promise<number> => {
     const person = await ctx.db.get(args.personId);
-    const found = await organizerOf(ctx, args.inviteCode, person);
+    const found = await organizerOf(ctx, args.inviteCode, person, "people");
     if (!found || found.khatma.kind === "rota") {
       throw new ConvexError({ code: "forbidden" });
     }
@@ -264,7 +276,7 @@ export const applyInviteReset = internalMutation({
   },
   handler: async (ctx, args): Promise<{ inviteCode: string } | null> => {
     const person = await ctx.db.get(args.personId);
-    const found = await organizerOf(ctx, args.inviteCode, person);
+    const found = await organizerOf(ctx, args.inviteCode, person, "people");
     if (!found || found.khatma.kind === "rota") {
       throw new ConvexError({ code: "forbidden" });
     }
@@ -506,7 +518,11 @@ async function clearPersonNotes(
 export const unblock = sessionMutation({
   args: { inviteCode: v.string(), memberId: v.id("members") },
   handler: async (ctx, args): Promise<{ ok: boolean }> => {
-    const { khatma } = await requireLiveOrganizer(ctx, args.inviteCode);
+    const { khatma } = await requireLiveOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
     const member = await ctx.db.get(args.memberId);
     if (
       !member ||
@@ -529,8 +545,12 @@ export const handOver = sessionMutation({
     ctx,
     args,
   ): Promise<{ ok: true } | { ok: false; reason: "not_member" | "self" }> => {
-    const { khatma } = await requirePoolOrganizer(ctx, args.inviteCode);
-    // Only the owner gets here (the default need).
+    const { khatma } = await requirePoolOrganizer(
+      ctx,
+      args.inviteCode,
+      "owner",
+    );
+    // Only the owner gets here.
     const member = await otherMember(ctx, khatma, args.memberId, "active", {
       owner: true,
     });

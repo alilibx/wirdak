@@ -17,7 +17,7 @@ import {
 } from "../rota";
 import { endCoOrganizer } from "../../coOrganizers";
 import { refreshPhone } from "../directory";
-import type { OrganizerRole } from "../organizerAuth";
+import { allows, roleIn, type OrganizerRole } from "../organizerAuth";
 import { isArchived } from "../khatma";
 import { khatmaJoinLink } from "../rotaJoin";
 import { slotRowsByJuz, targetDay, type RotaConfig } from "../rotaPlace";
@@ -38,6 +38,15 @@ const LATE_ADD_FROM = 18 * 60;
 
 /** Whoever is running the khatma. An admin helping out has no `personId`: nobody is "me" to them. */
 export type Actor = { personId: Id<"people"> | null };
+
+/**
+ * Whose saved list (and home country) a call works with: the caller's own, so
+ * a co-organizer saves to and picks from their own list and one person's
+ * contacts never reach another (spec 4.3). An admin has none: the owner's.
+ */
+export function savedOwner(khatma: Doc<"khatmas">, actor: Actor): Id<"people"> {
+  return actor.personId ?? khatma.creatorPersonId;
+}
 
 /** Whether this participant is the actor themselves. */
 export function isActor(
@@ -201,7 +210,7 @@ export async function people(
       )
       .collect()
   ).sort((a, b) => a.createdAt - b.createdAt);
-  const organizer = await ctx.db.get(khatma.creatorPersonId);
+  const organizer = await ctx.db.get(savedOwner(khatma, actor));
   return {
     title: khatmaTitle(khatma),
     archived: isArchived(khatma),
@@ -336,6 +345,7 @@ export async function addParticipant(
   khatma: Doc<"khatmas">,
   _rota: RotaConfig,
   args: { name: string; phone: string; juz?: number; readsToday?: boolean },
+  actor: Actor,
 ): Promise<
   | { ok: true; participantId: Id<"rotaParticipants">; juz: number }
   | {
@@ -350,7 +360,7 @@ export async function addParticipant(
 > {
   const name = cleanDisplayName(args.name);
   if (name === null) return { error: "bad_name" };
-  const organizer = await ctx.db.get(khatma.creatorPersonId);
+  const organizer = await ctx.db.get(savedOwner(khatma, actor));
   const phone = normalizePhone(args.phone, homeCountry(organizer));
   if (phone === null) return { error: "bad_phone" };
   const same = await ctx.db
@@ -718,15 +728,17 @@ export async function activeIdentities(
   };
 }
 
-/** The organizer's saved participants, by name, and which are in this khatma already. */
+/** The caller's saved participants, by name, and which are in this khatma already. */
 export async function saved(
   ctx: QueryCtx,
   khatma: Doc<"khatmas">,
+  actor: Actor,
 ): Promise<SavedContact[]> {
   const { phones, personIds } = await activeIdentities(ctx, khatma._id);
+  const owner = savedOwner(khatma, actor);
   const contacts = await ctx.db
     .query("rotaContacts")
-    .withIndex("by_owner", (q) => q.eq("ownerPersonId", khatma.creatorPersonId))
+    .withIndex("by_owner", (q) => q.eq("ownerPersonId", owner))
     .collect();
   return contacts
     .filter((c) => c.removedAt === undefined)
@@ -747,6 +759,7 @@ export async function addSaved(
   khatma: Doc<"khatmas">,
   _rota: RotaConfig,
   args: { contactId: Id<"rotaContacts">; juz?: number; readsToday?: boolean },
+  actor: Actor,
 ): Promise<
   | { ok: true; participantId: Id<"rotaParticipants">; juz: number }
   | {
@@ -761,7 +774,7 @@ export async function addSaved(
   const contact = await ctx.db.get(args.contactId);
   if (
     !contact ||
-    contact.ownerPersonId !== khatma.creatorPersonId ||
+    contact.ownerPersonId !== savedOwner(khatma, actor) ||
     contact.removedAt !== undefined
   ) {
     return { error: "not_found" };
@@ -805,7 +818,7 @@ export async function addSaved(
  * Whether this person's number stays hidden from the organizer: they came in
  * from a pool khatma (their saved contact has no number, even one the organizer
  * removed from their list: that row is kept for this), or are in a pool khatma
- * the organizer runs.
+ * the organizer runs, as its owner or as a co-organizer with People.
  */
 async function numberHiddenFrom(
   ctx: QueryCtx,
@@ -824,12 +837,13 @@ async function numberHiddenFrom(
     .query("members")
     .withIndex("by_person", (q) => q.eq("personId", personId))
     .collect();
+  const organizer = await ctx.db.get(organizerId);
   for (const membership of memberships) {
     if (membership.status !== "active") continue;
     const khatma = await ctx.db.get(membership.khatmaId);
-    if (khatma?.kind !== "rota" && khatma?.creatorPersonId === organizerId) {
-      return true;
-    }
+    if (!khatma || khatma.kind === "rota") continue;
+    if (khatma.creatorPersonId === organizerId) return true;
+    if (allows(await roleIn(ctx, khatma, organizer), "people")) return true;
   }
   return false;
 }
@@ -904,6 +918,7 @@ export async function acceptJoinRequest(
     name?: string;
     readsToday?: boolean;
   },
+  actor: Actor,
 ): Promise<
   | { ok: true; participantId: Id<"rotaParticipants"> }
   | {
@@ -967,9 +982,14 @@ export async function acceptJoinRequest(
     .withIndex("by_phone", (q) => q.eq("phone", request.phone))
     .first();
   const personId = person?._id ?? null;
+  // Everyone with People sees the row's number, so it stays hidden when it is
+  // hidden from the owner or from whoever accepts.
+  const accepter = savedOwner(khatma, actor);
   const phoneHidden =
     personId !== null &&
-    (await numberHiddenFrom(ctx, khatma.creatorPersonId, personId));
+    ((await numberHiddenFrom(ctx, khatma.creatorPersonId, personId)) ||
+      (accepter !== khatma.creatorPersonId &&
+        (await numberHiddenFrom(ctx, accepter, personId))));
   const name =
     chosenName ??
     cleanDisplayName(request.profileName ?? "") ??
@@ -986,7 +1006,7 @@ export async function acceptJoinRequest(
     // `juz` was given, so a juz' is always chosen.
     return { error: placed.error === "ask_today" ? "ask_today" : "juz_taken" };
   }
-  const organizer = await ctx.db.get(khatma.creatorPersonId);
+  const organizer = await ctx.db.get(accepter);
   if (organizer) {
     await saveContact(ctx, organizer, {
       name,
