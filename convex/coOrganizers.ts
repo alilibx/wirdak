@@ -42,7 +42,7 @@ async function rowsOf(
     .collect();
 }
 
-async function personByPhone(
+export async function personByPhone(
   ctx: QueryCtx,
   phone: string,
 ): Promise<Doc<"people"> | null> {
@@ -52,7 +52,7 @@ async function personByPhone(
     .first();
 }
 
-async function liveParticipant(
+export async function liveParticipant(
   ctx: QueryCtx,
   khatmaId: Id<"khatmas">,
   phone: string,
@@ -207,7 +207,7 @@ async function candidatePhone(
  * notifications on, so the khatma is on their home list and push reaches
  * them. Rota participants have none otherwise. A pool co-organizer is a member already.
  */
-async function ensureRotaMembership(
+export async function ensureRotaMembership(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
   person: Doc<"people">,
@@ -312,6 +312,42 @@ export async function setCoOrganizer(
     await tellNamed(ctx, khatma, person);
   }
   return { ok: true };
+}
+
+/**
+ * The old owner after a transfer: a co-organizer with every switch, past
+ * `maxCoOrganizers` if need be (spec 4.5). Only someone still in the khatma
+ * stays on: an active member, and in a rota khatma a live participant too. No
+ * `coOrganizerNow` note: the transfer's own notes say what happened.
+ */
+export async function keepOldOwner(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  person: Doc<"people">,
+): Promise<void> {
+  const membership = await ctx.db
+    .query("members")
+    .withIndex("by_khatma_person", (q) =>
+      q.eq("khatmaId", khatma._id).eq("personId", person._id),
+    )
+    .first();
+  if (membership?.status !== "active") return;
+  if (
+    khatma.kind === "rota" &&
+    !(await liveParticipant(ctx, khatma._id, person.phone))
+  ) {
+    return;
+  }
+  const rows = await rowsOf(ctx, khatma._id);
+  if (rows.some((r) => r.phone === person.phone)) return;
+  await ctx.db.insert("coOrganizers", {
+    khatmaId: khatma._id,
+    phone: person.phone,
+    readings: true,
+    people: true,
+    settings: true,
+    addedAt: Date.now(),
+  });
 }
 
 /** Takes the role away; the person stays in the khatma. The caller decides who may call. */

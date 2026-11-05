@@ -419,6 +419,205 @@ test("an admin moves an archived khatma quietly, with the usual audit row", asyn
   });
 });
 
+test("an admin hand over keeps the co-organizer bookkeeping", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  const ali = await person(t, "+971500000001", "علي");
+  const sara = await person(t, "+971500000002", "سارة");
+  const { khatmaId, memberIds } = await khatma(t, ali, [sara]);
+  await t.run((ctx) =>
+    ctx.db.insert("coOrganizers", {
+      khatmaId,
+      phone: "+971500000002",
+      readings: true,
+      people: false,
+      settings: false,
+      addedAt: NOW,
+    }),
+  );
+
+  expect(
+    await t.mutation(api.adminOps.handOver, {
+      adminToken: "admin",
+      khatmaId,
+      memberId: memberIds[1]!,
+    }),
+  ).toEqual({ ok: true });
+
+  const rows = await t.run((ctx) => ctx.db.query("coOrganizers").collect());
+  expect(rows).toMatchObject([
+    { phone: "+971500000001", readings: true, people: true, settings: true },
+  ]);
+  expect((await audit(t)).at(-1)).toMatchObject({
+    action: "khatma.handOver",
+    before: ali,
+    after: sara,
+  });
+});
+
+test("an admin hands a rota khatma only to a co-organizer or participant with an account", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  const ali = await person(t, "+971500000001", "علي");
+  const sara = await person(t, "+971500000002", "سارة");
+  const stranger = await person(t, "+971500000003", "غريب");
+  const ids = await t.run(async (ctx) => {
+    const khatmaId = await ctx.db.insert("khatmas", {
+      name: "ختمة التناوب",
+      schedule: "none",
+      grace: { value: 7, unit: "days" },
+      creatorPersonId: ali,
+      inviteCode: "rotaKhatma1",
+      completedRounds: 0,
+      createdAt: 0,
+      kind: "rota",
+    });
+    const participant = (phone: string, personId: Id<"people"> | null) =>
+      ctx.db.insert("rotaParticipants", {
+        khatmaId,
+        name: phone,
+        phone,
+        personId,
+        addedAt: 0,
+        removedAt: null,
+      });
+    const member = (personId: Id<"people">) =>
+      ctx.db.insert("members", {
+        khatmaId,
+        personId,
+        joinedAt: 0,
+        status: "active",
+        notificationsOn: true,
+        lastNudgeAt: null,
+        lastCelebratedRound: 0,
+      });
+    await participant("+971500000001", ali);
+    await member(ali);
+    return {
+      khatmaId,
+      saraParticipant: await participant("+971500000002", null),
+      pendingParticipant: await participant("+971505550001", null),
+      strangerMember: await member(stranger),
+    };
+  });
+  const handOver = (target: {
+    memberId?: Id<"members">;
+    participantId?: Id<"rotaParticipants">;
+  }) =>
+    t.mutation(api.adminOps.handOver, {
+      adminToken: "admin",
+      khatmaId: ids.khatmaId,
+      ...target,
+    });
+
+  expect(await handOver({ participantId: ids.pendingParticipant })).toEqual({
+    error: "no_account",
+  });
+  // a membership alone, with no place among the participants, is no target
+  expect(await handOver({ memberId: ids.strangerMember })).toEqual({
+    error: "not_member",
+  });
+  expect(
+    (await t.run((ctx) => ctx.db.get(ids.khatmaId)))?.creatorPersonId,
+  ).toBe(ali);
+
+  expect(await handOver({ participantId: ids.saraParticipant })).toEqual({
+    ok: true,
+  });
+  const after = await t.run(async (ctx) => ({
+    organizer: (await ctx.db.get(ids.khatmaId))?.creatorPersonId,
+    saraMember: await ctx.db
+      .query("members")
+      .withIndex("by_khatma_person", (q) =>
+        q.eq("khatmaId", ids.khatmaId).eq("personId", sara),
+      )
+      .unique(),
+    rows: await ctx.db.query("coOrganizers").collect(),
+  }));
+  expect(after.organizer).toBe(sara);
+  expect(after.saraMember).toMatchObject({ status: "active" });
+  expect(after.rows).toMatchObject([
+    { phone: "+971500000001", readings: true, people: true, settings: true },
+  ]);
+  expect((await audit(t)).at(-1)).toMatchObject({
+    action: "khatma.handOver",
+    before: ali,
+    after: sara,
+  });
+});
+
+test("a transfer ends the wait for an owner an admin set a rota khatma up for", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  const ali = await person(t, "+971500000001", "علي");
+  const sara = await person(t, "+971500000002", "سارة");
+  const { khatmaId, saraParticipant } = await t.run(async (ctx) => {
+    const khatmaId = await ctx.db.insert("khatmas", {
+      name: "ختمة التناوب",
+      schedule: "none",
+      grace: { value: 7, unit: "days" },
+      creatorPersonId: ali,
+      inviteCode: "rotaKhatma2",
+      completedRounds: 0,
+      createdAt: 0,
+      kind: "rota",
+      rota: {
+        days: { kind: "weekly", weekdays: [5], everyWeeks: 1 },
+        firstDate: "2027-01-15",
+        endDate: null,
+        timeZone: "Asia/Dubai",
+        messages: {
+          dayAt: 0,
+          reminder: { at: 0, on: false },
+          unread: { at: 0, on: false },
+          summary: { at: 0, on: false },
+        },
+        pausedAt: null,
+        pauseDates: [],
+        archivedAt: null,
+        pendingOrganizer: true,
+      },
+    });
+    // ali never sent the join message: a participant, with no membership
+    for (const [phone, personId] of [
+      ["+971500000001", ali],
+      ["+971500000002", sara],
+    ] as const) {
+      await ctx.db.insert("rotaParticipants", {
+        khatmaId,
+        name: phone,
+        phone,
+        personId,
+        addedAt: 0,
+        removedAt: null,
+      });
+    }
+    const rows = await ctx.db.query("rotaParticipants").collect();
+    return {
+      khatmaId,
+      saraParticipant: rows.find((p) => p.personId === sara)!._id,
+    };
+  });
+
+  expect(
+    await t.mutation(api.adminOps.handOver, {
+      adminToken: "admin",
+      khatmaId,
+      participantId: saraParticipant,
+    }),
+  ).toEqual({ ok: true });
+
+  const after = await t.run(async (ctx) => ({
+    khatma: await ctx.db.get(khatmaId),
+    rows: await ctx.db.query("coOrganizers").collect(),
+  }));
+  expect(after.khatma?.creatorPersonId).toBe(sara);
+  // sara's own join message mustn't make her the owner a second time
+  expect(after.khatma?.rota?.pendingOrganizer).toBe(false);
+  // ali was never in the khatma, so he doesn't stay on
+  expect(after.rows).toEqual([]);
+});
+
 test("an admin can reset an archived khatma's invite", async () => {
   const t = convexTest(schema, modules);
   await admin(t);
