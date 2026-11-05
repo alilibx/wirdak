@@ -121,6 +121,15 @@ async function nameOf(
   return person?.displayName ?? "";
 }
 
+/** The switches a newly named co-organizer starts with (the admin's defaults). */
+export async function coOrganizerDefaults(ctx: QueryCtx): Promise<Switches> {
+  return {
+    readings: await getSetting(ctx, "coOrganizerDefaultReadings"),
+    people: await getSetting(ctx, "coOrganizerDefaultPeople"),
+    settings: await getSetting(ctx, "coOrganizerDefaultSettings"),
+  };
+}
+
 /** Who helps run the khatma, oldest first, with their switches. */
 export async function coOrganizersOf(
   ctx: QueryCtx,
@@ -172,11 +181,7 @@ export const list = sessionQuery({
     return {
       max: await getSetting(ctx, "maxCoOrganizers"),
       enabled: await getSetting(ctx, "coOrganizersOn"),
-      defaults: {
-        readings: await getSetting(ctx, "coOrganizerDefaultReadings"),
-        people: await getSetting(ctx, "coOrganizerDefaultPeople"),
-        settings: await getSetting(ctx, "coOrganizerDefaultSettings"),
-      },
+      defaults: await coOrganizerDefaults(ctx),
       coOrganizers,
       candidates,
     };

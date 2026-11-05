@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   rota: null as unknown,
   archived: false,
   blockedMember: false,
+  defaults: { readings: true, people: true, settings: true },
   handOverCandidates: [{ memberId: "m2", name: "سارة" }] as unknown[],
 }));
 vi.mock("convex/react", async () => {
@@ -63,6 +64,7 @@ vi.mock("convex/react", async () => {
         },
       ],
       coOrganizerCandidates: [{ candidateId: "m:m2", name: "سارة" }],
+      coOrganizerDefaults: m.defaults,
       handOverCandidates: m.handOverCandidates,
       round: { number: 3, startedAt: 0, free: 20, taken: 4, finished: 6 },
       openHelpRequests: 1,
@@ -82,6 +84,7 @@ beforeEach(() => {
   m.rota = null;
   m.archived = false;
   m.blockedMember = false;
+  m.defaults = { readings: true, people: true, settings: true };
   m.handOverCandidates = [{ memberId: "m2", name: "سارة" }];
   m.mutation.mockReset().mockResolvedValue({ ok: true });
   m.reset.mockReset().mockResolvedValue({ inviteCode: "newCode00001" });
@@ -436,6 +439,19 @@ describe("KhatmaAdminPage co-organizers", () => {
     expect(
       screen.getByText(new RegExp(t.coOrganizers.pending)),
     ).toBeInTheDocument();
+  });
+
+  it("starts the add sheet from the admin's default switches", async () => {
+    m.defaults = { readings: true, people: false, settings: false };
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: t.coOrganizers.add }),
+    );
+    const on = (name: string) =>
+      screen.getByRole("switch", { name }).getAttribute("aria-checked");
+    expect(on(t.coOrganizers.readings)).toBe("true");
+    expect(on(t.coOrganizers.people)).toBe("false");
+    expect(on(t.coOrganizers.settings)).toBe("false");
   });
 
   it("names a co-organizer with the three switches and a note", async () => {

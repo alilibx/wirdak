@@ -786,3 +786,16 @@ test("a rota khatma offers its participants with an account as hand-over targets
     }),
   ).toEqual({ error: "no_account" });
 });
+
+test("the khatma view carries the default switches for a new co-organizer", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  await setSetting(t, "coOrganizerDefaultPeople", false);
+  const { khatmaId } = await pool(t);
+  const view = await t.query(api.adminLookup.khatma, { ...auth, khatmaId });
+  expect(view!.coOrganizerDefaults).toEqual({
+    readings: true,
+    people: false,
+    settings: true,
+  });
+});

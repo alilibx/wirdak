@@ -415,7 +415,7 @@ export function KhatmaAdminPage() {
           title={t.coOrganizers.add}
           body={t.coOrganizers.addBody}
           people={k.coOrganizerCandidates}
-          initial={{ readings: true, people: true, settings: true }}
+          initial={k.coOrganizerDefaults}
           onSave={({ candidateId, ...switches }, note) =>
             void run(() =>
               setCoOrganizer(

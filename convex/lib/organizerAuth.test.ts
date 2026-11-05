@@ -30,10 +30,7 @@ test("a co-organizer passes only its switches, never owner", () => {
   expect(allows(null, "readings")).toBe(false);
 });
 
-async function person(
-  ctx: MutationCtx,
-  phone: string,
-): Promise<Id<"people">> {
+async function person(ctx: MutationCtx, phone: string): Promise<Id<"people">> {
   return await ctx.db.insert("people", {
     phone,
     displayName: phone,

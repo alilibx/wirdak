@@ -2,7 +2,12 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { normalizeAdminPhone } from "./admins";
-import { coOrganizersOf, openCandidates, personByPhone } from "./coOrganizers";
+import {
+  coOrganizerDefaults,
+  coOrganizersOf,
+  openCandidates,
+  personByPhone,
+} from "./coOrganizers";
 import { adminQuery } from "./lib/adminSession";
 import { isBlocked } from "./lib/blocked";
 import { isArchived } from "./lib/khatma";
@@ -228,6 +233,7 @@ export const khatma = adminQuery({
       members,
       coOrganizers: await coOrganizersOf(ctx, k),
       coOrganizerCandidates: await openCandidates(ctx, k),
+      coOrganizerDefaults: await coOrganizerDefaults(ctx),
       handOverCandidates: await handOverCandidates(ctx, k, members),
       round: pool,
       openHelpRequests: help.filter((r) => r.khatmaId === k._id).length,
