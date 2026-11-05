@@ -85,6 +85,7 @@ test("notes about a participant's own messages stay off WhatsApp", () => {
     "rotaSilenced",
     "rotaStopped",
     "rotaEnabled",
+    "coOrganizerNow",
   ] as const) {
     expect(
       noteTemplate(

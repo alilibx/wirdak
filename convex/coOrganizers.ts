@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { refreshPerson, refreshPhone } from "./lib/directory";
+import { notify } from "./notes";
 import { sessionMutation, sessionQuery } from "./lib/session";
 import { getSetting } from "./lib/settings";
 import { organizerOf, requireLiveOrganizer } from "./organizer";
@@ -239,6 +240,19 @@ async function ensureRotaMembership(
   await refreshPerson(ctx, person._id);
 }
 
+/** Tells a co-organizer with an account that they were named: in the app and by push. */
+async function tellNamed(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  person: Doc<"people">,
+): Promise<void> {
+  await notify(ctx, {
+    personId: person._id,
+    khatmaId: khatma._id,
+    kind: "coOrganizerNow",
+  });
+}
+
 /**
  * Names someone (`candidateId`) or changes a co-organizer's switches
  * (`coOrganizerId`). Naming refuses `disabled` while `coOrganizersOn` is off
@@ -293,7 +307,10 @@ export async function setCoOrganizer(
     addedAt: Date.now(),
   });
   const person = await personByPhone(ctx, phone);
-  if (person) await ensureRotaMembership(ctx, khatma, person);
+  if (person) {
+    await ensureRotaMembership(ctx, khatma, person);
+    await tellNamed(ctx, khatma, person);
+  }
   return { ok: true };
 }
 
@@ -362,6 +379,7 @@ export async function linkCoOrganizerRoles(
     if (khatma?.kind !== "rota") continue;
     if (!(await liveParticipant(ctx, khatma._id, person.phone))) continue;
     await ensureRotaMembership(ctx, khatma, person);
+    await tellNamed(ctx, khatma, person);
   }
 }
 

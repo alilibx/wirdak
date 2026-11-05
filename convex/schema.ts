@@ -207,6 +207,7 @@ export default defineSchema({
       v.literal("rotaSilenced"),
       v.literal("rotaStopped"),
       v.literal("rotaEnabled"),
+      v.literal("coOrganizerNow"),
     ),
     /** A rota participant's name, in the organizer notes about them. */
     name: v.optional(v.union(v.string(), v.null())),
@@ -219,6 +220,8 @@ export default defineSchema({
     pushedAt: nullableNumber,
     // When its WhatsApp message went out; at most one per note.
     whatsappSentAt: v.optional(nullableNumber),
+    // A co-organizer's copy of an organizer note: never sent on WhatsApp.
+    whatsappOff: v.optional(v.boolean()),
     clearedAt: nullableNumber,
   })
     .index("by_person_khatma", ["personId", "khatmaId", "clearedAt"])

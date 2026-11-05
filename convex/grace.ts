@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
 import { isArchived } from "./lib/khatma";
+import { organizerRecipients } from "./lib/organizerRecipients";
 import { clearNotes, notify } from "./notes";
 import { getSetting, quietHours } from "./lib/settings";
 import { nextAwake } from "./lib/wakingTime";
@@ -26,25 +27,45 @@ export async function alertOrganizer(
   juz: number,
   actorPersonId: Id<"people">,
 ): Promise<void> {
-  const organizerId = khatma.creatorPersonId;
-  if (organizerId === actorPersonId) return;
+  const recipients = await organizerRecipients(ctx, khatma, "readings");
+  const open = await ctx.db
+    .query("notes")
+    .withIndex("by_khatma_kind", (q) =>
+      q
+        .eq("khatmaId", khatma._id)
+        .eq("kind", "openForHelp")
+        .eq("clearedAt", null),
+    )
+    .collect();
+  const batchMs = await getSetting(ctx, "openForHelpBatchMs");
+  for (const r of recipients) {
+    // skipped when the juz' is the recipient's own, or one they released
+    if (r.personId === actorPersonId) continue;
+    await alertRecipient(
+      ctx,
+      khatma,
+      juz,
+      r,
+      open.filter((n) => n.personId === r.personId),
+      batchMs,
+    );
+  }
+}
 
+/** One recipient's alert: a new one, or the juz' added to their recent batch. */
+async function alertRecipient(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  juz: number,
+  recipient: { personId: Id<"people">; whatsappOff: boolean },
+  alerts: Doc<"notes">[],
+  batchMs: number,
+): Promise<void> {
+  const organizerId = recipient.personId;
   const now = Date.now();
-  const alerts = (
-    await ctx.db
-      .query("notes")
-      .withIndex("by_khatma_kind", (q) =>
-        q
-          .eq("khatmaId", khatma._id)
-          .eq("kind", "openForHelp")
-          .eq("clearedAt", null),
-      )
-      .collect()
-  ).filter((n) => n.personId === organizerId);
   // the organizer already has this juz' in front of them
   if (alerts.some((n) => n.juz.includes(juz))) return;
 
-  const batchMs = await getSetting(ctx, "openForHelpBatchMs");
   const batch = alerts
     .filter((n) => now - n.createdAt < batchMs)
     .sort((a, b) => b.createdAt - a.createdAt)[0];
@@ -54,6 +75,7 @@ export async function alertOrganizer(
       khatmaId: khatma._id,
       kind: "openForHelp",
       juz: [juz],
+      whatsappOff: recipient.whatsappOff,
     });
     return;
   }
