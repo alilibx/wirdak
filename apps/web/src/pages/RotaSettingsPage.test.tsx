@@ -60,6 +60,7 @@ const baseSettings = {
   upcoming: ["2026-11-27", "2026-11-28", "2026-11-29"],
   quiet: { startHour: 22, endHour: 7 },
   lateTap: { override: null, defaultMs: 28_800_000 },
+  access: { owner: true, readings: true, people: true, settings: true },
   cheer: {
     override: null,
     defaults: {

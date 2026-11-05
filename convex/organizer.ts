@@ -56,7 +56,7 @@ export type OrganizerSettings = {
     memberId: Id<"members">;
     displayName: string;
     isOrganizer: boolean;
-    /** Named by the owner to help run the khatma. */
+    /** Named by the owner to help run the khatma; always false unless the caller has People. */
     isCoOrganizer: boolean;
   }[];
   blocked: { memberId: Id<"members">; displayName: string }[];
@@ -184,13 +184,16 @@ export const settings = sessionQuery({
 
     const members: OrganizerSettings["members"] = [];
     const blocked: OrganizerSettings["blocked"] = [];
+    // Who the co-organizers are follows the People switch, like the blocked list (spec 4.3, 4.6).
     const coOrganizerPhones = new Set(
-      (
-        await ctx.db
-          .query("coOrganizers")
-          .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
-          .collect()
-      ).map((row) => row.phone),
+      access.owner || access.people
+        ? (
+            await ctx.db
+              .query("coOrganizers")
+              .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
+              .collect()
+          ).map((row) => row.phone)
+        : [],
     );
     for (const member of await membersByJoin(ctx, khatma._id)) {
       if (member.status === "former") continue;

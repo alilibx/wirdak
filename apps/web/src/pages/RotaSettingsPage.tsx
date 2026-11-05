@@ -113,15 +113,16 @@ export function RotaSettingsPage() {
 
 /**
  * A rotating khatma's settings: pausing, the message times, the days and the name. `headingLevel`
- * is for a page that already has its `h1`. The owner (and an admin) also gets the owner-only
- * sections: co-organizers, transfer, archive and delete; `access` without `owner` hides them.
+ * is for a page that already has its `h1`. The owner (and an admin, whose `access` is the
+ * owner's) also gets the owner-only sections: co-organizers, transfer, archive and delete.
  */
 export function RotaSettingsContent({
   settings,
   inviteCode,
   headingLevel: Heading = "h1",
 }: {
-  settings: SettingsView & { access?: OrganizerAccess };
+  /** `access` says who is looking; an admin's backend gives the owner's (co-organizers spec 4.7). */
+  settings: SettingsView & { access: OrganizerAccess };
   inviteCode: string;
   headingLevel?: "h1" | "h2";
 }) {
@@ -149,7 +150,7 @@ export function RotaSettingsContent({
   } | null>(null);
   const args = backend.authArgs();
 
-  const isOwner = settings.access?.owner ?? true;
+  const isOwner = settings.access.owner;
   const paused = settings.pausedAt !== null;
   const { quiet } = settings;
   const earliest = quiet.endHour * 60;

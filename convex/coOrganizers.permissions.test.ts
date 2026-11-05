@@ -1133,3 +1133,32 @@ test("the organizer pages mark who is a co-organizer, and Today carries its own 
     timeZone: khatma.rota!.timeZone,
   });
 });
+
+test("who the co-organizers are reaches a pool co-organizer only with People", async () => {
+  const c = await poolWithCoOrganizer(ONLY("readings"));
+  // Sara is a second co-organizer; the viewer (Ali) has only Readings.
+  await name(c.t, c.code, c.org, `m:${c.saraMember}`, ONLY("settings"));
+  const marks = async (who: Who) => {
+    const shell = await c.t.query(api.organizer.settings, {
+      sessionToken: who.token,
+      inviteCode: c.code,
+    });
+    if ("forbidden" in shell) throw new Error("forbidden");
+    return shell.members.map((m) => [m.displayName, m.isCoOrganizer]);
+  };
+  expect(await marks(c.co)).toEqual([
+    ["المنظم", false],
+    ["علي", false],
+    ["سارة", false],
+  ]);
+  expect(await marks(c.sara)).toEqual([
+    ["المنظم", false],
+    ["علي", false],
+    ["سارة", false],
+  ]);
+  expect(await marks(c.org)).toEqual([
+    ["المنظم", false],
+    ["علي", true],
+    ["سارة", true],
+  ]);
+});
