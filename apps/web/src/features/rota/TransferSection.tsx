@@ -12,13 +12,17 @@ import { useRotaCall } from "./useRotaCall";
 
 const transferErrors: Record<string, string> = t.organizer.errors;
 
-type Candidate = { id: Id<"rotaParticipants">; name: string };
+type Candidate = {
+  id: Id<"rotaParticipants">;
+  name: string;
+  hasAccount: boolean;
+};
 
 /**
  * The owner hands a rotating khatma to one of its participants (co-organizers spec 4.5): anyone
- * live in it but the owner, by name only. One without a Wirdak account is refused (`no_account`),
- * since ownership can't wait for a sign-in. Shows nothing on a backend without it (an admin
- * transfers from the admin's own khatma card).
+ * live in it but the owner, by name only. One without a Wirdak account is listed but can't be
+ * picked (the server refuses it as `no_account`), since ownership can't wait for a sign-in. Shows
+ * nothing on a backend without it (an admin transfers from the admin's own khatma card).
  */
 export function TransferSection({ inviteCode }: { inviteCode: string }) {
   const backend = useRotaBackend(inviteCode);
@@ -51,7 +55,7 @@ function TransferList({
   if (!people) return null;
   const candidates: Candidate[] = people.participants
     .filter((p) => !p.isOrganizer)
-    .map((p) => ({ id: p.id, name: p.name }));
+    .map((p) => ({ id: p.id, name: p.name, hasAccount: p.hasAccount }));
   if (candidates.length === 0) return null;
 
   const confirm = (candidate: Candidate) => {
@@ -84,11 +88,16 @@ function TransferList({
           <li key={candidate.id}>
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || !candidate.hasAccount}
               onClick={() => setPicked(candidate)}
               className="min-h-14 w-full rounded-ui border-2 border-line bg-card px-4 text-start font-medium disabled:opacity-50"
             >
               {candidate.name}
+              {!candidate.hasAccount && (
+                <span className="ms-2 text-sm font-normal text-ink-soft">
+                  {t.coOrganizers.pending}
+                </span>
+              )}
             </button>
           </li>
         ))}

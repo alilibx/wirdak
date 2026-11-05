@@ -949,6 +949,7 @@ describe("OrganizerPage", () => {
       silenced: false,
       isOrganizer: false,
       isCoOrganizer: false,
+      hasAccount: true,
       ...extra,
     });
 
@@ -988,7 +989,7 @@ describe("OrganizerPage", () => {
       expect(await screen.findByText("khatma-page")).toBeInTheDocument();
     });
 
-    it("says when the participant has no Wirdak account yet", async () => {
+    it("still says when the participant lost their account by the time of confirming (a stale list)", async () => {
       m.fns.handOver.mockResolvedValue({ ok: false, reason: "no_account" });
       const user = userEvent.setup();
       renderPage();

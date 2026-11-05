@@ -1209,3 +1209,35 @@ test("only the organizer answers a join request", async () => {
   ).rejects.toThrow();
   expect((await people(t, s))?.requests).toHaveLength(1);
 });
+
+test("people says which participants have signed in, by account or by the number", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const byAccount = await add(t, s, { phone: "+971505550101" });
+  await add(t, s, { phone: "+971505550102" });
+  await add(t, s, { phone: "+971505550103" }); // a placeholder an admin made
+  await add(t, s, { phone: "+971505550104" }); // no person at all
+  await t.run(async (ctx) => {
+    const insert = (phone: string, verifiedAt: number) =>
+      ctx.db.insert("people", {
+        phone,
+        displayName: phone,
+        verifiedAt,
+        timeZone: "Asia/Dubai",
+        lastSeenAt: NOW,
+      });
+    const account = await insert("+971505550101", NOW);
+    await ctx.db.patch(participantId(byAccount), { personId: account });
+    await insert("+971505550102", NOW);
+    await insert("+971505550103", 0);
+  });
+  const view = await people(t, s);
+  expect(view?.participants.map((p) => p.hasAccount)).toEqual([
+    false, // the organizer's fixture person never signed in
+    true,
+    true,
+    false,
+    false,
+  ]);
+  expect(view?.rows[1]?.participant?.hasAccount).toBe(true);
+});

@@ -15,7 +15,7 @@ import {
   slotFor,
   type ReadingDaysKind,
 } from "../rota";
-import { endCoOrganizer } from "../../coOrganizers";
+import { endCoOrganizer, hasAccount, personByPhone } from "../../coOrganizers";
 import { refreshPhone } from "../directory";
 import { allows, roleIn, type OrganizerRole } from "../organizerAuth";
 import { isArchived } from "../khatma";
@@ -118,6 +118,8 @@ type PersonState = {
   isOrganizer: boolean;
   /** The owner named them a co-organizer: only the owner can take them out. */
   isCoOrganizer: boolean;
+  /** They have signed in to Wirdak (an admin's placeholder has not): ownership can be handed to them. */
+  hasAccount: boolean;
 };
 
 export type PeopleView = {
@@ -196,6 +198,7 @@ function personState(
   owner: Doc<"people"> | null,
   coOrganizerPhones: ReadonlySet<string>,
   hiddenFromViewer: ReadonlySet<Id<"rotaParticipants">>,
+  withAccount: ReadonlySet<Id<"rotaParticipants">>,
 ): PersonState {
   const isOrganizer = isOwnerRow(p, khatma, owner);
   return {
@@ -206,7 +209,23 @@ function personState(
     joined: p.joinedAt != null,
     stopped: p.stoppedAt != null,
     silenced: p.silencedAt != null,
+    hasAccount: withAccount.has(p._id),
   };
+}
+
+/** The participants who have signed in: by their account, or by the person on their number. */
+async function participantsWithAccount(
+  ctx: QueryCtx,
+  participants: Doc<"rotaParticipants">[],
+): Promise<Set<Id<"rotaParticipants">>> {
+  const found = new Set<Id<"rotaParticipants">>();
+  for (const p of participants) {
+    const person = p.personId
+      ? await ctx.db.get(p.personId)
+      : await personByPhone(ctx, p.phone);
+    if (person && hasAccount(person)) found.add(p._id);
+  }
+  return found;
 }
 
 /**
@@ -288,6 +307,7 @@ export async function people(
     ).map((row) => row.phone),
   );
   const hidden = await hiddenFromViewer(ctx, khatma, participants, actor);
+  const withAccount = await participantsWithAccount(ctx, participants);
   return {
     title: khatmaTitle(khatma),
     archived: isArchived(khatma),
@@ -316,7 +336,14 @@ export async function people(
               name: holder.name,
               isMe: isActor(holder, actor),
               slots: heldBy.get(holder._id)?.length ?? 0,
-              ...personState(holder, khatma, owner, coOrganizerPhones, hidden),
+              ...personState(
+                holder,
+                khatma,
+                owner,
+                coOrganizerPhones,
+                hidden,
+                withAccount,
+              ),
             }
           : null,
       };
@@ -326,7 +353,7 @@ export async function people(
       name: p.name,
       isMe: isActor(p, actor),
       juz: heldBy.get(p._id) ?? [],
-      ...personState(p, khatma, owner, coOrganizerPhones, hidden),
+      ...personState(p, khatma, owner, coOrganizerPhones, hidden, withAccount),
     })),
     freeJuz: freeJuzOf(byJuz),
     maxSlots: await getSetting(ctx, "rotaMaxSlotsPerPerson"),
