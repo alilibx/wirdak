@@ -703,6 +703,16 @@ export const handOver = sessionMutation({
   },
 });
 
+/** The two settings `organizerAway` weighs, read once by the caller. */
+type AwayWindows = { inactiveMs: number; successorActiveMs: number };
+
+async function awayWindows(ctx: QueryCtx): Promise<AwayWindows> {
+  return {
+    inactiveMs: await getSetting(ctx, "organizerInactiveMs"),
+    successorActiveMs: await getSetting(ctx, "successorActiveMs"),
+  };
+}
+
 /**
  * Whether `khatma`'s owner has been away longer than `organizerInactiveMs`,
  * so the khatma may be handed over. A pool owner is seen on the website. A
@@ -717,13 +727,14 @@ async function organizerAway(
   khatma: Doc<"khatmas">,
   owner: Doc<"people"> | null,
   now: number,
+  windows: AwayWindows,
 ): Promise<boolean> {
   if (!owner) return true;
-  const inactiveSince = now - (await getSetting(ctx, "organizerInactiveMs"));
+  const inactiveSince = now - windows.inactiveMs;
   if (khatma.kind !== "rota") return owner.lastSeenAt < inactiveSince;
   const row = await liveParticipant(ctx, khatma._id, owner.phone);
   const repliedAt = row?.lastReplyAt ?? 0;
-  if (repliedAt >= now - (await getSetting(ctx, "successorActiveMs"))) {
+  if (repliedAt >= now - windows.successorActiveMs) {
     return false;
   }
   if (owner.lastSeenAt === 0) return false;
@@ -744,12 +755,14 @@ export const autoHandoverSweep = internalMutation({
       .paginate({ numItems: SWEEP_PAGE, cursor: args.cursor ?? null });
     const now = Date.now();
     const toCoOrganizers = await getSetting(ctx, "handoverToCoOrganizerOn");
+    const windows = await awayWindows(ctx);
     for (const khatma of page.page) {
       if (isArchived(khatma)) continue;
       // Without co-organizers to take it, a rota khatma keeps its organizer.
       if (khatma.kind === "rota" && !toCoOrganizers) continue;
       const organizer = await ctx.db.get(khatma.creatorPersonId);
-      if (!(await organizerAway(ctx, khatma, organizer, now))) continue;
+      if (!(await organizerAway(ctx, khatma, organizer, now, windows)))
+        continue;
       await ctx.scheduler.runAfter(0, internal.organizer.autoHandover, {
         khatmaId: khatma._id,
       });
@@ -778,9 +791,10 @@ export const autoHandover = internalMutation({
     if (khatma.kind === "rota" && !toCoOrganizers) return;
     const now = Date.now();
     const organizer = await ctx.db.get(khatma.creatorPersonId);
-    if (!(await organizerAway(ctx, khatma, organizer, now))) return;
+    const windows = await awayWindows(ctx);
+    if (!(await organizerAway(ctx, khatma, organizer, now, windows))) return;
 
-    const activeSince = now - (await getSetting(ctx, "successorActiveMs"));
+    const activeSince = now - windows.successorActiveMs;
     if (toCoOrganizers) {
       const member = await coOrganizerSuccessor(ctx, khatma, activeSince);
       if (member) {
