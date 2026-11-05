@@ -629,12 +629,12 @@ export const moveJuz = sessionMutation({
     toJuz: v.number(),
   },
   handler: async (ctx, args): ReturnType<typeof ops.moveJuz> => {
-    const { khatma, rota } = await requireRotaOrganizer(
+    const { khatma, rota, role } = await requireRotaOrganizer(
       ctx,
       args.inviteCode,
       "people",
     );
-    return ops.moveJuz(ctx, khatma, rota, args);
+    return ops.moveJuz(ctx, khatma, rota, args, role);
   },
 });
 
@@ -645,12 +645,12 @@ export const freeJuz = sessionMutation({
     juz: v.number(),
   },
   handler: async (ctx, args): ReturnType<typeof ops.freeJuz> => {
-    const { khatma, rota } = await requireRotaOrganizer(
+    const { khatma, rota, role } = await requireRotaOrganizer(
       ctx,
       args.inviteCode,
       "people",
     );
-    return ops.freeJuz(ctx, khatma, rota, args);
+    return ops.freeJuz(ctx, khatma, rota, args, role);
   },
 });
 
@@ -661,12 +661,14 @@ export const renameParticipant = sessionMutation({
     name: v.string(),
   },
   handler: async (ctx, args): ReturnType<typeof ops.renameParticipant> => {
-    const { khatma, rota } = await requireRotaOrganizer(
+    const { person, khatma, rota } = await requireRotaOrganizer(
       ctx,
       args.inviteCode,
       "people",
     );
-    return ops.renameParticipant(ctx, khatma, rota, args);
+    return ops.renameParticipant(ctx, khatma, rota, args, {
+      personId: person._id,
+    });
   },
 });
 

@@ -317,7 +317,7 @@ export const moveJuz = adminMutation({
       ctx,
       args,
       "moveJuz",
-      await ops.moveJuz(ctx, khatma, rota, args),
+      await ops.moveJuz(ctx, khatma, rota, args, "admin"),
     );
   },
 });
@@ -334,7 +334,7 @@ export const freeJuz = adminMutation({
       ctx,
       args,
       "freeJuz",
-      await ops.freeJuz(ctx, khatma, rota, args),
+      await ops.freeJuz(ctx, khatma, rota, args, "admin"),
     );
   },
 });
@@ -351,7 +351,7 @@ export const renameParticipant = adminMutation({
       ctx,
       args,
       "renameParticipant",
-      await ops.renameParticipant(ctx, khatma, rota, args),
+      await ops.renameParticipant(ctx, khatma, rota, args, ADMIN),
     );
   },
 });

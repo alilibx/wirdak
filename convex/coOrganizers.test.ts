@@ -566,7 +566,7 @@ test("a co-organizer with People cannot remove the owner or another co-organizer
   expect((await coOrganizerRows(t, khatma._id)).length).toBe(2);
 });
 
-test("a rota co-organizer with People cannot remove the owner or another co-organizer", async () => {
+test("a rota co-organizer with People cannot remove, free, or move the owner or another co-organizer", async () => {
   const t = convexTest(schema, modules);
   const { org, code, khatma } = await rotaSetup(t);
   const ali = await signedIn(t, "علي");
@@ -583,6 +583,53 @@ test("a rota co-organizer with People cannot remove the owner or another co-orga
       inviteCode: code,
       participantId,
     });
+  // Nor free or move their slots, or swap someone else's juz' into theirs.
+  const people = await t.query(api.rota.people, {
+    sessionToken: org.token,
+    inviteCode: code,
+  });
+  const juzOf = (id: Id<"rotaParticipants">) =>
+    people!.participants.find((p) => p.id === id)!.juz[0]!;
+  const free = people!.freeJuz[0]!;
+  const freeBy = (by: Who, participantId: Id<"rotaParticipants">) =>
+    t.mutation(api.rota.freeJuz, {
+      sessionToken: by.token,
+      inviteCode: code,
+      participantId,
+      juz: juzOf(participantId),
+    });
+  const moveBy = (
+    by: Who,
+    participantId: Id<"rotaParticipants">,
+    toJuz: number,
+  ) =>
+    t.mutation(api.rota.moveJuz, {
+      sessionToken: by.token,
+      inviteCode: code,
+      participantId,
+      fromJuz: juzOf(participantId),
+      toJuz,
+    });
+  expect(await freeBy(ali, ownerP)).toEqual({ error: "is_organizer" });
+  expect(await freeBy(ali, saraP)).toEqual({ error: "is_organizer" });
+  expect(await moveBy(ali, ownerP, free)).toEqual({ error: "is_organizer" });
+  expect(await moveBy(ali, saraP, free)).toEqual({ error: "is_organizer" });
+  expect(await moveBy(ali, omarP, juzOf(saraP))).toEqual({
+    error: "is_organizer",
+  });
+  // A plain participant's slot is theirs to move and free.
+  expect(await moveBy(ali, omarP, free)).toEqual({ ok: true });
+  expect(
+    await t.mutation(api.rota.freeJuz, {
+      sessionToken: ali.token,
+      inviteCode: code,
+      participantId: omarP,
+      juz: free,
+    }),
+  ).toEqual({ ok: true });
+  // The owner can still free a co-organizer's slot.
+  expect(await freeBy(org, saraP)).toEqual({ ok: true });
+
   expect(await removeBy(ali, ownerP)).toEqual({ error: "is_organizer" });
   expect(await removeBy(ali, saraP)).toEqual({ error: "is_organizer" });
   expect(await removeBy(ali, omarP)).toEqual({ ok: true });

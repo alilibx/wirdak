@@ -166,7 +166,11 @@ export const settings = sessionQuery({
     const khatma = ctx.person
       ? await khatmaByInviteCode(ctx, args.inviteCode)
       : null;
-    const access = khatma && accessOf(await roleIn(ctx, khatma, ctx.person));
+    // A rota khatma has its own settings (`rota.settings`).
+    const access =
+      khatma &&
+      khatma.kind !== "rota" &&
+      accessOf(await roleIn(ctx, khatma, ctx.person));
     if (!khatma || !access) return { forbidden: true };
 
     const members: OrganizerSettings["members"] = [];
@@ -191,7 +195,8 @@ export const settings = sessionQuery({
       grace: khatma.grace,
       suggestedGrace: (await getSetting(ctx, "graceDefaults"))[khatma.schedule],
       members,
-      blocked,
+      // Seeing who is blocked follows the People switch (spec 4.3).
+      blocked: access.people ? blocked : [],
       cheer: await cheerSetting(ctx, khatma),
       archived: isArchived(khatma),
       access,

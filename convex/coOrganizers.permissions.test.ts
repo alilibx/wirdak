@@ -1019,3 +1019,78 @@ test("a co-organizer with People sees the numbers the owner sees, and a number h
   expect((await phones(c.org))["نور"]).toBeNull();
   expect((await phones(c.co))["نور"]).toBeNull();
 });
+
+test("the pool settings shell shows the blocked list only with People, and refuses a rota khatma", async () => {
+  const shell = async (c: PoolCtx, who: Who) => {
+    const r = await c.t.query(api.organizer.settings, {
+      sessionToken: who.token,
+      inviteCode: c.code,
+    });
+    if ("forbidden" in r) throw new Error("forbidden");
+    return {
+      members: r.members.map((m) => m.displayName),
+      blocked: r.blocked.map((b) => b.displayName),
+    };
+  };
+  const blockSara = (c: PoolCtx) =>
+    c.t.mutation(api.organizer.removeMember, {
+      sessionToken: c.org.token,
+      inviteCode: c.code,
+      memberId: c.saraMember,
+    });
+
+  const readings = await poolWithCoOrganizer(ONLY("readings"));
+  await blockSara(readings);
+  expect(await shell(readings, readings.co)).toEqual({
+    members: ["المنظم", "علي"],
+    blocked: [],
+  });
+  expect((await shell(readings, readings.org)).blocked).toEqual(["سارة"]);
+
+  const people = await poolWithCoOrganizer(ONLY("people"));
+  await blockSara(people);
+  expect((await shell(people, people.co)).blocked).toEqual(["سارة"]);
+
+  // A rota khatma has its own settings: no pool-shaped answer, even to its owner.
+  const rota = await rotaWithCoOrganizer(ALL);
+  for (const who of [rota.org, rota.co]) {
+    expect(
+      await rota.t.query(api.organizer.settings, rotaArgs(rota, who)),
+    ).toEqual({ forbidden: true });
+  }
+});
+
+test("a co-organizer's rename goes to their own saved list, not the owner's", async () => {
+  const c = await rotaWithCoOrganizer(ONLY("people"));
+  const savedBy = async (who: Who) =>
+    ((await c.t.query(api.rota.saved, rotaArgs(c, who))) ?? []).map(
+      (s) => s.name,
+    );
+  const rename = (participantId: Id<"rotaParticipants">, name: string) =>
+    c.t.mutation(api.rota.renameParticipant, {
+      ...rotaArgs(c, c.co),
+      participantId,
+      name,
+    });
+
+  // Sara is on the owner's list: the khatma's name changes, the owner's row doesn't.
+  expect(await rename(c.saraP, "سارة أحمد")).toEqual({ ok: true });
+  expect(await savedBy(c.org)).toContain("سارة");
+  expect(await savedBy(c.org)).not.toContain("سارة أحمد");
+  expect(await savedBy(c.co)).not.toContain("سارة أحمد");
+
+  // Huda is on the co-organizer's own list, which follows the rename.
+  const hudaP = await addParticipant(c.t, c.code, c.co, "هدى", "+971505550020");
+  expect(await rename(hudaP, "هدى علي")).toEqual({ ok: true });
+  expect(await savedBy(c.co)).toEqual(["هدى علي"]);
+
+  // The owner renaming still updates the owner's list.
+  expect(
+    await c.t.mutation(api.rota.renameParticipant, {
+      ...rotaArgs(c, c.org),
+      participantId: c.saraP,
+      name: "سارة محمد",
+    }),
+  ).toEqual({ ok: true });
+  expect(await savedBy(c.org)).toContain("سارة محمد");
+});

@@ -486,6 +486,48 @@ export async function spreadFreeJuz(
   return { ok: true, given, left: free.length - given };
 }
 
+/** Whether this participant runs the khatma: its owner, or someone named co-organizer. */
+async function runsKhatma(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  participant: Doc<"rotaParticipants">,
+): Promise<boolean> {
+  if (participant.personId === khatma.creatorPersonId) return true;
+  const named = await ctx.db
+    .query("coOrganizers")
+    .withIndex("by_khatma_phone", (q) =>
+      q.eq("khatmaId", khatma._id).eq("phone", participant.phone),
+    )
+    .first();
+  return named !== null;
+}
+
+/**
+ * Whether `caller` may take a slot from these participants: the owner and an
+ * admin always; a co-organizer never from the owner or another co-organizer,
+ * since only the owner changes what the people running the khatma hold (spec 4.2).
+ */
+async function mayTakeSlotsOf(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  participantIds: Id<"rotaParticipants">[],
+  caller: OrganizerRole | "admin",
+): Promise<boolean> {
+  if (caller === "admin" || caller.owner) return true;
+  for (const id of participantIds) {
+    const participant = await ctx.db.get(id);
+    if (participant && (await runsKhatma(ctx, khatma, participant))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Moves a participant's juz' of the next day to another one, swapping with its
+ * holder if it has one. A co-organizer can't move the owner's or another
+ * co-organizer's juz', nor swap one into theirs (`is_organizer`).
+ */
 export async function moveJuz(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
@@ -495,7 +537,8 @@ export async function moveJuz(
     fromJuz: number;
     toJuz: number;
   },
-): Promise<{ ok: true } | { error: "not_found" }> {
+  caller: OrganizerRole | "admin",
+): Promise<{ ok: true } | { error: "not_found" | "is_organizer" }> {
   if (!isJuz(args.fromJuz) || !isJuz(args.toJuz)) {
     return { error: "not_found" };
   }
@@ -506,6 +549,12 @@ export async function moveJuz(
     return { error: "not_found" };
   }
   const to = byJuz.get(args.toJuz);
+  const moved = to
+    ? [from.participantId, to.participantId]
+    : [from.participantId];
+  if (!(await mayTakeSlotsOf(ctx, khatma, moved, caller))) {
+    return { error: "is_organizer" };
+  }
   if (to) {
     // Swap holders; the slots stay where they are.
     await ctx.db.patch(from._id, { participantId: to.participantId });
@@ -518,12 +567,14 @@ export async function moveJuz(
   return { ok: true };
 }
 
+/** Frees a juz' of the next day. A co-organizer can't free the owner's or a co-organizer's (`is_organizer`). */
 export async function freeJuz(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
   _rota: RotaConfig,
   args: { participantId: Id<"rotaParticipants">; juz: number },
-): Promise<{ ok: true } | { error: "not_found" }> {
+  caller: OrganizerRole | "admin",
+): Promise<{ ok: true } | { error: "not_found" | "is_organizer" }> {
   if (!isJuz(args.juz)) return { error: "not_found" };
   const target = await targetDay(ctx, khatma);
   const row = (await slotRowsByJuz(ctx, khatma._id, target.number)).get(
@@ -532,6 +583,9 @@ export async function freeJuz(
   // The screen may be a day behind: only free the slot the organizer saw.
   if (!row || row.participantId !== args.participantId) {
     return { error: "not_found" };
+  }
+  if (!(await mayTakeSlotsOf(ctx, khatma, [row.participantId], caller))) {
+    return { error: "is_organizer" };
   }
   await ctx.db.delete(row._id);
   return { ok: true };
@@ -561,14 +615,8 @@ export async function removeParticipant(
   if (participant.personId === khatma.creatorPersonId) {
     return { error: byOwner ? "is_me" : "is_organizer" };
   }
-  if (!byOwner) {
-    const named = await ctx.db
-      .query("coOrganizers")
-      .withIndex("by_khatma_phone", (q) =>
-        q.eq("khatmaId", khatma._id).eq("phone", participant.phone),
-      )
-      .first();
-    if (named) return { error: "is_organizer" };
+  if (!byOwner && (await runsKhatma(ctx, khatma, participant))) {
+    return { error: "is_organizer" };
   }
   const slots = await ctx.db
     .query("rotaSlots")
@@ -583,18 +631,20 @@ export async function removeParticipant(
 }
 
 /**
- * Sets someone's name in this khatma, and in the organizer's saved list unless
- * they removed that row. Their own account's name stays as it is.
+ * Sets someone's name in this khatma, and in the caller's own saved list
+ * (`savedOwner`) unless they removed that row. Their own account's name stays
+ * as it is.
  */
 async function setParticipantName(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
   participant: Doc<"rotaParticipants">,
   name: string,
+  actor: Actor,
 ): Promise<void> {
   await ctx.db.patch(participant._id, { name });
   await refreshPhone(ctx, participant.phone);
-  const owner = khatma.creatorPersonId;
+  const owner = savedOwner(khatma, actor);
   const { personId, phone } = participant;
   const byPhone = await ctx.db
     .query("rotaContacts")
@@ -623,6 +673,7 @@ export async function renameParticipant(
   khatma: Doc<"khatmas">,
   _rota: RotaConfig,
   args: { participantId: Id<"rotaParticipants">; name: string },
+  actor: Actor,
 ): Promise<{ ok: true } | { error: "not_found" | "bad_name" }> {
   const participant = await activeParticipant(
     ctx,
@@ -632,7 +683,7 @@ export async function renameParticipant(
   if (!participant) return { error: "not_found" };
   const name = cleanDisplayName(args.name);
   if (name === null) return { error: "bad_name" };
-  await setParticipantName(ctx, khatma, participant, name);
+  await setParticipantName(ctx, khatma, participant, name, actor);
   return { ok: true };
 }
 
@@ -960,7 +1011,7 @@ export async function acceptJoinRequest(
       await ctx.db.patch(existing._id, { joinedAt: now });
     }
     if (chosenName !== undefined) {
-      await setParticipantName(ctx, khatma, existing, chosenName);
+      await setParticipantName(ctx, khatma, existing, chosenName, actor);
     }
     await ctx.db.patch(request._id, { resolvedAt: now, outcome: "accepted" });
     await welcomeAccepted(
