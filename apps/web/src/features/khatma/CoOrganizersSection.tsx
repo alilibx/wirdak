@@ -202,7 +202,8 @@ type Fns = {
 /**
  * The owner's «المنظّمون المساعدون» in a khatma's settings: who helps run it and with which
  * switches, a way to name someone, and a sheet per co-organizer. Shows nothing on a backend
- * without it (an admin has the admin's own card), and nothing to anyone the list refuses.
+ * without it (an admin has the admin's own card), nothing to anyone the list refuses, and
+ * nothing while the feature is off unless someone still holds the role.
  */
 export function CoOrganizersSection({ inviteCode }: { inviteCode: string }) {
   const backend = useRotaBackend(inviteCode);
@@ -227,6 +228,8 @@ function CoOrganizersList({ fns }: { fns: Fns }) {
   const [open, setOpen] = useState<Open | null>(null);
 
   if (!view || "forbidden" in view) return null;
+  // With the feature off, the section stays only while someone still holds the role (spec 6).
+  if (!view.enabled && view.coOrganizers.length === 0) return null;
 
   const full = view.coOrganizers.length >= view.max;
   const editing =

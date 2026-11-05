@@ -197,6 +197,12 @@ describe("CoOrganizersSection", () => {
     expect(screen.getByRole("dialog", { name: "مريم" })).toBeInTheDocument();
   });
 
+  it("shows nothing while the feature is off and nobody was named", () => {
+    m.list = listView({ enabled: false, coOrganizers: [] });
+    const { container } = render(<CoOrganizersSection inviteCode="CODE" />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("offers no add once the khatma has the most co-organizers it can", () => {
     m.list = listView({ max: 2 });
     render(<CoOrganizersSection inviteCode="CODE" />);
