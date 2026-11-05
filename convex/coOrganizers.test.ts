@@ -1,6 +1,6 @@
 import { convexTest, type TestConvexForDataModel } from "convex-test";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { linkCoOrganizerRoles } from "./coOrganizers";
 import { sha256Hex } from "./lib/crypto";
@@ -667,4 +667,55 @@ test("a People co-organizer never sees the number of someone in a pool khatma th
   // the pool's organizer, helping here, does not
   expect(await phoneOf(runsPool)).toBeNull();
   expect(JSON.stringify(await view(runsPool))).not.toContain(bakr.phone);
+});
+
+test("a co-organizer named before signing in marks their own juz' as their reply", async () => {
+  const t = convexTest(schema, modules);
+  const { org, code, khatma } = await rotaSetup(t);
+  const phone = "+971505550001";
+  const participantId = await addParticipant(t, code, org, "خالد", phone);
+  await name(t, code, org, `p:${participantId}`);
+
+  // signing in with that number, as verification does
+  const token = "co-khalid-token";
+  const tokenHash = await sha256Hex(token);
+  await t.run(async (ctx) => {
+    const personId = await ctx.db.insert("people", {
+      phone,
+      displayName: "خالد",
+      verifiedAt: NOW,
+      timeZone: "Asia/Dubai",
+      lastSeenAt: NOW,
+    });
+    await ctx.db.insert("sessions", {
+      personId,
+      tokenHash,
+      alertTokenHash: "co-khalid-alert",
+      deviceLabel: "test",
+      createdAt: NOW,
+      lastUsedAt: NOW,
+    });
+    await linkCoOrganizerRoles(ctx, (await ctx.db.get(personId))!);
+    await ctx.db.patch(participantId, { joinedAt: NOW - 1000, silentDays: 2 });
+  });
+  await t.mutation(api.rota.finishSetup, {
+    sessionToken: org.token,
+    inviteCode: code,
+  });
+  await t.mutation(internal.rotaDays.tick, { khatmaId: khatma._id });
+
+  const args = { sessionToken: token, inviteCode: code };
+  const today = await t.query(api.rota.today, args);
+  expect(today!.participants.find((p) => p.id === participantId)?.isMe).toBe(
+    true,
+  );
+  const tile = today!.tiles.find((x) => x.readerId === participantId)!;
+  const before = Date.now();
+  expect(
+    await t.mutation(api.rota.markDone, { ...args, readId: tile.readId }),
+  ).toMatchObject({ ok: true });
+
+  const row = await t.run((ctx) => ctx.db.get(participantId));
+  expect(row?.silentDays).toBe(0);
+  expect(row?.lastReplyAt).toBeGreaterThanOrEqual(before);
 });

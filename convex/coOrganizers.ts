@@ -229,6 +229,8 @@ async function candidatePhone(
  * A rota co-organizer with an account gets an active membership with
  * notifications on, so the khatma is on their home list and push reaches
  * them. Rota participants have none otherwise. A pool co-organizer is a member already.
+ * Their participant row, added by phone before the account, gets the account
+ * too, so Today knows it is them ("me", and their own juz' marked is their reply).
  */
 export async function ensureRotaMembership(
   ctx: MutationCtx,
@@ -236,6 +238,10 @@ export async function ensureRotaMembership(
   person: Doc<"people">,
 ): Promise<void> {
   if (khatma.kind !== "rota") return;
+  const row = await liveParticipant(ctx, khatma._id, person.phone);
+  if (row && row.personId === null) {
+    await ctx.db.patch(row._id, { personId: person._id });
+  }
   const existing = await ctx.db
     .query("members")
     .withIndex("by_khatma_person", (q) =>
