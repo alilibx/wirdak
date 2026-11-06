@@ -293,7 +293,11 @@ describe("RotaPeopleSetup: bringing people in", () => {
       contactIds: ["c1"],
     });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByText(t.rota.savedManyResult(1, 0))).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        t.rota.savedManyResult({ added: 1, noRoom: 0, skipped: 0 }),
+      ),
+    ).toBeInTheDocument();
   });
 
   it("offers no saved list when nobody is saved", () => {

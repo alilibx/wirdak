@@ -330,7 +330,9 @@ describe("PeoplePanel", () => {
       contactIds: ["c1"],
     });
     expect(
-      await screen.findByText(t.rota.savedManyResult(1, 0)),
+      await screen.findByText(
+        t.rota.savedManyResult({ added: 1, noRoom: 0, skipped: 0 }),
+      ),
     ).toBeInTheDocument();
   });
 

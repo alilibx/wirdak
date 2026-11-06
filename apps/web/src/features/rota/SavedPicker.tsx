@@ -159,7 +159,9 @@ function Checklist({
     () => new Set(),
   );
 
-  const room = Math.max(0, (people?.freeJuz.length ?? 0) - ticked.size);
+  // Until the free ajza' load, the server's own count is the limit (it reports who didn't fit).
+  const free = people ? people.freeJuz.length : Infinity;
+  const room = Math.max(0, free - ticked.size);
   const locked = busy || question !== null;
   const canTick = (c: SavedContact) =>
     !c.inKhatma && !ticked.has(c.id) && room > 0;
@@ -196,7 +198,13 @@ function Checklist({
       () => {
         const done = result;
         if (done && "ok" in done) {
-          onAddedMany?.(t.rota.savedManyResult(done.added, done.noRoom));
+          onAddedMany?.(
+            t.rota.savedManyResult({
+              added: done.added,
+              noRoom: done.noRoom,
+              skipped: done.alreadyIn + done.notFound,
+            }),
+          );
         }
         onClose();
       },

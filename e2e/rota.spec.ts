@@ -151,7 +151,13 @@ test("rota: add several saved people to a new khatma in one press", async ({
     .click();
   await expect(picker).toBeHidden();
   await expect(
-    page.getByText(t.rota.savedManyResult(readers.length, 0)),
+    page.getByText(
+      t.rota.savedManyResult({
+        added: readers.length,
+        noRoom: 0,
+        skipped: 0,
+      }),
+    ),
   ).toBeVisible();
   // A holds juz' 1; the three take the next ones, in the list's order.
   await expect(people.getByRole("listitem")).toHaveCount(4);

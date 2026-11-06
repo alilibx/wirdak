@@ -27,6 +27,17 @@ function counted(
     : `${digits} ${forms.many}`;
 }
 
+/** «ل» before a count of people: `لشخص واحد`, `لشخصين`, `لـ٣ أشخاص`, `لـ١١ شخصاً`. */
+function forPeople(n: number): string {
+  const said = counted(n, {
+    one: "شخص واحد",
+    two: "شخصين",
+    few: "أشخاص",
+    many: "شخصاً",
+  });
+  return n <= 2 ? `ل${said}` : `لـ${said}`;
+}
+
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
@@ -823,11 +834,18 @@ export const ar = {
     savedPickActive: "حدّد من يقرأ معك الآن",
     /** How many more can be ticked: the ajza' with no reader left. */
     savedRoom: (n: number) =>
-      n === 0
-        ? "لم يبقَ جزء بلا قارئ."
-        : `يتّسع لـ${counted(n, { one: "شخص واحد", two: "شخصين", few: "أشخاص", many: "شخصاً" })}.`,
+      n === 0 ? "لم يبقَ جزء بلا قارئ." : `يتّسع ${forPeople(n)}.`,
     savedAddMany: (n: number) => `أضِف (${toArabicDigits(n)})`,
-    savedManyResult: (added: number, noRoom: number) => {
+    savedManyResult: ({
+      added,
+      noRoom,
+      skipped,
+    }: {
+      added: number;
+      noRoom: number;
+      /** Already in the khatma, or no longer on the caller's list. */
+      skipped: number;
+    }) => {
       const people = (n: number) =>
         counted(n, {
           one: "شخصاً واحداً",
@@ -835,10 +853,23 @@ export const ar = {
           few: "أشخاص",
           many: "شخصاً",
         });
-      if (added === 0) return "لم نضف أحداً: كلّهم في الختمة أو لم يبقَ جزء.";
-      const left =
-        noRoom > 0 ? ` لم يتّسع لـ${people(noRoom)} لأن الأجزاء اكتملت.` : "";
-      return `أضفنا ${people(added)}.${left} لتصلهم رسائل الختمة يرسل كلٌّ منهم رسالة الانضمام من رابط المجموعة.`;
+      const parts = [added > 0 ? `أضفنا ${people(added)}.` : "لم نضف أحداً."];
+      if (noRoom > 0) {
+        parts.push(`لم يتّسع ${forPeople(noRoom)} لأن الأجزاء اكتملت.`);
+      }
+      if (skipped > 0) {
+        parts.push(
+          skipped === 1
+            ? `تركنا ${people(1)} لأنه في الختمة أو لم يعد في قائمتك.`
+            : `تركنا ${people(skipped)} لأنهم في الختمة أو لم يعودوا في قائمتك.`,
+        );
+      }
+      if (added > 0) {
+        parts.push(
+          "لتصلهم رسائل الختمة يرسل كلٌّ منهم رسالة الانضمام من رابط المجموعة.",
+        );
+      }
+      return parts.join(" ");
     },
     importTitle: (title: string) => `أضف أعضاء ${title}`,
     importCount: (n: number) =>

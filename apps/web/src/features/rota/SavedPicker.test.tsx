@@ -104,7 +104,9 @@ describe("SavedPicker", () => {
       contactIds: ["c1", "c2"],
     });
     expect(m.addSaved).not.toHaveBeenCalled();
-    expect(onAddedMany).toHaveBeenCalledWith(t.rota.savedManyResult(2, 0));
+    expect(onAddedMany).toHaveBeenCalledWith(
+      t.rota.savedManyResult({ added: 2, noRoom: 0, skipped: 0 }),
+    );
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -145,6 +147,31 @@ describe("SavedPicker", () => {
     expect(
       screen.queryByRole("button", { name: t.rota.savedPickActive }),
     ).toBeNull();
+  });
+
+  it("while the free ajza' load, people can still be ticked", async () => {
+    const user = userEvent.setup();
+    m.people = undefined;
+    render(<SavedPicker inviteCode="CODE" onClose={() => {}} />);
+    const box = screen.getByRole("checkbox", { name: /أم خالد/ });
+    expect(box).not.toBeDisabled();
+    await user.click(box);
+    expect(box).toBeChecked();
+  });
+
+  it("the room line reads right for one, two, and more", () => {
+    expect(t.rota.savedRoom(1)).toBe("يتّسع لشخص واحد.");
+    expect(t.rota.savedRoom(2)).toBe("يتّسع لشخصين.");
+    expect(t.rota.savedRoom(5)).toBe("يتّسع لـ٥ أشخاص.");
+  });
+
+  it("the result says who was added, who didn't fit, and who was skipped", () => {
+    expect(t.rota.savedManyResult({ added: 2, noRoom: 1, skipped: 1 })).toBe(
+      "أضفنا شخصين. لم يتّسع لشخص واحد لأن الأجزاء اكتملت. تركنا شخصاً واحداً لأنه في الختمة أو لم يعد في قائمتك. لتصلهم رسائل الختمة يرسل كلٌّ منهم رسالة الانضمام من رابط المجموعة.",
+    );
+    expect(t.rota.savedManyResult({ added: 0, noRoom: 0, skipped: 3 })).toBe(
+      "لم نضف أحداً. تركنا ٣ أشخاص لأنهم في الختمة أو لم يعودوا في قائمتك.",
+    );
   });
 
   it("late in the day, asks once and sends the answer for the whole batch", async () => {

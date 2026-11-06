@@ -7,6 +7,7 @@ import {
   activeIdentities,
   lateInTheDay,
   placeNewParticipant,
+  resolveContact,
   savedOwner,
   type Actor,
 } from "./people";
@@ -49,45 +50,21 @@ export async function addSavedMany(
     throw new ConvexError({ code: "too_many" });
   }
   const owner = savedOwner(khatma, actor);
-  const { phones, personIds } = await activeIdentities(ctx, khatma._id);
+  const identities = await activeIdentities(ctx, khatma._id);
   let alreadyIn = 0;
   let notFound = 0;
   const batch: Who[] = [];
   for (const contactId of new Set(args.contactIds)) {
-    const contact = await ctx.db.get(contactId);
-    if (
-      !contact ||
-      contact.ownerPersonId !== owner ||
-      contact.removedAt !== undefined
-    ) {
-      notFound += 1;
+    // The identities grow as the batch does, so one number listed twice goes in once.
+    const who = await resolveContact(ctx, contactId, owner, identities);
+    if ("error" in who) {
+      if (who.error === "not_found") notFound += 1;
+      else alreadyIn += 1;
       continue;
     }
-    // A contact without a number is someone from a pool khatma: it stays hidden.
-    const linked =
-      contact.phone === null && contact.personId !== null
-        ? await ctx.db.get(contact.personId)
-        : null;
-    const phone = contact.phone ?? linked?.phone ?? null;
-    if (phone === null) {
-      notFound += 1;
-      continue;
-    }
-    if (
-      phones.has(phone) ||
-      (contact.personId !== null && personIds.has(contact.personId))
-    ) {
-      alreadyIn += 1;
-      continue;
-    }
-    phones.add(phone);
-    if (contact.personId !== null) personIds.add(contact.personId);
-    batch.push({
-      name: contact.name,
-      phone,
-      personId: contact.personId,
-      phoneHidden: contact.phone === null,
-    });
+    identities.phones.add(who.phone);
+    if (who.personId !== null) identities.personIds.add(who.personId);
+    batch.push(who);
   }
 
   const target = await targetDay(ctx, khatma);

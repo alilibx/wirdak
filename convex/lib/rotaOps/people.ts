@@ -853,40 +853,51 @@ export type SavedContact = {
 };
 
 /**
- * Whether `phone` reads now in a live rota khatma `owner` runs, other than
- * `except`: set up, on its list, joined, not stopped or silenced, and holding
- * a juz'. Someone who holds nothing was taken off on purpose (`spreadFreeJuz`
- * gives them nothing either).
+ * Who reads now in the live rota khatmas `owner` runs, other than `except`, by
+ * phone and by linked person: set up, on the list, joined, not stopped or
+ * silenced, and holding a juz'. Someone who holds nothing was taken off on
+ * purpose (`spreadFreeJuz` gives them nothing either).
  */
-async function readsWith(
+async function readingNow(
   ctx: QueryCtx,
-  phone: string,
   owner: Id<"people">,
   except: Id<"khatmas">,
-): Promise<boolean> {
-  const rows = await ctx.db
-    .query("rotaParticipants")
-    .withIndex("by_phone", (q) => q.eq("phone", phone))
-    .collect();
-  for (const row of rows) {
-    if (row.khatmaId === except || !reachable(row)) continue;
-    const khatma = await ctx.db.get(row.khatmaId);
-    if (
-      !khatma ||
-      khatma.kind !== "rota" ||
-      khatma.creatorPersonId !== owner ||
-      isArchived(khatma) ||
-      khatma.rota?.setupDoneAt == null
-    ) {
-      continue;
-    }
-    const slot = await ctx.db
-      .query("rotaSlots")
-      .withIndex("by_participant", (q) => q.eq("participantId", row._id))
-      .first();
-    if (slot) return true;
-  }
-  return false;
+): Promise<{ phones: Set<string>; personIds: Set<Id<"people">> }> {
+  const phones = new Set<string>();
+  const personIds = new Set<Id<"people">>();
+  const khatmas = (
+    await ctx.db
+      .query("khatmas")
+      .withIndex("by_creator", (q) => q.eq("creatorPersonId", owner))
+      .collect()
+  ).filter(
+    (k) =>
+      k._id !== except &&
+      k.kind === "rota" &&
+      !isArchived(k) &&
+      k.rota?.setupDoneAt != null,
+  );
+  await Promise.all(
+    khatmas.map(async (k) => {
+      const [rows, slots] = await Promise.all([
+        ctx.db
+          .query("rotaParticipants")
+          .withIndex("by_khatma", (q) => q.eq("khatmaId", k._id))
+          .collect(),
+        ctx.db
+          .query("rotaSlots")
+          .withIndex("by_khatma_slot", (q) => q.eq("khatmaId", k._id))
+          .collect(),
+      ]);
+      const holding = new Set(slots.map((slot) => slot.participantId));
+      for (const row of rows) {
+        if (!reachable(row) || !holding.has(row._id)) continue;
+        phones.add(row.phone);
+        if (row.personId !== null) personIds.add(row.personId);
+      }
+    }),
+  );
+  return { phones, personIds };
 }
 
 /** Active participants of a khatma, by phone and by linked person. */
@@ -920,15 +931,10 @@ export async function saved(
     .query("rotaContacts")
     .withIndex("by_owner", (q) => q.eq("ownerPersonId", owner))
     .collect();
-  const list: SavedContact[] = [];
-  for (const c of contacts) {
-    if (c.removedAt !== undefined) continue;
-    // A hidden number is looked up through the linked person, never returned.
-    const phone =
-      c.phone ??
-      (c.personId === null ? null : (await ctx.db.get(c.personId))?.phone) ??
-      null;
-    list.push({
+  const reading = await readingNow(ctx, owner, khatma._id);
+  return contacts
+    .filter((c) => c.removedAt === undefined)
+    .map((c) => ({
       id: c._id,
       name: c.name,
       phone: c.phone,
@@ -936,13 +942,63 @@ export async function saved(
         (c.phone !== null && phones.has(c.phone)) ||
         (c.personId !== null && personIds.has(c.personId)),
       active:
-        phone !== null && (await readsWith(ctx, phone, owner, khatma._id)),
-    });
+        (c.phone !== null && reading.phones.has(c.phone)) ||
+        (c.personId !== null && reading.personIds.has(c.personId)),
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.active) - Number(a.active) ||
+        a.name.localeCompare(b.name, "ar"),
+    );
+}
+
+/**
+ * A saved contact of `owner`, ready to place: its name, number (a hidden one
+ * through the linked person) and link. `not_found` for a contact that isn't
+ * theirs, was removed, or has no number to reach; `already_added` when that
+ * number or person is in `identities` (the khatma's active participants).
+ */
+export async function resolveContact(
+  ctx: QueryCtx,
+  contactId: Id<"rotaContacts">,
+  owner: Id<"people">,
+  identities: { phones: Set<string>; personIds: Set<Id<"people">> },
+): Promise<
+  | {
+      name: string;
+      phone: string;
+      personId: Id<"people"> | null;
+      phoneHidden: boolean;
+    }
+  | { error: "not_found" | "already_added" }
+> {
+  const contact = await ctx.db.get(contactId);
+  if (
+    !contact ||
+    contact.ownerPersonId !== owner ||
+    contact.removedAt !== undefined
+  ) {
+    return { error: "not_found" };
   }
-  return list.sort(
-    (a, b) =>
-      Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, "ar"),
-  );
+  // A contact without a number is someone from a pool khatma: it stays hidden.
+  const linked =
+    contact.phone === null && contact.personId !== null
+      ? await ctx.db.get(contact.personId)
+      : null;
+  const phone = contact.phone ?? linked?.phone ?? null;
+  if (phone === null) return { error: "not_found" };
+  if (
+    identities.phones.has(phone) ||
+    (contact.personId !== null && identities.personIds.has(contact.personId))
+  ) {
+    return { error: "already_added" };
+  }
+  return {
+    name: contact.name,
+    phone,
+    personId: contact.personId,
+    phoneHidden: contact.phone === null,
+  };
 }
 
 /** Adds a saved contact to the khatma, as `addParticipant` does for a typed one. */
@@ -963,38 +1019,17 @@ export async function addSaved(
         | "ask_today";
     }
 > {
-  const contact = await ctx.db.get(args.contactId);
-  if (
-    !contact ||
-    contact.ownerPersonId !== savedOwner(khatma, actor) ||
-    contact.removedAt !== undefined
-  ) {
-    return { error: "not_found" };
-  }
-  // A contact without a number is someone from a pool khatma: it stays hidden.
-  const linked =
-    contact.phone === null && contact.personId !== null
-      ? await ctx.db.get(contact.personId)
-      : null;
-  const phone = contact.phone ?? linked?.phone ?? null;
-  if (phone === null) return { error: "not_found" };
-
-  const { phones, personIds } = await activeIdentities(ctx, khatma._id);
-  if (
-    phones.has(phone) ||
-    (contact.personId !== null && personIds.has(contact.personId))
-  ) {
-    return { error: "already_added" };
-  }
+  const who = await resolveContact(
+    ctx,
+    args.contactId,
+    savedOwner(khatma, actor),
+    await activeIdentities(ctx, khatma._id),
+  );
+  if ("error" in who) return who;
   const placed = await placeNewParticipant(
     ctx,
     khatma,
-    {
-      name: contact.name,
-      phone,
-      personId: contact.personId,
-      phoneHidden: contact.phone === null,
-    },
+    who,
     args.juz,
     undefined,
     { readsToday: args.readsToday },
