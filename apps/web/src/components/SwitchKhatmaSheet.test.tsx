@@ -124,7 +124,7 @@ describe("SwitchKhatmaSheet", () => {
       name: /ختمة العائلة/,
       current: false,
     });
-    expect(row).toHaveTextContent("ختمة بالتناوب · ٢٦ من ٣٠ اليوم");
+    expect(row).toHaveTextContent("ختمة بالتناوب، ٢٦ من ٣٠ اليوم");
   });
 
   it("leaves archived khatmas out", () => {

@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
+import { twMerge } from "tailwind-merge";
 
 type Variant = "primary" | "ghost" | "whatsapp" | "gold";
 
@@ -15,9 +16,13 @@ const variants: Record<Variant, string> = {
     "min-h-14 border-2 border-line bg-transparent text-ink-soft text-base font-medium",
 };
 
-/** The button look, for links that must read as buttons. */
+/**
+ * The button look, for links that must read as buttons. `extra` wins over the variant's own
+ * classes: a plain join would leave the winner to the stylesheet's order, which put a ghost
+ * button's grey over the red of a delete button.
+ */
 export function buttonClass(variant: Variant = "primary", extra = ""): string {
-  return `${base} ${variants[variant]} ${extra}`.trim();
+  return twMerge(base, variants[variant], extra);
 }
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant };

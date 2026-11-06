@@ -71,6 +71,24 @@ function ActiveTag() {
   );
 }
 
+/**
+ * Under a saved person's name: «في هذه الختمة» when they are in it already, else their number.
+ * It sits on its own line so a long number never squeezes the name onto two on a small phone.
+ */
+function SecondLine({ contact }: { contact: SavedContact }) {
+  if (contact.inKhatma) {
+    return (
+      <span className="text-base text-ink-soft">{t.rota.savedInKhatma}</span>
+    );
+  }
+  if (contact.phone === null) return null;
+  return (
+    <span dir="ltr" className="text-base text-ink-soft">
+      {contact.phone}
+    </span>
+  );
+}
+
 function OneTap({
   inviteCode,
   juz,
@@ -112,23 +130,13 @@ function OneTap({
               type="button"
               disabled={busy || contact.inKhatma || question !== null}
               onClick={() => void add(contact.id)}
-              className="flex min-h-14 w-full items-center justify-between gap-3 rounded-ui border-2 border-line bg-card px-4 py-2 text-start disabled:opacity-50"
+              className="flex min-h-14 w-full flex-col items-start justify-center gap-0.5 rounded-ui border-2 border-line bg-card px-4 py-2 text-start disabled:opacity-50"
             >
               <span className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{contact.name}</span>
                 {contact.active && !contact.inKhatma && <ActiveTag />}
               </span>
-              {contact.inKhatma ? (
-                <span className="text-base text-ink-soft">
-                  {t.rota.savedInKhatma}
-                </span>
-              ) : (
-                contact.phone !== null && (
-                  <span dir="ltr" className="text-base text-ink-soft">
-                    {contact.phone}
-                  </span>
-                )
-              )}
+              <SecondLine contact={contact} />
             </button>
           </li>
         ))}
@@ -243,21 +251,13 @@ function Checklist({
                   onChange={() => toggle(contact.id)}
                   className="size-6 shrink-0 accent-[var(--green)]"
                 />
-                <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                  <span className="font-medium">{contact.name}</span>
-                  {contact.active && !contact.inKhatma && <ActiveTag />}
-                </span>
-                {contact.inKhatma ? (
-                  <span className="text-base text-ink-soft">
-                    {t.rota.savedInKhatma}
+                <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{contact.name}</span>
+                    {contact.active && !contact.inKhatma && <ActiveTag />}
                   </span>
-                ) : (
-                  contact.phone !== null && (
-                    <span dir="ltr" className="text-base text-ink-soft">
-                      {contact.phone}
-                    </span>
-                  )
-                )}
+                  <SecondLine contact={contact} />
+                </span>
               </label>
             </li>
           );
