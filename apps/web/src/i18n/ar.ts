@@ -734,7 +734,7 @@ export const ar = {
     answerNone: "لم يردّ",
     answerNotYet: "ردّ: ليس بعد",
     cardLine: (done: string, total: string) =>
-      `ختمة بالتناوب · ${done} من ${total} اليوم`,
+      `ختمة بالتناوب، ${done} من ${total} اليوم`,
     // Today
     heading: (number: number, date: string) =>
       `الختمة ${toArabicDigits(number)} · ${date}`,

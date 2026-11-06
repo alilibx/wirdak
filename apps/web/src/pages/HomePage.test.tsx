@@ -142,7 +142,7 @@ describe("HomePage", () => {
     const link = screen
       .getAllByRole("link")
       .find((l) => l.getAttribute("href") === "/j/AAA")!;
-    expect(link).toHaveTextContent("ختمة بالتناوب · ٢٦ من ٣٠ اليوم");
+    expect(link).toHaveTextContent("ختمة بالتناوب، ٢٦ من ٣٠ اليوم");
     expect(link).not.toHaveTextContent("تمّت");
     expect(link).not.toHaveTextContent("جزؤك");
     expect(within(link).getByRole("progressbar")).toHaveAttribute(
