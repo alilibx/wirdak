@@ -291,6 +291,8 @@ describe("ArchivedSection", () => {
     ["a hamza on the alef", "إحذف", true],
     ["another word", "حذف", false],
     ["nothing", "", false],
+    ["a direction mark", "\u200Fاحذف", true],
+    ["tatweel", "احـذف", true],
     ["the word and more", "احذف الختمة", false],
   ])("isDeleteWord takes %s: %s", (_, typed, expected) => {
     expect(isDeleteWord(typed)).toBe(expected);
@@ -302,6 +304,20 @@ describe("ArchivedSection", () => {
     await user.click(deleteButton(confirm));
     expect(m.remove).toHaveBeenCalledWith(args);
     expect(where()).toBe("/");
+  });
+
+  it("starts with an empty field each time the sheet opens", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const confirm = await openDelete(user);
+    await user.click(
+      within(confirm).getByRole("button", { name: t.archive.cancel }),
+    );
+    await user.click(screen.getByRole("button", { name: t.archive.delete }));
+    const again = sheet(t.archive.deleteTitle);
+    expect(within(again).getByLabelText(t.archive.deleteTypeLabel)).toHaveValue(
+      "",
+    );
+    expect(deleteButton(again)).toBeDisabled();
   });
 
   it("backing out of delete deletes nothing", async () => {

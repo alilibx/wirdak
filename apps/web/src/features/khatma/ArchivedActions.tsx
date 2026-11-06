@@ -193,11 +193,17 @@ function RestartSheet({
 }
 
 /**
- * Whether `typed` is the word «احذف». Spaces around it and a hamza on the alef (إحذف) still
- * count: the word is there to slow a tap down, not to test spelling.
+ * Whether `typed` is the word «احذف». Spaces around it, a hamza on the alef (إحذف), tatweel, and
+ * the invisible direction and zero-width marks some keyboards and pastes add still count: the
+ * word is there to slow a tap down, not to test spelling.
  */
 export function isDeleteWord(typed: string): boolean {
-  return typed.trim().replace(/[أإآ]/g, "ا") === t.archive.deleteWord;
+  return (
+    typed
+      .replace(/[\u0640\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, "")
+      .trim()
+      .replace(/[أإآ]/g, "ا") === t.archive.deleteWord
+  );
 }
 
 /**
