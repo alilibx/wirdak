@@ -10,7 +10,7 @@ import {
 } from "./coOrganizers";
 import { adminQuery } from "./lib/adminSession";
 import { isBlocked } from "./lib/blocked";
-import { isArchived } from "./lib/khatma";
+import { activeCount, isArchived } from "./lib/khatma";
 import { JUZ_COUNT } from "./lib/juz";
 import { ROTA_SIZE } from "./lib/rota";
 import { khatmaJoinLink } from "./lib/rotaJoin";
@@ -22,24 +22,6 @@ import { env } from "./whatsapp";
 const MAX_RESULTS = 20;
 const MIN_QUERY = 2;
 const MAX_HELP = 20;
-
-async function activeCount(ctx: QueryCtx, khatmaId: Id<"khatmas">) {
-  const members = await ctx.db
-    .query("members")
-    .withIndex("by_khatma", (q) => q.eq("khatmaId", khatmaId))
-    .collect();
-  return members.filter((m) => m.status === "active").length;
-}
-
-/** Who is in a khatma: its active members, or a rotating khatma's readers still on the list. */
-export async function memberCount(ctx: QueryCtx, k: Doc<"khatmas">) {
-  if (k.kind !== "rota") return await activeCount(ctx, k._id);
-  const readers = await ctx.db
-    .query("rotaParticipants")
-    .withIndex("by_khatma", (q) => q.eq("khatmaId", k._id))
-    .collect();
-  return readers.filter((p) => p.removedAt === null).length;
-}
 
 /** How far a reading day has come, or null unless it's open. */
 export async function dayProgress(ctx: QueryCtx, day: Doc<"rotaDays"> | null) {

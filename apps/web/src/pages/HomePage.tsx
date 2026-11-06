@@ -182,6 +182,11 @@ function KhatmaCard({ khatma }: { khatma: Card }) {
           <span>{t.schedules[khatma.schedule]}</span>
         </span>
       )}
+      {khatma.peopleCount !== null && (
+        <span className="mt-2 inline-block rounded-full bg-paper-2 px-3 py-0.5 text-base font-medium text-ink-soft">
+          {t.home.peopleCount(khatma.peopleCount)}
+        </span>
+      )}
       {!khatma.archived && khatma.hasNote && (
         <span className="mt-2 flex items-center gap-2 text-base font-semibold text-green-deep">
           <span

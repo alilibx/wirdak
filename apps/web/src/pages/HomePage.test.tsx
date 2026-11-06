@@ -91,6 +91,7 @@ const card = (over: object = {}) => ({
   done: 12,
   holding: null,
   hasNote: false,
+  peopleCount: null,
   ...over,
 });
 
@@ -148,6 +149,29 @@ describe("HomePage", () => {
       "aria-valuenow",
       "26",
     );
+  });
+
+  it("an organizer's card shows how many people are in it; a member's shows none", () => {
+    m.mine = [
+      card({ peopleCount: 3 }),
+      card({ inviteCode: "BBB", peopleCount: null }),
+      card({ inviteCode: "CCC", peopleCount: 1 }),
+      card({ inviteCode: "DDD", peopleCount: 2 }),
+      card({ inviteCode: "EEE", peopleCount: 11 }),
+    ];
+    renderHome();
+    const cardOf = (code: string) =>
+      screen
+        .getAllByRole("link")
+        .find((l) => l.getAttribute("href") === `/j/${code}`)!;
+    expect(cardOf("AAA")).toHaveTextContent(t.home.peopleCount(3));
+    expect(t.home.peopleCount(3)).toBe("٣ أشخاص");
+    expect(t.home.peopleCount(1)).toBe("شخص واحد");
+    expect(t.home.peopleCount(2)).toBe("شخصان");
+    expect(t.home.peopleCount(11)).toBe("١١ شخصاً");
+    expect(cardOf("BBB")).not.toHaveTextContent(/شخص|أشخاص/);
+    expect(cardOf("CCC")).toHaveTextContent("شخص واحد");
+    expect(cardOf("EEE")).toHaveTextContent("١١ شخصاً");
   });
 
   it("home shows the new-message label", () => {

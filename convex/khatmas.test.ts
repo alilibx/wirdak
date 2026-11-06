@@ -522,6 +522,7 @@ test("mine lists active memberships newest first with progress", async () => {
       holding: null,
       hasNote: false,
       archived: false,
+      peopleCount: 1,
     },
     {
       kind: "pool",
@@ -533,8 +534,48 @@ test("mine lists active memberships newest first with progress", async () => {
       holding: 6,
       hasNote: false,
       archived: false,
+      peopleCount: 1,
     },
   ]);
+});
+
+test("mine gives the organizer a people count and a member none", async () => {
+  const t = convexTest(schema, modules);
+  const ali = await signedIn(t, "A");
+  const bob = await signedIn(t, "B");
+  const cy = await signedIn(t, "C");
+  const dee = await signedIn(t, "D");
+
+  const code = await createKhatma(t, ali);
+  const pool = await khatmaByCode(t, code);
+  await join(t, pool._id, bob);
+  await join(t, pool._id, cy);
+  await join(t, pool._id, dee, { status: "blocked" });
+
+  const rotaId = await createRotaKhatma(t, ali, "rotaKhatma02");
+  await t.run(async (ctx) => {
+    for (const [i, removedAt] of [null, null, NOW].entries()) {
+      await ctx.db.insert("rotaParticipants", {
+        khatmaId: rotaId,
+        name: `قارئ ${i}`,
+        phone: `+97150558000${i}`,
+        personId: null,
+        addedAt: NOW,
+        removedAt,
+      });
+    }
+  });
+
+  const counts = (
+    cards: { inviteCode: string; peopleCount: number | null }[],
+  ) => Object.fromEntries(cards.map((c) => [c.inviteCode, c.peopleCount]));
+  // Ali, Bob and Cy are in the pool; Dee is blocked. Two readers are still on the rota's list.
+  expect(
+    counts(await t.query(api.khatmas.mine, { sessionToken: ali.token })),
+  ).toEqual({ [code]: 3, rotaKhatma02: 2 });
+  expect(
+    counts(await t.query(api.khatmas.mine, { sessionToken: bob.token })),
+  ).toEqual({ [code]: null });
 });
 
 /** A rota khatma row with `who` as its organizer and an active member. */

@@ -528,6 +528,14 @@ export const ar = {
     startNew: "＋ ابدأ ختمة جديدة",
     startNewPlain: "ابدأ ختمة جديدة",
     settings: "إعداداتي",
+    /** The people in a khatma the viewer runs: `شخص واحد`, `شخصان`, `٣ أشخاص`, `١١ شخصاً`. */
+    peopleCount: (n: number) =>
+      counted(n, {
+        one: "شخص واحد",
+        two: "شخصان",
+        few: "أشخاص",
+        many: "شخصاً",
+      }),
     doneOf: (done: string, total: string) => `${done} من ${total} تمّت`,
     yours: (n: string, name: string) => `جزؤك: الجزء ${n} «${name}»`,
     archived: "المؤرشفة",
