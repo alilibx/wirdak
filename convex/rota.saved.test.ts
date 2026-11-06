@@ -1158,9 +1158,11 @@ test("saved marks people who read in the organizer's other live khatmas and list
       rota: { ...other.rota!, setupDoneAt: NOW },
     });
     // A copy of it, archived.
-    const { _id, _creationTime, ...copy } = other;
+    const copy: Partial<Doc<"khatmas">> = { ...other };
+    delete copy._id;
+    delete copy._creationTime;
     const archivedId = await ctx.db.insert("khatmas", {
-      ...copy,
+      ...(copy as Omit<Doc<"khatmas">, "_id" | "_creationTime">),
       inviteCode: "archivedCode",
       rota: { ...other.rota!, setupDoneAt: NOW },
       archivedAt: NOW,

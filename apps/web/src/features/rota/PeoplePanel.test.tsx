@@ -80,7 +80,13 @@ beforeEach(() => {
   m.fns = {};
   m.view = makeView();
   m.saved = [
-    { id: "c1", name: "أم خالد", phone: "+971509998877", inKhatma: false },
+    {
+      id: "c1",
+      name: "أم خالد",
+      phone: "+971509998877",
+      inKhatma: false,
+      active: false,
+    },
   ];
 });
 
@@ -219,7 +225,11 @@ describe("PeoplePanel", () => {
     await user.click(
       screen.getByRole("button", { name: /أضف قارئاً للجزء ٥/ }),
     );
-    await user.click(screen.getByRole("button", { name: t.rota.savedFrom }));
+    await user.click(
+      within(
+        screen.getByRole("dialog", { name: t.rota.readerTitle(5) }),
+      ).getByRole("button", { name: t.rota.savedFrom }),
+    );
     const picker = screen.getByRole("dialog", { name: t.rota.savedTitle });
     await user.click(within(picker).getByRole("button", { name: /أم خالد/ }));
     const question = await within(picker).findByRole("group", {
@@ -292,6 +302,44 @@ describe("PeoplePanel", () => {
     await user.click(screen.getByRole("button", { name: t.rota.cancel }));
     expect(m.fns.renameParticipant).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: t.rota.rename })).toBeVisible();
+  });
+
+  it("the leftover banner adds several saved people and says what it did", async () => {
+    m.fns.addSavedMany = vi.fn().mockResolvedValue({
+      ok: true,
+      added: 1,
+      alreadyIn: 0,
+      noRoom: 0,
+      notFound: 0,
+    });
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+    const banner = screen.getByText(/بلا قارئ/, { selector: "p" })
+      .parentElement as HTMLElement;
+    await user.click(
+      within(banner).getByRole("button", { name: t.rota.savedFrom }),
+    );
+    const picker = screen.getByRole("dialog", { name: t.rota.savedTitle });
+    await user.click(within(picker).getByRole("checkbox", { name: /أم خالد/ }));
+    await user.click(
+      within(picker).getByRole("button", { name: t.rota.savedAddMany(1) }),
+    );
+    expect(m.fns.addSavedMany).toHaveBeenCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+      contactIds: ["c1"],
+    });
+    expect(
+      await screen.findByText(t.rota.savedManyResult(1, 0)),
+    ).toBeInTheDocument();
+  });
+
+  it("the leftover banner offers no saved list when everyone saved is in already", () => {
+    m.saved = [
+      { id: "c1", name: "أم خالد", phone: null, inKhatma: true, active: false },
+    ];
+    render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+    expect(screen.queryByRole("button", { name: t.rota.savedFrom })).toBeNull();
   });
 
   it("offers nothing from before when no one is saved", async () => {

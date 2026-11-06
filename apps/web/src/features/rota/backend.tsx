@@ -24,6 +24,7 @@ const organizerFunctions = {
   renameParticipant: api.rota.renameParticipant,
   removeParticipant: api.rota.removeParticipant,
   addSaved: api.rota.addSaved,
+  addSavedMany: api.rota.addSavedMany,
   importMembers: api.rota.importMembers,
   ensureJoinLink: api.rota.ensureJoinLink,
   acceptJoinRequest: api.rota.acceptJoinRequest,

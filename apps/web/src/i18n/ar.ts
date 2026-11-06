@@ -810,6 +810,28 @@ export const ar = {
       already_added: "هذا الشخص مضاف في الختمة.",
       not_found: "لم نجد هذا الشخص. أعد تحميل الصفحة.",
     } as Record<string, string>,
+    savedManyHint: "حدّد من تريد إضافتهم، ويأخذ كلٌّ منهم أول جزء بلا قارئ.",
+    savedActive: "يقرأ معك الآن",
+    savedPickActive: "حدّد من يقرأ معك الآن",
+    /** How many more can be ticked: the ajza' with no reader left. */
+    savedRoom: (n: number) =>
+      n === 0
+        ? "لم يبقَ جزء بلا قارئ."
+        : `يتّسع لـ${counted(n, { one: "شخص واحد", two: "شخصين", few: "أشخاص", many: "شخصاً" })}.`,
+    savedAddMany: (n: number) => `أضِف (${toArabicDigits(n)})`,
+    savedManyResult: (added: number, noRoom: number) => {
+      const people = (n: number) =>
+        counted(n, {
+          one: "شخصاً واحداً",
+          two: "شخصين",
+          few: "أشخاص",
+          many: "شخصاً",
+        });
+      if (added === 0) return "لم نضف أحداً: كلّهم في الختمة أو لم يبقَ جزء.";
+      const left =
+        noRoom > 0 ? ` لم يتّسع لـ${people(noRoom)} لأن الأجزاء اكتملت.` : "";
+      return `أضفنا ${people(added)}.${left} لتصلهم رسائل الختمة يرسل كلٌّ منهم رسالة الانضمام من رابط المجموعة.`;
+    },
     importTitle: (title: string) => `أضف أعضاء ${title}`,
     importCount: (n: number) =>
       `${counted(n, { one: "عضو واحد", two: "عضوان", few: "أعضاء", many: "عضواً" })}، بالأسماء فقط`,

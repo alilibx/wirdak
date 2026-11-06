@@ -6,34 +6,66 @@ import { SavedPicker } from "./SavedPicker";
 
 const m = vi.hoisted(() => ({
   saved: undefined as unknown,
+  people: undefined as unknown,
   addSaved: vi.fn(),
+  addSavedMany: vi.fn(),
 }));
 
 vi.mock("../../lib/session", () => ({
   useSessionToken: () => "tok",
   getSessionToken: () => "tok",
 }));
-vi.mock("convex/react", () => ({
-  useQuery: () => m.saved,
-  useMutation: () => m.addSaved,
-}));
+vi.mock("convex/react", async () => {
+  const { getFunctionName } = await import("convex/server");
+  return {
+    useQuery: (fn: Parameters<typeof getFunctionName>[0]) =>
+      getFunctionName(fn) === "rota:people" ? m.people : m.saved,
+    useMutation: (fn: Parameters<typeof getFunctionName>[0]) =>
+      getFunctionName(fn) === "rota:addSavedMany" ? m.addSavedMany : m.addSaved,
+  };
+});
 
 const contacts = [
-  { id: "c1", name: "أم خالد", phone: "+971501234567", inKhatma: false },
-  { id: "c2", name: "سعد", phone: null, inKhatma: false },
-  { id: "c3", name: "نورة", phone: "+971507654321", inKhatma: true },
+  {
+    id: "c1",
+    name: "أم خالد",
+    phone: "+971501234567",
+    inKhatma: false,
+    active: false,
+  },
+  { id: "c2", name: "سعد", phone: null, inKhatma: false, active: false },
+  {
+    id: "c3",
+    name: "نورة",
+    phone: "+971507654321",
+    inKhatma: true,
+    active: false,
+  },
 ];
+
+/** The People view's free ajza', which bound how many can be ticked. */
+const freeJuz = (n: number) => ({
+  freeJuz: Array.from({ length: n }, (_, i) => i + 2),
+});
 
 const sheet = () => screen.getByRole("dialog", { name: t.rota.savedTitle });
 
 beforeEach(() => {
   m.saved = contacts;
+  m.people = freeJuz(29);
   m.addSaved.mockReset().mockResolvedValue({ ok: true });
+  m.addSavedMany.mockReset().mockResolvedValue({
+    ok: true,
+    added: 2,
+    alreadyIn: 0,
+    noRoom: 0,
+    notFound: 0,
+  });
 });
 
 describe("SavedPicker", () => {
   it("lists the saved people; a hidden number is not shown, and who is in already cannot be pressed", () => {
-    render(<SavedPicker inviteCode="CODE" onClose={() => {}} />);
+    render(<SavedPicker inviteCode="CODE" juz={7} onClose={() => {}} />);
     const list = within(sheet()).getByRole("list", { name: t.rota.savedTitle });
     expect(within(list).getAllByRole("listitem")).toHaveLength(3);
     expect(within(list).getByText("+971501234567")).toBeInTheDocument();
@@ -44,21 +76,95 @@ describe("SavedPicker", () => {
     expect(within(list).getAllByText(/^\+971/)).toHaveLength(1);
   });
 
-  it("adds a person to the khatma's first free juz', and stays open for the next", async () => {
+  it("without a juz', ticks several and adds them in one call, in list order", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    const onAdded = vi.fn();
+    const onAddedMany = vi.fn();
     render(
-      <SavedPicker inviteCode="CODE" onClose={onClose} onAdded={onAdded} />,
+      <SavedPicker
+        inviteCode="CODE"
+        onClose={onClose}
+        onAddedMany={onAddedMany}
+      />,
     );
-    await user.click(screen.getByRole("button", { name: /أم خالد/ }));
-    expect(m.addSaved).toHaveBeenCalledWith({
+    const add = screen.getByRole("button", { name: t.rota.savedAddMany(0) });
+    expect(add).toBeDisabled();
+    // Who is in already can't be ticked.
+    expect(screen.getByRole("checkbox", { name: /نورة/ })).toBeDisabled();
+
+    await user.click(screen.getByRole("checkbox", { name: /سعد/ }));
+    await user.click(screen.getByRole("checkbox", { name: /أم خالد/ }));
+    await user.click(
+      screen.getByRole("button", { name: t.rota.savedAddMany(2) }),
+    );
+
+    expect(m.addSavedMany).toHaveBeenCalledWith({
       sessionToken: "tok",
       inviteCode: "CODE",
-      contactId: "c1",
+      contactIds: ["c1", "c2"],
     });
-    expect(onAdded).toHaveBeenCalledTimes(1);
-    expect(onClose).not.toHaveBeenCalled();
+    expect(m.addSaved).not.toHaveBeenCalled();
+    expect(onAddedMany).toHaveBeenCalledWith(t.rota.savedManyResult(2, 0));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops ticking once the ticks fill the free ajza'", async () => {
+    const user = userEvent.setup();
+    m.people = freeJuz(1);
+    render(<SavedPicker inviteCode="CODE" onClose={() => {}} />);
+    expect(screen.getByText(t.rota.savedRoom(1))).toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: /أم خالد/ }));
+    expect(screen.getByText(t.rota.savedRoom(0))).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /سعد/ })).toBeDisabled();
+    // Unticking frees the room again.
+    await user.click(screen.getByRole("checkbox", { name: /أم خالد/ }));
+    expect(screen.getByRole("checkbox", { name: /سعد/ })).not.toBeDisabled();
+  });
+
+  it("ticks the people who read with the organizer now, up to the room", async () => {
+    const user = userEvent.setup();
+    m.saved = [
+      { id: "a1", name: "زيد", phone: null, inKhatma: false, active: true },
+      { id: "a2", name: "عمر", phone: null, inKhatma: false, active: true },
+      { id: "a3", name: "هند", phone: null, inKhatma: true, active: true },
+      { id: "a4", name: "ليلى", phone: null, inKhatma: false, active: false },
+    ];
+    m.people = freeJuz(1);
+    render(<SavedPicker inviteCode="CODE" onClose={() => {}} />);
+    // Who is in already shows that instead.
+    expect(screen.getAllByText(t.rota.savedActive)).toHaveLength(2);
+
+    await user.click(
+      screen.getByRole("button", { name: t.rota.savedPickActive }),
+    );
+
+    expect(screen.getByRole("checkbox", { name: /زيد/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /عمر/ })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /ليلى/ })).not.toBeChecked();
+    expect(
+      screen.queryByRole("button", { name: t.rota.savedPickActive }),
+    ).toBeNull();
+  });
+
+  it("late in the day, asks once and sends the answer for the whole batch", async () => {
+    const user = userEvent.setup();
+    m.addSavedMany.mockResolvedValueOnce({ error: "ask_today" });
+    render(<SavedPicker inviteCode="CODE" onClose={() => {}} />);
+    await user.click(screen.getByRole("checkbox", { name: /أم خالد/ }));
+    await user.click(screen.getByRole("checkbox", { name: /سعد/ }));
+    await user.click(
+      screen.getByRole("button", { name: t.rota.savedAddMany(2) }),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: t.rota.readsNextDay }),
+    );
+    expect(m.addSavedMany).toHaveBeenLastCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+      contactIds: ["c1", "c2"],
+      readsToday: false,
+    });
   });
 
   it("for one juz', adds there and closes", async () => {
@@ -77,7 +183,7 @@ describe("SavedPicker", () => {
 
   it("does not press a person already in the khatma", async () => {
     const user = userEvent.setup();
-    render(<SavedPicker inviteCode="CODE" onClose={() => {}} />);
+    render(<SavedPicker inviteCode="CODE" juz={7} onClose={() => {}} />);
     await user.click(screen.getByRole("button", { name: /نورة/ }));
     expect(m.addSaved).not.toHaveBeenCalled();
   });

@@ -157,6 +157,8 @@ describe("RotaHelpPage", () => {
     const names = new Set(m.read.map((r) => r.name));
     expect([...names].sort()).toEqual([
       "adminRota:people",
+      // The People screen's «من ختمات سابقة» reads the owner's saved list.
+      "adminRota:saved",
       "adminRota:settings",
       "adminRota:today",
     ]);

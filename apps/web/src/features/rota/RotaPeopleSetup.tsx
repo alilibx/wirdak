@@ -111,11 +111,13 @@ function BringPeopleInList({
   const backend = useRotaBackend(inviteCode);
   const saved = useQuery(backend.saved, backend.scope);
   const [picking, setPicking] = useState(false);
+  const [savedResult, setSavedResult] = useState<string | null>(null);
 
   const hasPools = pools !== undefined && pools.length > 0;
   const hasSaved = saved !== undefined && saved !== null && saved.length > 0;
+  const said = result ?? savedResult;
   // An import takes its pool off the list, but what it did stays to be read.
-  if (!hasPools && !hasSaved && !result && !error) return null;
+  if (!hasPools && !hasSaved && !said && !error) return null;
 
   return (
     <section className="mb-5 grid gap-3">
@@ -146,13 +148,17 @@ function BringPeopleInList({
       )}
       <ErrorLine error={error} />
       <p role="status" className="font-medium text-green empty:hidden">
-        {result}
+        {said}
       </p>
       {picking && (
         <SavedPicker
           inviteCode={inviteCode}
           onClose={() => setPicking(false)}
-          onStart={onStart}
+          onStart={() => {
+            setSavedResult(null);
+            onStart?.();
+          }}
+          onAddedMany={setSavedResult}
         />
       )}
     </section>

@@ -14,7 +14,7 @@ import { JoinChip, ShareJoinLink, useEnsureJoinLink } from "./JoinStatus";
 import { JoinRequests } from "./JoinRequests";
 import { PersonPhone } from "./PersonPhone";
 import { RenameSheet } from "./RenameSheet";
-import { SavedPicker } from "./SavedPicker";
+import { PickSavedButton, SavedPicker } from "./SavedPicker";
 import { SpreadFreeJuz } from "./SpreadFreeJuz";
 import { useRotaCall } from "./useRotaCall";
 import { formatIsoDate } from "./format";
@@ -389,6 +389,11 @@ export function PeoplePanel({
             view={view}
             onStart={() => setSpreadResult(null)}
             onSpread={setSpreadResult}
+          />
+          <PickSavedButton
+            inviteCode={inviteCode}
+            onStart={() => setSpreadResult(null)}
+            onAddedMany={setSpreadResult}
           />
         </section>
       )}

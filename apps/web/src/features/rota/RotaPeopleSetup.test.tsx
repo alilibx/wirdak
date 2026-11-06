@@ -237,8 +237,15 @@ describe("RotaPeopleSetup: bringing people in", () => {
 
     await user.click(screen.getByRole("button", { name: t.rota.savedFrom }));
     const picker = screen.getByRole("dialog", { name: t.rota.savedTitle });
-    await user.click(within(picker).getByRole("button", { name: /أم خالد/ }));
-    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    await user.click(within(picker).getByRole("checkbox", { name: /أم خالد/ }));
+    await user.click(
+      within(picker).getByRole("button", { name: t.rota.savedAddMany(1) }),
+    );
+    expect(m.fns.addSavedMany).toHaveBeenCalled();
+    // The import's line is gone; the add's own line takes its place.
+    expect(screen.getAllByRole("status").at(-1)).not.toHaveTextContent(
+      t.rota.importResult(1, 0),
+    );
   });
 
   it("a refusal is said plainly", async () => {
@@ -262,25 +269,31 @@ describe("RotaPeopleSetup: bringing people in", () => {
     expect(screen.queryByRole("button", { name: /^أضف أعضاء/ })).toBeNull();
   });
 
-  it("opens the saved people and adds one, with no juz' chosen", async () => {
+  it("opens the saved people as a checklist and adds the ticked ones in one call", async () => {
     const user = userEvent.setup();
+    m.fns.addSavedMany = vi.fn().mockResolvedValue({
+      ok: true,
+      added: 1,
+      alreadyIn: 0,
+      noRoom: 0,
+      notFound: 0,
+    });
     renderSetup();
     await user.click(screen.getByRole("button", { name: t.rota.savedFrom }));
     const picker = screen.getByRole("dialog", { name: t.rota.savedTitle });
-    await user.click(within(picker).getByRole("button", { name: /أم خالد/ }));
-    expect(m.fns.addSaved).toHaveBeenCalledWith({
+    // Two free ajza' in the view.
+    expect(within(picker).getByText(t.rota.savedRoom(2))).toBeInTheDocument();
+    await user.click(within(picker).getByRole("checkbox", { name: /أم خالد/ }));
+    await user.click(
+      within(picker).getByRole("button", { name: t.rota.savedAddMany(1) }),
+    );
+    expect(m.fns.addSavedMany).toHaveBeenCalledWith({
       sessionToken: "tok",
       inviteCode: "CODE",
-      contactId: "c1",
+      contactIds: ["c1"],
     });
-    // Several can be added in a row: the sheet stays until it is closed.
-    expect(
-      screen.getByRole("dialog", { name: t.rota.savedTitle }),
-    ).toBeVisible();
-    await user.click(
-      within(picker).getByRole("button", { name: t.sheet.close }),
-    );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByText(t.rota.savedManyResult(1, 0))).toBeInTheDocument();
   });
 
   it("offers no saved list when nobody is saved", () => {
