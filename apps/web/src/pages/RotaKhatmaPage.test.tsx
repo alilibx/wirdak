@@ -6,6 +6,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { t } from "../i18n/ar";
 import { RotaKhatmaPage } from "./RotaKhatmaPage";
 
+type OrganizerAccess = {
+  owner: boolean;
+  readings: boolean;
+  people: boolean;
+  settings: boolean;
+};
+const OWNER: OrganizerAccess = {
+  owner: true,
+  readings: true,
+  people: true,
+  settings: true,
+};
+const coOrganizer = (switches: Partial<OrganizerAccess>): OrganizerAccess => ({
+  owner: false,
+  readings: false,
+  people: false,
+  settings: false,
+  ...switches,
+});
+
 type Person = {
   id: string;
   name: string;
@@ -29,6 +49,8 @@ const m = vi.hoisted(() => ({
   joinLink: null as string | null,
   /** What the khatma's public view says about being archived. */
   archived: false,
+  /** What the khatma's public view says the viewer may run: null for anyone but an organizer. */
+  access: null as unknown,
   notes: [] as unknown,
   fns: {
     reassign: vi.fn(),
@@ -135,6 +157,8 @@ function todayView(overrides: Record<string, unknown> = {}) {
     paused: false,
     archived: false,
     setupDone: true,
+    dayAt: 480,
+    timeZone: "UTC",
     tiles: Array.from({ length: 30 }, (_, i) => {
       const juz = i + 1;
       const state =
@@ -228,6 +252,7 @@ function Page() {
       name="ختمة العائلة"
       archived={m.archived}
       joinLink={m.joinLink}
+      access={m.access as OrganizerAccess | null}
     />
   );
 }
@@ -249,6 +274,7 @@ beforeEach(() => {
   m.me = { displayName: "علي" };
   m.joinLink = JOIN_LINK;
   m.archived = false;
+  m.access = OWNER;
   m.notes = [];
   m.startAgain.mockReset().mockResolvedValue({ inviteCode: "NEWCODE" });
 });
@@ -589,7 +615,7 @@ describe("Today", () => {
 
 describe("page", () => {
   it("shows only the short WhatsApp page to anyone but the organizer, titled with the khatma's name", () => {
-    m.today = null;
+    m.access = null;
     renderAt();
     expect(
       screen.getByRole("heading", { name: "ختمة العائلة" }),
@@ -603,14 +629,14 @@ describe("page", () => {
   });
 
   it("gives a visitor a big «انضمّ عبر واتساب» button to the join link", () => {
-    m.today = null;
+    m.access = null;
     renderAt();
     const join = screen.getByRole("link", { name: t.rota.joinOnWhatsApp });
     expect(join).toHaveAttribute("href", JOIN_LINK);
   });
 
   it("shows no join button while the khatma has no join link", () => {
-    m.today = null;
+    m.access = null;
     m.joinLink = null;
     renderAt();
     expect(
@@ -619,7 +645,7 @@ describe("page", () => {
   });
 
   it("offers a signed-out visitor the sign-in sheet, to come back here as the organizer", async () => {
-    m.today = null;
+    m.access = null;
     m.me = null;
     const user = userEvent.setup();
     renderAt();
@@ -686,6 +712,105 @@ describe("page", () => {
     expect(screen.getByRole("list")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "اليوم" }));
     expect(screen.getByText("٢٧ / ٣٠")).toBeInTheDocument();
+  });
+});
+
+describe("a co-organizer", () => {
+  it("a co-organizer with only Readings sees Today and not People or settings", () => {
+    m.access = coOrganizer({ readings: true });
+    // The server gives a co-organizer without Settings no settings.
+    m.settings = null;
+    renderAt("/j/CODE?tab=people");
+    expect(
+      screen.getByRole("heading", { name: "ختمة العائلة" }),
+    ).toBeInTheDocument();
+    expect(grid()).toBeInTheDocument();
+    // Today says when the next day starts without the settings.
+    expect(
+      screen.getByText("التالي: الختمة ١٣ · غداً ٨:٠٠ ص"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "المشاركون" })).toBeNull();
+    // The People screen's 30 rows are an ordered list; Today has none.
+    expect(document.querySelector("ol")).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: t.khatmaSettings.link }),
+    ).toBeNull();
+    expect(screen.queryByText(t.rota.whatsappOnly)).toBeNull();
+  });
+
+  it("with only People sees the People screen and no Today or settings", () => {
+    m.access = coOrganizer({ people: true });
+    m.today = null;
+    m.settings = null;
+    renderAt();
+    expect(screen.queryByRole("tab", { name: "اليوم" })).toBeNull();
+    expect(screen.queryByRole("region", { name: t.rota.gridLabel })).toBeNull();
+    expect(document.querySelector("ol")).not.toBeNull();
+    expect(
+      screen.queryByRole("link", { name: t.khatmaSettings.link }),
+    ).toBeNull();
+  });
+
+  it("with Readings and Settings has Today and the settings link", () => {
+    m.access = coOrganizer({ readings: true, settings: true });
+    renderAt();
+    expect(grid()).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: t.khatmaSettings.link }),
+    ).toHaveAttribute("href", "/j/CODE/settings");
+    expect(screen.queryByRole("tab", { name: "المشاركون" })).toBeNull();
+  });
+
+  it("without Settings is told setup isn't done but isn't offered to start the khatma", () => {
+    m.access = coOrganizer({ readings: true });
+    m.settings = null;
+    m.today = todayView({
+      day: null,
+      tiles: [],
+      setupDone: false,
+      next: { number: 1, date: "2026-11-10" },
+    });
+    renderAt();
+    expect(screen.getByText(t.rota.setupNotDoneViewer)).toBeInTheDocument();
+    expect(screen.queryByText(t.rota.setupNotDone)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: t.rota.startKhatma }),
+    ).toBeNull();
+  });
+
+  it("with Settings starts the khatma", async () => {
+    m.access = coOrganizer({ readings: true, settings: true });
+    m.today = todayView({
+      day: null,
+      tiles: [],
+      setupDone: false,
+      next: { number: 1, date: "2026-11-10" },
+    });
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole("button", { name: t.rota.startKhatma }));
+    expect(m.fns.finishSetup).toHaveBeenCalledWith(args);
+  });
+
+  it("with no switch on sees the member page", () => {
+    m.access = coOrganizer({});
+    m.today = null;
+    m.settings = null;
+    renderAt();
+    expect(screen.getByText(t.rota.whatsappOnly)).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).toBeNull();
+  });
+
+  it("is never offered to start an archived khatma again or delete it", () => {
+    m.access = coOrganizer({ readings: true, people: true, settings: true });
+    m.today = todayView({ archived: true });
+    m.settings = { ...settings, archived: true };
+    renderAt();
+    expect(screen.getByText(t.archive.banner)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: t.archive.restart }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: t.archive.delete })).toBeNull();
   });
 });
 
@@ -893,7 +1018,7 @@ describe("an archived khatma", () => {
 
 describe("an archived khatma, for anyone but the organizer", () => {
   beforeEach(() => {
-    m.today = null;
+    m.access = null;
     m.archived = true;
   });
 

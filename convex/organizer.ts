@@ -8,7 +8,6 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
-import { activeMembership } from "./khatmas";
 import {
   cheerConfigValidator,
   cheerSetting,
@@ -17,13 +16,30 @@ import {
 } from "./lib/cheer";
 import { randomToken } from "./lib/crypto";
 import { nameFields, refreshPerson } from "./lib/directory";
+import {
+  accessOf,
+  allows,
+  roleIn,
+  type Need,
+  type OrganizerAccess,
+  type OrganizerRole,
+} from "./lib/organizerAuth";
 import { graceValidator, isValidGrace, type Grace } from "./lib/grace";
 import { isArchived, khatmaByInviteCode } from "./lib/khatma";
 import { scheduleValidator, type Schedule } from "./lib/schedule";
 import type { SessionContext } from "./lib/session";
 import { sessionMutation, sessionQuery } from "./lib/session";
+import { isOwnerRow } from "./lib/rotaOwner";
 import { getSetting } from "./lib/settings";
 import { cleanKhatmaName } from "./lib/text";
+import {
+  endCoOrganizer,
+  ensureRotaMembership,
+  keepOldOwner,
+  liveParticipant,
+  accountByPhone,
+} from "./coOrganizers";
+import { activeMembership } from "./khatmas";
 import { clearNotes, notify } from "./notes";
 import { heldAssignment, roundAssignments } from "./rounds";
 
@@ -41,38 +57,56 @@ export type OrganizerSettings = {
     memberId: Id<"members">;
     displayName: string;
     isOrganizer: boolean;
+    /** Named by the owner to help run the khatma; always false unless the caller has People. */
+    isCoOrganizer: boolean;
   }[];
   blocked: { memberId: Id<"members">; displayName: string }[];
   cheer: CheerSetting;
   /** An archived khatma can only be read, and deleted. */
   archived: boolean;
+  /** What the caller may do here, so the page shows only those controls. */
+  access: OrganizerAccess;
 };
 
 // ---------------------------------------------------------------------------
 // Authority
 
 /**
- * The khatma behind `inviteCode` when `person` is its organizer and still an
- * active member of it; otherwise `null`. A removed organizer holds no controls.
+ * The khatma behind `inviteCode` when `person` holds a role in it that meets
+ * `need`; otherwise `null`. The default `"owner"` is the owner alone, and a
+ * removed owner holds no controls.
  */
 export async function organizerOf(
   ctx: QueryCtx,
   inviteCode: string,
   person: Doc<"people"> | null,
-): Promise<{ person: Doc<"people">; khatma: Doc<"khatmas"> } | null> {
+  need: Need = "owner",
+): Promise<{
+  person: Doc<"people">;
+  khatma: Doc<"khatmas">;
+  role: OrganizerRole;
+} | null> {
   if (!person) return null;
   const khatma = await khatmaByInviteCode(ctx, inviteCode);
-  if (!khatma || khatma.creatorPersonId !== person._id) return null;
-  if (!(await activeMembership(ctx, khatma._id, person._id))) return null;
-  return { person, khatma };
+  if (!khatma) return null;
+  const role = await roleIn(ctx, khatma, person);
+  if (!role || !allows(role, need)) return null;
+  return { person, khatma, role };
 }
 
-/** The caller and their khatma, or `forbidden` unless they are its active organizer. */
+type Organizer = {
+  person: Doc<"people">;
+  khatma: Doc<"khatmas">;
+  role: OrganizerRole;
+};
+
+/** The caller and their khatma, or `forbidden` unless their role meets `need`. */
 export async function requireOrganizer(
   ctx: QueryCtx & SessionContext,
   inviteCode: string,
-): Promise<{ person: Doc<"people">; khatma: Doc<"khatmas"> }> {
-  const found = await organizerOf(ctx, inviteCode, ctx.person);
+  need: Need = "owner",
+): Promise<Organizer> {
+  const found = await organizerOf(ctx, inviteCode, ctx.person, need);
   if (!found) throw new ConvexError({ code: "forbidden" });
   return found;
 }
@@ -86,24 +120,26 @@ function refuseArchived(khatma: Doc<"khatmas">): void {
  * `requireOrganizer` for a change to the khatma: `archived` once it is archived.
  * Reading it, archiving and deleting it use `requireOrganizer` instead.
  */
-async function requireLiveOrganizer(
+export async function requireLiveOrganizer(
   ctx: QueryCtx & SessionContext,
   inviteCode: string,
-): Promise<{ person: Doc<"people">; khatma: Doc<"khatmas"> }> {
-  const found = await requireOrganizer(ctx, inviteCode);
+  need: Need = "owner",
+): Promise<Organizer> {
+  const found = await requireOrganizer(ctx, inviteCode, need);
   refuseArchived(found.khatma);
   return found;
 }
 
 /**
  * `requireLiveOrganizer` for the pool khatma's own controls (settings, invite
- * reset, handover), which a rota khatma doesn't have: `forbidden` there too.
+ * reset, removing members), which a rota khatma doesn't have: `forbidden` there too.
  */
 async function requirePoolOrganizer(
   ctx: QueryCtx & SessionContext,
   inviteCode: string,
-): Promise<{ person: Doc<"people">; khatma: Doc<"khatmas"> }> {
-  const found = await requireLiveOrganizer(ctx, inviteCode);
+  need: Need = "owner",
+): Promise<Organizer> {
+  const found = await requireLiveOrganizer(ctx, inviteCode, need);
   if (found.khatma.kind === "rota") {
     throw new ConvexError({ code: "forbidden" });
   }
@@ -128,7 +164,8 @@ export async function membersByJoin(
 
 /**
  * What the organizer's settings sheet shows: names, never numbers (spec 6.1).
- * No phone, pace, or reading data leaves this query.
+ * No phone, pace, or reading data leaves this query. The owner and every
+ * co-organizer get it, with `access` saying which controls are theirs.
  */
 export const settings = sessionQuery({
   args: { inviteCode: v.string() },
@@ -136,12 +173,29 @@ export const settings = sessionQuery({
     ctx,
     args,
   ): Promise<OrganizerSettings | { forbidden: true }> => {
-    const found = await organizerOf(ctx, args.inviteCode, ctx.person);
-    if (!found) return { forbidden: true };
-    const { khatma } = found;
+    const khatma = ctx.person
+      ? await khatmaByInviteCode(ctx, args.inviteCode)
+      : null;
+    // A rota khatma has its own settings (`rota.settings`).
+    const access =
+      khatma &&
+      khatma.kind !== "rota" &&
+      accessOf(await roleIn(ctx, khatma, ctx.person));
+    if (!khatma || !access) return { forbidden: true };
 
     const members: OrganizerSettings["members"] = [];
     const blocked: OrganizerSettings["blocked"] = [];
+    // Who the co-organizers are follows the People switch, like the blocked list (spec 4.3, 4.6).
+    const coOrganizerPhones = new Set(
+      access.owner || access.people
+        ? (
+            await ctx.db
+              .query("coOrganizers")
+              .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
+              .collect()
+          ).map((row) => row.phone)
+        : [],
+    );
     for (const member of await membersByJoin(ctx, khatma._id)) {
       if (member.status === "former") continue;
       const person = await ctx.db.get(member.personId);
@@ -153,6 +207,9 @@ export const settings = sessionQuery({
           memberId: member._id,
           displayName: person.displayName,
           isOrganizer: member.personId === khatma.creatorPersonId,
+          isCoOrganizer:
+            member.personId !== khatma.creatorPersonId &&
+            coOrganizerPhones.has(person.phone),
         });
       }
     }
@@ -162,9 +219,11 @@ export const settings = sessionQuery({
       grace: khatma.grace,
       suggestedGrace: (await getSetting(ctx, "graceDefaults"))[khatma.schedule],
       members,
-      blocked,
+      // Seeing who is blocked follows the People switch (spec 4.3).
+      blocked: access.people ? blocked : [],
       cheer: await cheerSetting(ctx, khatma),
       archived: isArchived(khatma),
+      access,
     };
   },
 });
@@ -189,7 +248,11 @@ export const update = sessionMutation({
   ): Promise<
     { ok: true } | { ok: false; reason: "invalid_grace" | "invalid_cheer" }
   > => {
-    const { khatma } = await requirePoolOrganizer(ctx, args.inviteCode);
+    const { khatma } = await requirePoolOrganizer(
+      ctx,
+      args.inviteCode,
+      "settings",
+    );
     if (args.grace && !isValidGrace(args.grace)) {
       return { ok: false, reason: "invalid_grace" };
     }
@@ -216,7 +279,7 @@ export const activeMemberCount = internalQuery({
   args: { personId: v.id("people"), inviteCode: v.string() },
   handler: async (ctx, args): Promise<number> => {
     const person = await ctx.db.get(args.personId);
-    const found = await organizerOf(ctx, args.inviteCode, person);
+    const found = await organizerOf(ctx, args.inviteCode, person, "people");
     if (!found || found.khatma.kind === "rota") {
       throw new ConvexError({ code: "forbidden" });
     }
@@ -242,7 +305,7 @@ export const applyInviteReset = internalMutation({
   },
   handler: async (ctx, args): Promise<{ inviteCode: string } | null> => {
     const person = await ctx.db.get(args.personId);
-    const found = await organizerOf(ctx, args.inviteCode, person);
+    const found = await organizerOf(ctx, args.inviteCode, person, "people");
     if (!found || found.khatma.kind === "rota") {
       throw new ConvexError({ code: "forbidden" });
     }
@@ -290,9 +353,11 @@ export async function resetInviteCode(
 }
 
 /**
- * Makes `member` the organizer and tells them; with `previous`, tells the
- * old organizer too. Shared by the organizer, the 30-day sweep and admins.
- * Only an admin reaches an archived khatma here, and that sends nothing.
+ * Makes `member` the owner and tells them; with `previous`, tells the old
+ * owner too. Shared by the owner, the 30-day sweep and admins. The new owner's
+ * co-organizer role ends, and with `oldOwnerStaysOn` the old owner stays on as
+ * a co-organizer with every switch (co-organizers spec 4.5). Only an admin
+ * reaches an archived khatma here, and that sends nothing.
  */
 export async function handOverTo(
   ctx: MutationCtx,
@@ -300,7 +365,44 @@ export async function handOverTo(
   member: Doc<"members">,
   previous: Doc<"people"> | null,
 ): Promise<void> {
-  await ctx.db.patch(khatma._id, { creatorPersonId: member.personId });
+  const rota = khatma.rota;
+  await ctx.db.patch(khatma._id, {
+    creatorPersonId: member.personId,
+    // The owner an admin set it up for never took it up; the new one has a
+    // membership already, so no join message may make them owner again.
+    ...(rota?.pendingOrganizer === true
+      ? { rota: { ...rota, pendingOrganizer: false } }
+      : {}),
+  });
+  // After the patch, so a rota owner keeps the membership the role gave them.
+  const owner = await ctx.db.get(member.personId);
+  if (owner) {
+    await endCoOrganizer(ctx, khatma._id, owner.phone);
+    if (khatma.kind === "rota") {
+      // A participant added by phone has no account on their row: the owner's
+      // own row must name them, or the owner checks miss them.
+      const row = await liveParticipant(ctx, khatma._id, owner.phone);
+      if (row && row.personId !== owner._id) {
+        await ctx.db.patch(row._id, { personId: owner._id });
+      }
+    }
+  }
+  const oldOwner = await ctx.db.get(khatma.creatorPersonId);
+  if (oldOwner) {
+    const stays =
+      (await getSetting(ctx, "oldOwnerStaysOn")) &&
+      (await keepOldOwner(ctx, khatma, oldOwner));
+    if (!stays && khatma.kind === "rota") {
+      // A rota membership means owner or co-organizer, as `endCoOrganizer` keeps it.
+      const membership = await ctx.db
+        .query("members")
+        .withIndex("by_khatma_person", (q) =>
+          q.eq("khatmaId", khatma._id).eq("personId", oldOwner._id),
+        )
+        .first();
+      if (membership) await ctx.db.delete(membership._id);
+    }
+  }
   await refreshPerson(ctx, khatma.creatorPersonId);
   await refreshPerson(ctx, member.personId);
   if (isArchived(khatma)) return;
@@ -316,6 +418,72 @@ export async function handOverTo(
       kind: "organizerMoved",
     });
   }
+}
+
+/** Who a transfer names: a member, or in a rota khatma a participant. */
+export const transferArgs = {
+  memberId: v.optional(v.id("members")),
+  participantId: v.optional(v.id("rotaParticipants")),
+};
+type TransferTarget = {
+  memberId?: Id<"members">;
+  participantId?: Id<"rotaParticipants">;
+};
+
+/**
+ * The membership a transfer hands `khatma` to, or why there is none. In a pool
+ * khatma, an active member (`memberId`). In a rota khatma, a live participant
+ * with an account, by `participantId` or by the membership a co-organizer has
+ * (`memberId`); one who hasn't signed in yet is `no_account`, because
+ * ownership can't wait for a sign-in (spec 4.5). A rota participant gets their
+ * membership here, and only once nothing refuses the transfer.
+ */
+export async function transferTarget(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  target: TransferTarget,
+  caller: { owner: true } | "admin",
+): Promise<Doc<"members"> | "self" | "not_member" | "no_account"> {
+  if (
+    (target.memberId === undefined) ===
+    (target.participantId === undefined)
+  ) {
+    return "not_member";
+  }
+  if (khatma.kind !== "rota") {
+    if (target.memberId === undefined) return "not_member";
+    return await otherMember(ctx, khatma, target.memberId, "active", caller);
+  }
+  if (target.memberId !== undefined) {
+    const member = await otherMember(
+      ctx,
+      khatma,
+      target.memberId,
+      "active",
+      caller,
+    );
+    if (typeof member === "string") return member;
+    const person = await ctx.db.get(member.personId);
+    if (!person || !(await liveParticipant(ctx, khatma._id, person.phone))) {
+      return "not_member";
+    }
+    return member;
+  }
+
+  const participant = await ctx.db.get(target.participantId!);
+  if (
+    !participant ||
+    participant.khatmaId !== khatma._id ||
+    participant.removedAt !== null
+  ) {
+    return "not_member";
+  }
+  const owner = await ctx.db.get(khatma.creatorPersonId);
+  if (isOwnerRow(participant, khatma, owner)) return "self";
+  const person = await accountByPhone(ctx, participant.phone);
+  if (!person) return "no_account";
+  await ensureRotaMembership(ctx, khatma, person);
+  return (await activeMembership(ctx, khatma._id, person._id)) ?? "not_member";
 }
 
 export const resetInvite = action({
@@ -345,18 +513,54 @@ export const resetInvite = action({
 // ---------------------------------------------------------------------------
 // Members
 
-/** A member of this khatma who is not the organizer, or the reason they aren't one. */
+/**
+ * A member of this khatma who is not the organizer, or the reason they aren't
+ * one. A `caller` who isn't the owner (a co-organizer) gets `is_organizer` for
+ * the owner and for every co-organizer: only the owner changes who else runs
+ * the khatma (spec 4.2). An admin passes `"admin"`.
+ */
 export async function otherMember(
   ctx: QueryCtx,
   khatma: Doc<"khatmas">,
   memberId: Id<"members">,
   status: Doc<"members">["status"],
-): Promise<Doc<"members"> | "self" | "not_member"> {
+  caller: { owner: true } | "admin",
+): Promise<Doc<"members"> | "self" | "not_member">;
+export async function otherMember(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  memberId: Id<"members">,
+  status: Doc<"members">["status"],
+  caller: OrganizerRole | "admin",
+): Promise<Doc<"members"> | "self" | "not_member" | "is_organizer">;
+export async function otherMember(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  memberId: Id<"members">,
+  status: Doc<"members">["status"],
+  caller: OrganizerRole | "admin",
+): Promise<Doc<"members"> | "self" | "not_member" | "is_organizer"> {
   const member = await ctx.db.get(memberId);
   if (!member || member.khatmaId !== khatma._id || member.status !== status) {
     return "not_member";
   }
-  return member.personId === khatma.creatorPersonId ? "self" : member;
+  const byOwner = caller === "admin" || caller.owner;
+  if (member.personId === khatma.creatorPersonId) {
+    return byOwner ? "self" : "is_organizer";
+  }
+  if (!byOwner) {
+    const person = await ctx.db.get(member.personId);
+    const named =
+      person &&
+      (await ctx.db
+        .query("coOrganizers")
+        .withIndex("by_khatma_phone", (q) =>
+          q.eq("khatmaId", khatma._id).eq("phone", person.phone),
+        )
+        .first());
+    if (named) return "is_organizer";
+  }
+  return member;
 }
 
 /**
@@ -370,16 +574,32 @@ export const removeMember = sessionMutation({
   handler: async (
     ctx,
     args,
-  ): Promise<{ ok: true } | { ok: false; reason: "self" | "not_member" }> => {
-    const { khatma } = await requireLiveOrganizer(ctx, args.inviteCode);
-    const member = await otherMember(ctx, khatma, args.memberId, "active");
+  ): Promise<
+    { ok: true } | { ok: false; reason: "self" | "not_member" | "is_organizer" }
+  > => {
+    // A rota khatma removes participants instead (`rota.removeParticipant`).
+    const { khatma, role } = await requirePoolOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    const member = await otherMember(
+      ctx,
+      khatma,
+      args.memberId,
+      "active",
+      role,
+    );
     if (typeof member === "string") return { ok: false, reason: member };
     await blockMember(ctx, khatma, member);
     return { ok: true };
   },
 });
 
-/** What removing a member does, for `removeMember` and the admin's own. */
+/**
+ * What removing a member does, for `removeMember` and the admin's own. A
+ * co-organizer's role ends with their place, and coming back doesn't restore it.
+ */
 export async function blockMember(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
@@ -390,6 +610,8 @@ export async function blockMember(
     shareToken: undefined,
   });
   await refreshPerson(ctx, member.personId);
+  const person = await ctx.db.get(member.personId);
+  if (person) await endCoOrganizer(ctx, khatma._id, person.phone);
 
   if (khatma.currentRoundId) {
     const held = heldAssignment(
@@ -430,7 +652,11 @@ async function clearPersonNotes(
 export const unblock = sessionMutation({
   args: { inviteCode: v.string(), memberId: v.id("members") },
   handler: async (ctx, args): Promise<{ ok: boolean }> => {
-    const { khatma } = await requireLiveOrganizer(ctx, args.inviteCode);
+    const { khatma } = await requireLiveOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
     const member = await ctx.db.get(args.memberId);
     if (
       !member ||
@@ -447,24 +673,74 @@ export const unblock = sessionMutation({
 // ---------------------------------------------------------------------------
 // Handover
 
+/**
+ * The owner transfers the khatma (spec 4.5): to an active member of a pool
+ * khatma, or to a participant of a rota khatma who has an account.
+ */
 export const handOver = sessionMutation({
-  args: { inviteCode: v.string(), memberId: v.id("members") },
+  args: { inviteCode: v.string(), ...transferArgs },
   handler: async (
     ctx,
     args,
-  ): Promise<{ ok: true } | { ok: false; reason: "not_member" | "self" }> => {
-    const { khatma } = await requirePoolOrganizer(ctx, args.inviteCode);
-    const member = await otherMember(ctx, khatma, args.memberId, "active");
+  ): Promise<
+    { ok: true } | { ok: false; reason: "not_member" | "self" | "no_account" }
+  > => {
+    const { khatma } = await requireLiveOrganizer(
+      ctx,
+      args.inviteCode,
+      "owner",
+    );
+    // Only the owner gets here.
+    const member = await transferTarget(ctx, khatma, args, { owner: true });
     if (typeof member === "string") return { ok: false, reason: member };
-    // The organizer chose this, so they get no "moved" note.
+    // The owner chose this, so they get no "moved" note.
     await handOverTo(ctx, khatma, member, null);
     return { ok: true };
   },
 });
 
+/** The two settings `organizerAway` weighs, read once by the caller. */
+type AwayWindows = { inactiveMs: number; successorActiveMs: number };
+
+async function awayWindows(ctx: QueryCtx): Promise<AwayWindows> {
+  return {
+    inactiveMs: await getSetting(ctx, "organizerInactiveMs"),
+    successorActiveMs: await getSetting(ctx, "successorActiveMs"),
+  };
+}
+
+/**
+ * Whether `khatma`'s owner has been away longer than `organizerInactiveMs`,
+ * so the khatma may be handed over. A pool owner is seen on the website. A
+ * rota owner may run it from WhatsApp alone, so their own participant row's
+ * last reply counts too: a reply within `successorActiveMs` keeps the khatma,
+ * and otherwise the later of the two times is their last sighting. A rota
+ * owner never seen at all (an admin set it up and they haven't signed in)
+ * never loses it this way.
+ */
+async function organizerAway(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  owner: Doc<"people"> | null,
+  now: number,
+  windows: AwayWindows,
+): Promise<boolean> {
+  if (!owner) return true;
+  const inactiveSince = now - windows.inactiveMs;
+  if (khatma.kind !== "rota") return owner.lastSeenAt < inactiveSince;
+  const row = await liveParticipant(ctx, khatma._id, owner.phone);
+  const repliedAt = row?.lastReplyAt ?? 0;
+  if (repliedAt >= now - windows.successorActiveMs) {
+    return false;
+  }
+  if (owner.lastSeenAt === 0) return false;
+  return Math.max(owner.lastSeenAt, repliedAt) < inactiveSince;
+}
+
 /**
  * Daily: pages through every khatma and schedules a handover check for each
  * one not archived whose organizer has been away longer than `organizerInactiveMs`.
+ * Rota khatmas are skipped while `handoverToCoOrganizerOn` is off.
  * Paginated, and one mutation per khatma, like the behind sweep.
  */
 export const autoHandoverSweep = internalMutation({
@@ -473,12 +749,16 @@ export const autoHandoverSweep = internalMutation({
     const page = await ctx.db
       .query("khatmas")
       .paginate({ numItems: SWEEP_PAGE, cursor: args.cursor ?? null });
-    const cutoff = Date.now() - (await getSetting(ctx, "organizerInactiveMs"));
+    const now = Date.now();
+    const toCoOrganizers = await getSetting(ctx, "handoverToCoOrganizerOn");
+    const windows = await awayWindows(ctx);
     for (const khatma of page.page) {
-      // a rota khatma keeps its organizer: readers are not members to hand it to
-      if (khatma.kind === "rota" || isArchived(khatma)) continue;
+      if (isArchived(khatma)) continue;
+      // Without co-organizers to take it, a rota khatma keeps its organizer.
+      if (khatma.kind === "rota" && !toCoOrganizers) continue;
       const organizer = await ctx.db.get(khatma.creatorPersonId);
-      if (organizer && organizer.lastSeenAt >= cutoff) continue;
+      if (!(await organizerAway(ctx, khatma, organizer, now, windows)))
+        continue;
       await ctx.scheduler.runAfter(0, internal.organizer.autoHandover, {
         khatmaId: khatma._id,
       });
@@ -492,26 +772,34 @@ export const autoHandoverSweep = internalMutation({
 });
 
 /**
- * Hands a khatma to its earliest-joined active member seen within
- * `successorActiveMs` when its organizer has been away too long. With nobody
- * to hand it to, nothing changes: the khatma waits for its organizer.
+ * Hands a khatma whose organizer has been away too long to someone seen within
+ * `successorActiveMs`: with `handoverToCoOrganizerOn`, first the longest-serving
+ * co-organizer with an account (spec 4.5). A pool khatma then falls back to its
+ * earliest-joined active member; a rota khatma has no fallback. With nobody to
+ * hand it to, nothing changes: the khatma waits for its organizer.
  */
 export const autoHandover = internalMutation({
   args: { khatmaId: v.id("khatmas") },
   handler: async (ctx, args) => {
     const khatma = await ctx.db.get(args.khatmaId);
-    if (!khatma || khatma.kind === "rota" || isArchived(khatma)) return;
+    if (!khatma || isArchived(khatma)) return;
+    const toCoOrganizers = await getSetting(ctx, "handoverToCoOrganizerOn");
+    if (khatma.kind === "rota" && !toCoOrganizers) return;
     const now = Date.now();
     const organizer = await ctx.db.get(khatma.creatorPersonId);
-    if (
-      organizer &&
-      organizer.lastSeenAt >=
-        now - (await getSetting(ctx, "organizerInactiveMs"))
-    ) {
-      return;
-    }
+    const windows = await awayWindows(ctx);
+    if (!(await organizerAway(ctx, khatma, organizer, now, windows))) return;
 
-    const activeSince = now - (await getSetting(ctx, "successorActiveMs"));
+    const activeSince = now - windows.successorActiveMs;
+    if (toCoOrganizers) {
+      const member = await coOrganizerSuccessor(ctx, khatma, activeSince);
+      if (member) {
+        await handOverTo(ctx, khatma, member, organizer);
+        return;
+      }
+    }
+    if (khatma.kind === "rota") return;
+
     for (const member of await membersByJoin(ctx, khatma._id)) {
       if (member.status !== "active") continue;
       if (member.personId === khatma.creatorPersonId) continue;
@@ -523,3 +811,31 @@ export const autoHandover = internalMutation({
     }
   },
 });
+
+/**
+ * The membership of the longest-serving co-organizer who has an account, is
+ * still in the khatma, and was seen since `activeSince`; or null. A rota one
+ * gets the membership naming gives, if it is missing.
+ */
+async function coOrganizerSuccessor(
+  ctx: MutationCtx,
+  khatma: Doc<"khatmas">,
+  activeSince: number,
+): Promise<Doc<"members"> | null> {
+  const rows = (
+    await ctx.db
+      .query("coOrganizers")
+      .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
+      .collect()
+  ).sort((a, b) => a.addedAt - b.addedAt || a._creationTime - b._creationTime);
+  for (const row of rows) {
+    const person = await accountByPhone(ctx, row.phone);
+    if (!person || person._id === khatma.creatorPersonId) continue;
+    if (person.lastSeenAt < activeSince) continue;
+    if (!(await roleIn(ctx, khatma, person))) continue;
+    await ensureRotaMembership(ctx, khatma, person);
+    const member = await activeMembership(ctx, khatma._id, person._id);
+    if (member) return member;
+  }
+  return null;
+}

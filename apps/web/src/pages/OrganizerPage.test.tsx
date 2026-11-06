@@ -14,6 +14,10 @@ const m = vi.hoisted(() => ({
   settings: undefined as unknown,
   /** What `api.rota.settings` answers: null for a pool khatma. */
   rotaSettings: null as unknown,
+  /** What `api.coOrganizers.list` answers. */
+  coList: undefined as unknown,
+  /** What `api.rota.people` answers (the rota transfer picker). */
+  people: undefined as unknown,
   fns: {
     update: vi.fn(),
     removeMember: vi.fn(),
@@ -22,6 +26,10 @@ const m = vi.hoisted(() => ({
     archive: vi.fn(),
     remove: vi.fn(),
   },
+  coFns: {
+    "coOrganizers:set": vi.fn(),
+    "coOrganizers:remove": vi.fn(),
+  } as Record<string, ReturnType<typeof vi.fn>>,
   resetInvite: vi.fn(),
   /** When set, navigate() does nothing, so a test can stop between the action and the route change. */
   holdNavigation: false,
@@ -47,12 +55,30 @@ vi.mock("react-router", async () => {
 vi.mock("convex/react", async () => {
   const { getFunctionName } = await import("convex/server");
   return {
-    useQuery: (ref: never) =>
-      getFunctionName(ref) === "rota:settings" ? m.rotaSettings : m.settings,
-    useMutation: (ref: never) =>
-      m.fns[getFunctionName(ref).split(":")[1] as Fn],
+    useQuery: (ref: never, args: unknown) => {
+      if (args === "skip") return undefined;
+      const name = getFunctionName(ref);
+      if (name === "rota:settings") return m.rotaSettings;
+      if (name === "coOrganizers:list") return m.coList;
+      if (name === "rota:people") return m.people;
+      return m.settings;
+    },
+    useMutation: (ref: never) => {
+      const name = getFunctionName(ref);
+      if (name.startsWith("coOrganizers:")) return m.coFns[name];
+      return m.fns[name.split(":")[1] as Fn];
+    },
     useAction: () => m.resetInvite,
   };
+});
+
+const OWNER = { owner: true, readings: true, people: true, settings: true };
+const coOrganizer = (switches: Partial<typeof OWNER>) => ({
+  owner: false,
+  readings: false,
+  people: false,
+  settings: false,
+  ...switches,
 });
 
 const organizerView = {
@@ -61,9 +87,24 @@ const organizerView = {
   grace: { value: 2, unit: "days" },
   suggestedGrace: { value: 2, unit: "days" },
   members: [
-    { memberId: "m1", displayName: "أبو علي", isOrganizer: true },
-    { memberId: "m2", displayName: "سارة", isOrganizer: false },
-    { memberId: "m3", displayName: "خالد", isOrganizer: false },
+    {
+      memberId: "m1",
+      displayName: "أبو علي",
+      isOrganizer: true,
+      isCoOrganizer: false,
+    },
+    {
+      memberId: "m2",
+      displayName: "سارة",
+      isOrganizer: false,
+      isCoOrganizer: false,
+    },
+    {
+      memberId: "m3",
+      displayName: "خالد",
+      isOrganizer: false,
+      isCoOrganizer: false,
+    },
   ],
   blocked: [{ memberId: "m9", displayName: "ليلى" }],
   cheer: {
@@ -77,6 +118,7 @@ const organizerView = {
     },
   },
   archived: false,
+  access: OWNER,
 };
 
 const visited: string[] = [];
@@ -121,6 +163,17 @@ describe("OrganizerPage", () => {
     m.holdNavigation = false;
     m.settings = structuredClone(organizerView);
     m.rotaSettings = null;
+    m.coList = {
+      max: 5,
+      enabled: true,
+      defaults: { readings: true, people: true, settings: true },
+      coOrganizers: [],
+      candidates: [{ candidateId: "m:m2", name: "سارة" }],
+    };
+    m.people = undefined;
+    Object.values(m.coFns).forEach((f) =>
+      f.mockReset().mockResolvedValue({ ok: true }),
+    );
   });
 
   it("shows the rotating khatma's own settings for a rota khatma", () => {
@@ -142,6 +195,7 @@ describe("OrganizerPage", () => {
       upcoming: [],
       quiet: { startHour: 22, endHour: 7 },
       lateTap: { override: null, defaultMs: 28_800_000 },
+      access: { owner: true, readings: true, people: true, settings: true },
       cheer: {
         override: null,
         defaults: {
@@ -190,7 +244,7 @@ describe("OrganizerPage", () => {
     expect(rows[1]).toHaveTextContent(/^سارة/);
     expect(rows[1]).not.toHaveTextContent(/[٠-٩0-9]/);
     expect(
-      within(rows[1]!).getByRole("button", { name: /^اجعله المنظّم/ }),
+      within(rows[1]!).getByRole("button", { name: /^انقل ملكية الختمة/ }),
     ).toBeVisible();
     expect(
       within(rows[1]!).getByRole("button", { name: /^إزالة/ }),
@@ -401,12 +455,12 @@ describe("OrganizerPage", () => {
       "listitem",
     )[1]!;
     await user.click(
-      within(row).getByRole("button", { name: /^اجعله المنظّم/ }),
+      within(row).getByRole("button", { name: /^انقل ملكية الختمة/ }),
     );
     expect(m.fns.handOver).not.toHaveBeenCalled();
     await user.click(
       within(screen.getByRole("dialog")).getByRole("button", {
-        name: "اجعله المنظّم",
+        name: "انقل الملكية",
       }),
     );
     expect(m.fns.handOver).toHaveBeenCalledWith({
@@ -426,11 +480,11 @@ describe("OrganizerPage", () => {
       "listitem",
     )[1]!;
     await user.click(
-      within(row).getByRole("button", { name: /^اجعله المنظّم/ }),
+      within(row).getByRole("button", { name: /^انقل ملكية الختمة/ }),
     );
     await user.click(
       within(screen.getByRole("dialog")).getByRole("button", {
-        name: "اجعله المنظّم",
+        name: "انقل الملكية",
       }),
     );
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -710,6 +764,271 @@ describe("OrganizerPage", () => {
       expect(await within(name).findByRole("alert")).toHaveTextContent(
         t.organizer.errors.archived,
       );
+    });
+  });
+
+  describe("co-organizers", () => {
+    const withCoOrganizer = (access: ReturnType<typeof coOrganizer>) => {
+      const view = structuredClone(organizerView) as typeof organizerView & {
+        access: ReturnType<typeof coOrganizer>;
+      };
+      // Khalid helps run the khatma too; the viewer is another co-organizer.
+      view.members[2]!.isCoOrganizer = true;
+      view.access = access;
+      return view;
+    };
+    const memberRows = () =>
+      within(section(t.organizer.membersHeading)).getAllByRole("listitem");
+
+    it("the owner sees the co-organizer section, and members labelled «منظّم مساعد»", () => {
+      const view = withCoOrganizer(coOrganizer({}));
+      view.access = OWNER;
+      m.settings = view;
+      renderPage();
+      expect(
+        screen.getByRole("region", { name: t.coOrganizers.heading }),
+      ).toBeInTheDocument();
+      expect(memberRows()[2]).toHaveTextContent("منظّم مساعد");
+      expect(memberRows()[1]).not.toHaveTextContent("منظّم مساعد");
+      // The owner can still remove a co-organizer, or hand them the khatma.
+      expect(
+        within(memberRows()[2]!).getByRole("button", { name: /^إزالة/ }),
+      ).toBeInTheDocument();
+    });
+
+    it("a co-organizer never sees archive, delete, or transfer", () => {
+      m.settings = withCoOrganizer(
+        coOrganizer({ readings: true, people: true, settings: true }),
+      );
+      const view = renderPage();
+      expect(
+        screen.queryByRole("button", { name: t.archive.button }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /^انقل ملكية الختمة/ }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("region", { name: t.coOrganizers.heading }),
+      ).toBeNull();
+      // Their switches still give them the rest.
+      expect(
+        screen.getByRole("region", { name: t.organizer.nameHeading }),
+      ).toBeInTheDocument();
+      expect(
+        within(memberRows()[1]!).getByRole("button", { name: /^إزالة/ }),
+      ).toBeInTheDocument();
+
+      m.settings = {
+        ...withCoOrganizer(
+          coOrganizer({ readings: true, people: true, settings: true }),
+        ),
+        archived: true,
+      };
+      view.rerender(tree());
+      expect(
+        screen.queryByRole("button", { name: t.archive.delete }),
+      ).toBeNull();
+    });
+
+    it("a co-organizer with People sees no remove on the owner or another co-organizer", () => {
+      m.settings = withCoOrganizer(coOrganizer({ people: true }));
+      renderPage();
+      const rows = memberRows();
+      expect(within(rows[0]!).queryByRole("button")).toBeNull();
+      expect(rows[2]).toHaveTextContent("منظّم مساعد");
+      expect(within(rows[2]!).queryByRole("button")).toBeNull();
+      expect(
+        within(rows[1]!).getByRole("button", { name: /^إزالة/ }),
+      ).toBeInTheDocument();
+    });
+
+    it("People alone: the member controls and the invite link, but not the name, schedule, grace or cheer", () => {
+      m.settings = withCoOrganizer(coOrganizer({ people: true }));
+      renderPage();
+      for (const heading of [
+        t.organizer.nameHeading,
+        t.create.scheduleLegend,
+        t.grace.label,
+        t.cheer.heading,
+      ]) {
+        expect(screen.queryByRole("region", { name: heading })).toBeNull();
+      }
+      expect(
+        screen.getByRole("region", { name: t.organizer.blockedHeading }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: t.organizer.reset }),
+      ).toBeInTheDocument();
+    });
+
+    it("Settings alone: the form, but no member controls, blocked list or invite reset", () => {
+      m.settings = withCoOrganizer(coOrganizer({ settings: true }));
+      renderPage();
+      expect(
+        screen.getByRole("region", { name: t.organizer.nameHeading }),
+      ).toBeInTheDocument();
+      // The names still show.
+      expect(memberRows()).toHaveLength(3);
+      for (const row of memberRows()) {
+        expect(within(row).queryByRole("button")).toBeNull();
+      }
+      expect(
+        screen.queryByRole("region", { name: t.organizer.blockedHeading }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: t.organizer.reset }),
+      ).toBeNull();
+    });
+
+    it("says a removal was refused because that person runs the khatma", async () => {
+      m.fns.removeMember.mockResolvedValue({
+        ok: false,
+        reason: "is_organizer",
+      });
+      m.settings = withCoOrganizer(coOrganizer({ people: true }));
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(
+        within(memberRows()[1]!).getByRole("button", { name: /^إزالة/ }),
+      );
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: "إزالة",
+        }),
+      );
+      expect(
+        await within(section(t.organizer.membersHeading)).findByRole("alert"),
+      ).toHaveTextContent(t.organizer.errors.is_organizer);
+    });
+  });
+
+  describe("a rotating khatma's transfer", () => {
+    const rotaSettings = {
+      name: "ختمة الجمعة",
+      days: { kind: "daily" },
+      firstDate: "2026-10-30",
+      firstDatePassed: false,
+      endDate: null,
+      timeZone: "Asia/Dubai",
+      messages: {
+        dayAt: 480,
+        reminder: { at: 960, on: true },
+        unread: { at: 1140, on: true },
+        summary: { at: 1260, on: false },
+      },
+      pausedAt: null,
+      pauseDates: [],
+      upcoming: [],
+      quiet: { startHour: 22, endHour: 7 },
+      lateTap: { override: null, defaultMs: 28_800_000 },
+      cheer: {
+        override: null,
+        defaults: {
+          on: true,
+          everyone: false,
+          gapMs: 86_400_000,
+          showName: false,
+          showJuz: false,
+        },
+      },
+      archived: false,
+      access: OWNER,
+    };
+    const person = (
+      id: string,
+      name: string,
+      extra: Record<string, unknown> = {},
+    ) => ({
+      id,
+      name,
+      isMe: false,
+      juz: [1],
+      phone: "+971500000000",
+      joined: true,
+      stopped: false,
+      silenced: false,
+      isOrganizer: false,
+      isCoOrganizer: false,
+      hasAccount: true,
+      ...extra,
+    });
+
+    beforeEach(() => {
+      m.rotaSettings = rotaSettings;
+      m.people = {
+        participants: [
+          person("p1", "أبو علي", { isMe: true, isOrganizer: true }),
+          person("p2", "مريم", { isCoOrganizer: true }),
+          person("p3", "هدى"),
+        ],
+      };
+    });
+
+    it("offers every participant but the owner, and sends the participant", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const transfer = section(t.organizer.transfer);
+      const choices = within(transfer).getAllByRole("button");
+      expect(choices.map((b) => b.textContent)).toEqual(["مريم", "هدى"]);
+      // No number reaches this list.
+      expect(transfer).not.toHaveTextContent(/[٠-٩0-9]/);
+      await user.click(within(transfer).getByRole("button", { name: "هدى" }));
+      const sheet = screen.getByRole("dialog", {
+        name: t.organizer.transferTitle("هدى"),
+      });
+      await user.click(
+        within(sheet).getByRole("button", {
+          name: t.organizer.transferConfirm,
+        }),
+      );
+      expect(m.fns.handOver).toHaveBeenCalledWith({
+        sessionToken: "tok",
+        inviteCode: "CODE",
+        participantId: "p3",
+      });
+      expect(await screen.findByText("khatma-page")).toBeInTheDocument();
+    });
+
+    it("still says when the participant lost their account by the time of confirming (a stale list)", async () => {
+      m.fns.handOver.mockResolvedValue({ ok: false, reason: "no_account" });
+      const user = userEvent.setup();
+      renderPage();
+      const transfer = section(t.organizer.transfer);
+      await user.click(within(transfer).getByRole("button", { name: "هدى" }));
+      await user.click(
+        screen.getByRole("button", { name: t.organizer.transferConfirm }),
+      );
+      expect(await within(transfer).findByRole("alert")).toHaveTextContent(
+        t.organizer.errors.no_account,
+      );
+      expect(screen.queryByText("khatma-page")).toBeNull();
+    });
+
+    it("shows the owner the co-organizer section", () => {
+      renderPage();
+      expect(
+        screen.getByRole("region", { name: t.coOrganizers.heading }),
+      ).toBeInTheDocument();
+    });
+
+    it("a co-organizer with Settings sees no transfer, co-organizers, or archive", () => {
+      m.rotaSettings = {
+        ...rotaSettings,
+        access: coOrganizer({ settings: true }),
+      };
+      renderPage();
+      expect(screen.getByLabelText(t.rota.nameLabel)).toHaveValue(
+        "ختمة الجمعة",
+      );
+      expect(
+        screen.queryByRole("region", { name: t.organizer.transfer }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("region", { name: t.coOrganizers.heading }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: t.archive.button }),
+      ).toBeNull();
     });
   });
 });

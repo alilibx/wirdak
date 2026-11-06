@@ -136,6 +136,7 @@ export function KhatmaPage() {
         name={found.name}
         archived={found.archived}
         joinLink={found.joinLink}
+        access={found.organizerAccess}
       />
     );
   }
@@ -503,7 +504,8 @@ function MemberContent({
                 />
               </>
             )}
-            {view.isOrganizer && (
+            {/* The owner and every co-organizer: the settings page shows each their own controls. */}
+            {view.organizerAccess !== null && (
               <Link
                 to={`/j/${encodeURIComponent(inviteCode)}/settings`}
                 className="mt-3 inline-flex min-h-14 items-center font-semibold text-green underline underline-offset-4"

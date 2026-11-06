@@ -82,6 +82,7 @@ const settings = {
   upcoming: [],
   quiet: { startHour: 22, endHour: 7 },
   lateTap: { override: null, defaultMs: 28_800_000 },
+  access: { owner: true, readings: true, people: true, settings: true },
   cheer: {
     override: null,
     defaults: {

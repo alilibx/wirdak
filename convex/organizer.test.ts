@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { sha256Hex } from "./lib/crypto";
+import { roleIn } from "./lib/organizerAuth";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -34,7 +35,7 @@ async function signedIn(t: T, displayName: string, lastSeenAt = NOW) {
     const personId = await ctx.db.insert("people", {
       phone: `+97157000${String(seq).padStart(4, "0")}`,
       displayName,
-      verifiedAt: 0,
+      verifiedAt: NOW,
       timeZone: TZ,
       lastSeenAt,
     });
@@ -224,6 +225,7 @@ test("settings lists names only, by join date", async () => {
   expect(s.archived).toBe(false);
   expect(Object.keys(s.members[0] ?? {}).sort()).toEqual([
     "displayName",
+    "isCoOrganizer",
     "isOrganizer",
     "memberId",
   ]);
@@ -490,8 +492,10 @@ test("handOver moves the role and notifies the new organizer", async () => {
   expect(await notesOf(t, ali, "nowOrganizer")).toHaveLength(1);
   expect(await notesOf(t, org, "nowOrganizer")).toHaveLength(0);
 
-  // the old organizer is an ordinary member now; the new one has the controls
-  expect(await settingsOf(t, code, org)).toEqual({ forbidden: true });
+  // the old organizer helps as a co-organizer now; the new one owns it
+  const old = await settingsOf(t, code, org);
+  if ("forbidden" in old) throw new Error("forbidden");
+  expect(old.access.owner).toBe(false);
   const s = await settingsOf(t, code, ali);
   if ("forbidden" in s) throw new Error("forbidden");
   expect(s.members.map((m) => m.isOrganizer)).toEqual([false, true]);
@@ -620,10 +624,11 @@ test("the pool organizer controls refuse a rota khatma", async () => {
   await expect(t.action(api.organizer.resetInvite, base)).rejects.toThrow(
     /forbidden/,
   );
+  // a rota khatma is transferred too, but only to one of its participants
   const memberId = (await memberOf(t, rotaId, member))._id;
-  await expect(
-    t.mutation(api.organizer.handOver, { ...base, memberId }),
-  ).rejects.toThrow(/forbidden/);
+  expect(
+    await t.mutation(api.organizer.handOver, { ...base, memberId }),
+  ).toEqual({ ok: false, reason: "not_member" });
   expect((await khatmaOf(t, "rotaorg12345")).creatorPersonId).toBe(
     org.personId,
   );
@@ -753,4 +758,540 @@ test("touch updates lastSeenAt and timeZone", async () => {
   expect((await person())?.timeZone).toBe("UTC");
 
   expect(await touch("Asia/Dubai", null)).toEqual({ ok: false });
+});
+
+// ---------------------------------------------------------------------------
+// Transferring ownership (co-organizers spec 4.5)
+
+const ALL = { readings: true, people: true, settings: true };
+
+const setSetting = (t: T, key: string, value: unknown) =>
+  t.run(async (ctx) => {
+    const row = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", key))
+      .first();
+    if (row) await ctx.db.patch(row._id, { value });
+    else await ctx.db.insert("settings", { key, value, updatedAt: 0 });
+  });
+
+/** Names someone a co-organizer as the owner would, by candidate id. */
+async function nameCo(
+  t: T,
+  code: string,
+  owner: Who,
+  candidateId: string,
+  switches = ALL,
+) {
+  const r = await t.mutation(api.coOrganizers.set, {
+    sessionToken: owner.token,
+    inviteCode: code,
+    candidateId,
+    ...switches,
+  });
+  if (!("ok" in r)) throw new Error(JSON.stringify(r));
+}
+
+async function coRows(t: T, khatmaId: Id<"khatmas">) {
+  const rows = await t.run((ctx) =>
+    ctx.db
+      .query("coOrganizers")
+      .withIndex("by_khatma", (q) => q.eq("khatmaId", khatmaId))
+      .collect(),
+  );
+  return rows.sort((a, b) => a.addedAt - b.addedAt);
+}
+
+async function phoneOf(t: T, who: Who): Promise<string> {
+  return (await t.run((ctx) => ctx.db.get(who.personId)))!.phone;
+}
+
+async function roleOf(t: T, khatmaId: Id<"khatmas">, who: Who) {
+  return await t.run(async (ctx) =>
+    roleIn(ctx, (await ctx.db.get(khatmaId))!, await ctx.db.get(who.personId)),
+  );
+}
+
+async function sweep(t: T) {
+  await t.mutation(internal.organizer.autoHandoverSweep, {});
+  vi.advanceTimersByTime(10);
+  await t.finishInProgressScheduledFunctions();
+}
+
+/** A rota khatma the organizer made; they are participant 1 and a member. */
+async function rotaSetup() {
+  const t = convexTest(schema, modules);
+  await setSetting(t, "rotaStartNextDay", false);
+  const org = await signedIn(t, "المنظم");
+  await t.run((ctx) => ctx.db.patch(org.personId, { rotaAllowed: true }));
+  const at = Date.now();
+  const { inviteCode } = await t.action(api.rota.create, {
+    sessionToken: org.token,
+    name: "ختمة التناوب",
+    days: { kind: "weekly", weekdays: [5], everyWeeks: 1 },
+    firstDate: "2027-01-15",
+    endDate: null,
+  });
+  vi.setSystemTime(at);
+  return { t, org, code: inviteCode, khatma: await khatmaOf(t, inviteCode) };
+}
+
+/** A signed-in person on a mobile number a rota khatma accepts. */
+async function rotaPerson(t: T, displayName: string, phone: string) {
+  const who = await signedIn(t, displayName);
+  await t.run((ctx) => ctx.db.patch(who.personId, { phone }));
+  return who;
+}
+
+async function addParticipant(
+  t: T,
+  code: string,
+  by: Who,
+  name: string,
+  phone: string,
+): Promise<Id<"rotaParticipants">> {
+  const r = await t.mutation(api.rota.addParticipant, {
+    sessionToken: by.token,
+    inviteCode: code,
+    name,
+    phone,
+  });
+  if (!("participantId" in r)) throw new Error(JSON.stringify(r));
+  return r.participantId;
+}
+
+test("transfer makes the old owner a co-organizer with every switch, and ends the new owner's co-organizer role", async () => {
+  const { t, org, code, khatma } = await setup();
+  const ali = await signedIn(t, "علي");
+  const bob = await signedIn(t, "بلال");
+  await join(t, khatma._id, ali);
+  await join(t, khatma._id, bob);
+  const aliMember = await memberOf(t, khatma._id, ali);
+  const bobMember = await memberOf(t, khatma._id, bob);
+  await nameCo(t, code, org, `m:${aliMember._id}`, {
+    readings: true,
+    people: false,
+    settings: false,
+  });
+  vi.advanceTimersByTime(1000);
+  await nameCo(t, code, org, `m:${bobMember._id}`);
+  // already over the limit: the old owner's row is added anyway
+  await setSetting(t, "maxCoOrganizers", 1);
+
+  expect(
+    await t.mutation(api.organizer.handOver, {
+      sessionToken: org.token,
+      inviteCode: code,
+      memberId: aliMember._id,
+    }),
+  ).toEqual({ ok: true });
+
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(ali.personId);
+  const rows = await coRows(t, khatma._id);
+  expect(rows.map((r) => r.phone)).toEqual([
+    await phoneOf(t, bob),
+    await phoneOf(t, org),
+  ]);
+  expect(rows[1]).toMatchObject(ALL);
+  expect(await roleOf(t, khatma._id, org)).toEqual({ owner: false, ...ALL });
+  expect(await roleOf(t, khatma._id, ali)).toEqual({ owner: true });
+  expect((await memberOf(t, khatma._id, org)).status).toBe("active");
+  // the transfer's own notes, and no "you're a co-organizer now" on top
+  expect(await notesOf(t, ali, "nowOrganizer")).toHaveLength(1);
+  expect(await notesOf(t, org, "coOrganizerNow")).toHaveLength(0);
+  expect(await notesOf(t, org, "organizerMoved")).toHaveLength(0);
+});
+
+test("oldOwnerStaysOn off leaves the old owner a plain member", async () => {
+  const { t, org, code, khatma } = await setup();
+  await setSetting(t, "oldOwnerStaysOn", false);
+  const ali = await signedIn(t, "علي");
+  await join(t, khatma._id, ali);
+  const aliMember = await memberOf(t, khatma._id, ali);
+  await nameCo(t, code, org, `m:${aliMember._id}`);
+
+  expect(
+    await t.mutation(api.organizer.handOver, {
+      sessionToken: org.token,
+      inviteCode: code,
+      memberId: aliMember._id,
+    }),
+  ).toEqual({ ok: true });
+
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(ali.personId);
+  expect(await coRows(t, khatma._id)).toEqual([]);
+  expect(await roleOf(t, khatma._id, org)).toBeNull();
+  expect(await settingsOf(t, code, org)).toEqual({ forbidden: true });
+  expect((await memberOf(t, khatma._id, org)).status).toBe("active");
+});
+
+test("a rota khatma can be transferred to a participant with an account, not to a pending one", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  const ali = await rotaPerson(t, "علي", "+971505550011");
+  const aliId = await addParticipant(
+    t,
+    code,
+    org,
+    "علي",
+    await phoneOf(t, ali),
+  );
+  // a co-organizer who hasn't signed in yet (Review Focus 5)
+  const pendingId = await addParticipant(t, code, org, "خالد", "+971505550001");
+  await nameCo(t, code, org, `p:${pendingId}`);
+  const ownerRow = (
+    await t.run((ctx) =>
+      ctx.db
+        .query("rotaParticipants")
+        .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
+        .collect(),
+    )
+  ).find((p) => p.personId === org.personId)!;
+  const handOver = (
+    who: Who,
+    target: {
+      memberId?: Id<"members">;
+      participantId?: Id<"rotaParticipants">;
+    },
+  ) =>
+    t.mutation(api.organizer.handOver, {
+      sessionToken: who.token,
+      inviteCode: code,
+      ...target,
+    });
+  const snapshot = async () => ({
+    khatma: await khatmaById(t, khatma._id),
+    rows: await coRows(t, khatma._id),
+    members: await t.run((ctx) => ctx.db.query("members").collect()),
+    notes: await t.run((ctx) => ctx.db.query("notes").collect()),
+  });
+
+  const before = await snapshot();
+  expect(await handOver(org, { participantId: pendingId })).toEqual({
+    ok: false,
+    reason: "no_account",
+  });
+  expect(await handOver(org, { participantId: ownerRow._id })).toEqual({
+    ok: false,
+    reason: "self",
+  });
+  expect(await handOver(org, {})).toEqual({ ok: false, reason: "not_member" });
+  expect(await snapshot()).toEqual(before);
+
+  // a participant with an account, who isn't a co-organizer
+  expect(await handOver(org, { participantId: aliId })).toEqual({ ok: true });
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(ali.personId);
+  expect(await roleOf(t, khatma._id, ali)).toEqual({ owner: true });
+  expect(await roleOf(t, khatma._id, org)).toEqual({ owner: false, ...ALL });
+  expect((await memberOf(t, khatma._id, ali)).status).toBe("active");
+  expect(await notesOf(t, ali, "nowOrganizer")).toHaveLength(1);
+  expect(
+    (await t.query(api.khatmas.mine, { sessionToken: ali.token })).map(
+      (k) => k.inviteCode,
+    ),
+  ).toEqual([code]);
+
+  // and back to the old owner by their co-organizer membership: each keeps
+  // the membership they need
+  const orgMember = await memberOf(t, khatma._id, org);
+  expect(await handOver(ali, { memberId: orgMember._id })).toEqual({
+    ok: true,
+  });
+  expect(await roleOf(t, khatma._id, org)).toEqual({ owner: true });
+  expect(await roleOf(t, khatma._id, ali)).toEqual({ owner: false, ...ALL });
+  expect((await memberOf(t, khatma._id, org)).status).toBe("active");
+  expect((await memberOf(t, khatma._id, ali)).status).toBe("active");
+  expect((await coRows(t, khatma._id)).map((r) => r.phone)).toEqual([
+    "+971505550001",
+    await phoneOf(t, ali),
+  ]);
+});
+
+test("after a rota transfer to a participant added by phone, the owner checks find the new owner", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  const ali = await rotaPerson(t, "علي", "+971505550011");
+  // added by phone: the row names no account
+  const aliId = await addParticipant(
+    t,
+    code,
+    org,
+    "علي",
+    await phoneOf(t, ali),
+  );
+  expect((await t.run((ctx) => ctx.db.get(aliId)))?.personId).toBeNull();
+  expect(
+    await t.mutation(api.organizer.handOver, {
+      sessionToken: org.token,
+      inviteCode: code,
+      participantId: aliId,
+    }),
+  ).toEqual({ ok: true });
+  // the old owner stays on with every switch, People included
+  expect(await roleOf(t, khatma._id, org)).toEqual({ owner: false, ...ALL });
+
+  const aliRow = async () => {
+    const view = await t.query(api.rota.people, {
+      sessionToken: ali.token,
+      inviteCode: code,
+    });
+    return view!.participants.find((p) => p.id === aliId)!;
+  };
+  const guarded = async () => {
+    const row = await aliRow();
+    expect(row.isOrganizer).toBe(true);
+    expect(row.juz.length).toBeGreaterThan(0);
+    expect(
+      await t.mutation(api.rota.removeParticipant, {
+        sessionToken: org.token,
+        inviteCode: code,
+        participantId: aliId,
+      }),
+    ).toEqual({ error: "is_organizer" });
+    expect(
+      await t.mutation(api.rota.freeJuz, {
+        sessionToken: org.token,
+        inviteCode: code,
+        participantId: aliId,
+        juz: row.juz[0]!,
+      }),
+    ).toEqual({ error: "is_organizer" });
+    expect(
+      await t.mutation(api.rota.removeParticipant, {
+        sessionToken: ali.token,
+        inviteCode: code,
+        participantId: aliId,
+      }),
+    ).toEqual({ error: "is_me" });
+  };
+
+  // the transfer names the new owner on their row
+  expect((await t.run((ctx) => ctx.db.get(aliId)))?.personId).toBe(
+    ali.personId,
+  );
+  await guarded();
+  // and the checks match the owner's number even on a row without an account
+  await t.run((ctx) => ctx.db.patch(aliId, { personId: null }));
+  await guarded();
+});
+
+test("a rota old owner who doesn't stay on loses the membership the role gave", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  await setSetting(t, "oldOwnerStaysOn", false);
+  const ali = await rotaPerson(t, "علي", "+971505550011");
+  const aliId = await addParticipant(
+    t,
+    code,
+    org,
+    "علي",
+    await phoneOf(t, ali),
+  );
+  const mine = (who: Who) =>
+    t.query(api.khatmas.mine, { sessionToken: who.token });
+  expect((await mine(org)).map((k) => k.inviteCode)).toEqual([code]);
+
+  expect(
+    await t.mutation(api.organizer.handOver, {
+      sessionToken: org.token,
+      inviteCode: code,
+      participantId: aliId,
+    }),
+  ).toEqual({ ok: true });
+
+  expect(await coRows(t, khatma._id)).toEqual([]);
+  expect(await roleOf(t, khatma._id, org)).toBeNull();
+  const orgMembership = await t.run((ctx) =>
+    ctx.db
+      .query("members")
+      .withIndex("by_khatma_person", (q) =>
+        q.eq("khatmaId", khatma._id).eq("personId", org.personId),
+      )
+      .first(),
+  );
+  expect(orgMembership).toBeNull();
+  expect(await mine(org)).toEqual([]);
+  expect((await mine(ali)).map((k) => k.inviteCode)).toEqual([code]);
+});
+
+test("auto handover picks the longest-serving active co-organizer before the longest-standing member", async () => {
+  const { t, org, code, khatma } = await setup();
+  const early = await signedIn(t, "قديم");
+  const staleCo = await signedIn(t, "غائب", NOW - 8 * DAY);
+  const firstCo = await signedIn(t, "أول");
+  const laterCo = await signedIn(t, "ثان");
+  await join(t, khatma._id, early, { joinedAt: NOW + 1 });
+  await join(t, khatma._id, laterCo, { joinedAt: NOW + 2 });
+  await join(t, khatma._id, firstCo, { joinedAt: NOW + 3 });
+  await join(t, khatma._id, staleCo, { joinedAt: NOW + 4 });
+  for (const who of [staleCo, firstCo, laterCo]) {
+    await nameCo(t, code, org, `m:${(await memberOf(t, khatma._id, who))._id}`);
+    vi.advanceTimersByTime(1000);
+  }
+  await t.run((ctx) =>
+    ctx.db.patch(org.personId, { lastSeenAt: NOW - 31 * DAY }),
+  );
+
+  await sweep(t);
+
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(
+    firstCo.personId,
+  );
+  expect(await notesOf(t, firstCo, "nowOrganizer")).toHaveLength(1);
+  expect(await notesOf(t, org, "organizerMoved")).toHaveLength(1);
+  const rows = await coRows(t, khatma._id);
+  expect(rows.map((r) => r.phone)).toEqual([
+    await phoneOf(t, staleCo),
+    await phoneOf(t, laterCo),
+    await phoneOf(t, org),
+  ]);
+  expect(await roleOf(t, khatma._id, org)).toEqual({ owner: false, ...ALL });
+});
+
+test("auto handover hands a rota khatma only to a co-organizer, and does nothing without one", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  const ali = await rotaPerson(t, "علي", "+971505550011");
+  const bob = await rotaPerson(t, "بلال", "+971505550012");
+  await addParticipant(t, code, org, "علي", await phoneOf(t, ali));
+  const bobId = await addParticipant(
+    t,
+    code,
+    org,
+    "بلال",
+    await phoneOf(t, bob),
+  );
+  const away = () =>
+    t.run((ctx) => ctx.db.patch(org.personId, { lastSeenAt: NOW - 31 * DAY }));
+
+  // a participant with an account isn't enough
+  await away();
+  await sweep(t);
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(org.personId);
+  expect(await notesOf(t, org, "organizerMoved")).toHaveLength(0);
+
+  await nameCo(t, code, org, `p:${bobId}`);
+  await away();
+  await sweep(t);
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(bob.personId);
+  expect(await notesOf(t, bob, "nowOrganizer")).toHaveLength(1);
+  expect(await notesOf(t, org, "organizerMoved")).toHaveLength(1);
+  expect(await roleOf(t, khatma._id, bob)).toEqual({ owner: true });
+  expect(await roleOf(t, khatma._id, org)).toEqual({ owner: false, ...ALL });
+  expect((await memberOf(t, khatma._id, bob)).status).toBe("active");
+});
+
+/** The rota owner's own participant row, found by their phone. */
+async function ownerRow(t: T, khatmaId: Id<"khatmas">, owner: Who) {
+  const phone = await phoneOf(t, owner);
+  const row = await t.run((ctx) =>
+    ctx.db
+      .query("rotaParticipants")
+      .withIndex("by_khatma_phone", (q) =>
+        q.eq("khatmaId", khatmaId).eq("phone", phone),
+      )
+      .first(),
+  );
+  if (!row) throw new Error("no owner row");
+  return row;
+}
+
+test("a rota owner who replies on WhatsApp keeps the khatma though the website hasn't seen them", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  const bob = await rotaPerson(t, "بلال", "+971505550012");
+  const bobId = await addParticipant(
+    t,
+    code,
+    org,
+    "بلال",
+    await phoneOf(t, bob),
+  );
+  await nameCo(t, code, org, `p:${bobId}`);
+  const row = await ownerRow(t, khatma._id, org);
+  await t.run(async (ctx) => {
+    await ctx.db.patch(org.personId, { lastSeenAt: NOW - 31 * DAY });
+    await ctx.db.patch(row._id, { lastReplyAt: NOW - DAY });
+  });
+
+  await sweep(t);
+
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(org.personId);
+  expect(await notesOf(t, bob, "nowOrganizer")).toHaveLength(0);
+});
+
+test("a rota owner an admin set up who never signed in or replied keeps the khatma", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  const bob = await rotaPerson(t, "بلال", "+971505550012");
+  const bobId = await addParticipant(
+    t,
+    code,
+    org,
+    "بلال",
+    await phoneOf(t, bob),
+  );
+  await nameCo(t, code, org, `p:${bobId}`);
+  await t.run((ctx) =>
+    ctx.db.patch(org.personId, { lastSeenAt: 0, verifiedAt: 0 }),
+  );
+
+  await sweep(t);
+
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(org.personId);
+  expect(await notesOf(t, bob, "nowOrganizer")).toHaveLength(0);
+});
+
+test("a rota owner away from the website and silent on WhatsApp goes to an active co-organizer", async () => {
+  const { t, org, code, khatma } = await rotaSetup();
+  const bob = await rotaPerson(t, "بلال", "+971505550012");
+  const bobId = await addParticipant(
+    t,
+    code,
+    org,
+    "بلال",
+    await phoneOf(t, bob),
+  );
+  await nameCo(t, code, org, `p:${bobId}`);
+  const row = await ownerRow(t, khatma._id, org);
+  await t.run(async (ctx) => {
+    await ctx.db.patch(org.personId, { lastSeenAt: NOW - 31 * DAY });
+    await ctx.db.patch(row._id, { lastReplyAt: NOW - 31 * DAY });
+  });
+
+  await sweep(t);
+
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(bob.personId);
+  expect(await notesOf(t, bob, "nowOrganizer")).toHaveLength(1);
+});
+
+test("handoverToCoOrganizerOn off keeps today's rule and still skips rota", async () => {
+  const { t, org, code, khatma } = await setup();
+  await setSetting(t, "handoverToCoOrganizerOn", false);
+  const early = await signedIn(t, "قديم");
+  const co = await signedIn(t, "منظم مساعد");
+  await join(t, khatma._id, early, { joinedAt: NOW + 1 });
+  await join(t, khatma._id, co, { joinedAt: NOW + 2 });
+  await nameCo(t, code, org, `m:${(await memberOf(t, khatma._id, co))._id}`);
+  await t.run((ctx) =>
+    ctx.db.patch(org.personId, { lastSeenAt: NOW - 31 * DAY }),
+  );
+  await sweep(t);
+  expect((await khatmaById(t, khatma._id)).creatorPersonId).toBe(
+    early.personId,
+  );
+
+  const rota = await rotaSetup();
+  await setSetting(rota.t, "handoverToCoOrganizerOn", false);
+  const bob = await rotaPerson(rota.t, "بلال", "+971505550012");
+  const bobId = await addParticipant(
+    rota.t,
+    rota.code,
+    rota.org,
+    "بلال",
+    await phoneOf(rota.t, bob),
+  );
+  await nameCo(rota.t, rota.code, rota.org, `p:${bobId}`);
+  await rota.t.run((ctx) =>
+    ctx.db.patch(rota.org.personId, { lastSeenAt: NOW - 31 * DAY }),
+  );
+  await sweep(rota.t);
+  expect((await khatmaById(rota.t, rota.khatma._id)).creatorPersonId).toBe(
+    rota.org.personId,
+  );
+  expect(await notesOf(rota.t, bob, "nowOrganizer")).toHaveLength(0);
 });

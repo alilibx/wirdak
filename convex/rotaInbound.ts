@@ -9,6 +9,7 @@ import { scheduleRotaCheer } from "./cheers";
 import { isBlocked } from "./lib/blocked";
 import { refreshPhone } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
+import { organizerRecipients } from "./lib/organizerRecipients";
 import { notify } from "./notes";
 import { celebrateIfComplete, completeIfDone } from "./rotaDays";
 import { takeFreeJuzToday, titled, welcomeMessage } from "./rotaOutbox";
@@ -389,12 +390,15 @@ async function join(
         resolvedAt: null,
         outcome: null,
       });
-      await notify(ctx, {
-        personId: khatma.creatorPersonId,
-        khatmaId: khatma._id,
-        kind: "rotaJoinRequest",
-        name: profileName ?? maskPhone(args.phone),
-      });
+      for (const r of await organizerRecipients(ctx, khatma, "people")) {
+        await notify(ctx, {
+          personId: r.personId,
+          khatmaId: khatma._id,
+          kind: "rotaJoinRequest",
+          name: profileName ?? maskPhone(args.phone),
+          whatsappOff: r.whatsappOff,
+        });
+      }
     }
     return [about(khatma, notOnListText)];
   }
@@ -433,12 +437,15 @@ async function stop(
     await ctx.db.patch(p._id, { stoppedAt: now });
     const khatma = await ctx.db.get(p.khatmaId);
     if (!khatma || isArchived(khatma)) continue;
-    await notify(ctx, {
-      personId: khatma.creatorPersonId,
-      khatmaId: khatma._id,
-      kind: "rotaStopped",
-      name: p.name,
-    });
+    for (const r of await organizerRecipients(ctx, khatma, "people")) {
+      await notify(ctx, {
+        personId: r.personId,
+        khatmaId: khatma._id,
+        kind: "rotaStopped",
+        name: p.name,
+        whatsappOff: r.whatsappOff,
+      });
+    }
   }
   return [reply(stopText)];
 }

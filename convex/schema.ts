@@ -207,6 +207,7 @@ export default defineSchema({
       v.literal("rotaSilenced"),
       v.literal("rotaStopped"),
       v.literal("rotaEnabled"),
+      v.literal("coOrganizerNow"),
     ),
     /** A rota participant's name, in the organizer notes about them. */
     name: v.optional(v.union(v.string(), v.null())),
@@ -219,6 +220,8 @@ export default defineSchema({
     pushedAt: nullableNumber,
     // When its WhatsApp message went out; at most one per note.
     whatsappSentAt: v.optional(nullableNumber),
+    // A co-organizer's copy of an organizer note: never sent on WhatsApp.
+    whatsappOff: v.optional(v.boolean()),
     clearedAt: nullableNumber,
   })
     .index("by_person_khatma", ["personId", "khatmaId", "clearedAt"])
@@ -261,6 +264,23 @@ export default defineSchema({
     .index("by_khatma", ["khatmaId"])
     .index("by_khatma_phone", ["khatmaId", "phone"])
     // Every khatma a phone reads in, for its WhatsApp replies.
+    .index("by_phone", ["phone"]),
+
+  /**
+   * Someone the owner named to help run a khatma. Keyed by phone so a rota
+   * participant with no account can be named; the role takes effect when they
+   * sign in with that number.
+   */
+  coOrganizers: defineTable({
+    khatmaId: v.id("khatmas"),
+    phone: v.string(), // E.164
+    readings: v.boolean(),
+    people: v.boolean(),
+    settings: v.boolean(),
+    addedAt: v.number(),
+  })
+    .index("by_khatma", ["khatmaId"])
+    .index("by_khatma_phone", ["khatmaId", "phone"])
     .index("by_phone", ["phone"]),
 
   /** Someone an organizer added before: they can be added to another rota khatma in a tap. */

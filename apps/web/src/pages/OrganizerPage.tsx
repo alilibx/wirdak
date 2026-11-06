@@ -15,6 +15,7 @@ import {
   ArchiveSection,
 } from "../features/khatma/ArchivedActions";
 import { CheerField } from "../features/khatma/CheerField";
+import { CoOrganizersSection } from "../features/khatma/CoOrganizersSection";
 import { DeletingPage, useDeleting } from "../features/khatma/deleting";
 import { t } from "../i18n/ar";
 import { errorCode } from "../lib/errors";
@@ -35,7 +36,7 @@ type Settings = Exclude<
 >;
 
 type Confirm =
-  | { kind: "remove" | "handover"; memberId: Id<"members">; name: string }
+  | { kind: "remove" | "transfer"; memberId: Id<"members">; name: string }
   | { kind: "reset" };
 
 type SectionId =
@@ -111,6 +112,8 @@ function OrganizerContent({
 }) {
   const sessionToken = useSessionToken();
   const navigate = useNavigate();
+  // Which controls are this person's; the server checks every call anyway.
+  const { access } = settings;
   const update = useMutation(api.organizer.update);
   const removeMember = useMutation(api.organizer.removeMember);
   const unblock = useMutation(api.organizer.unblock);
@@ -226,11 +229,13 @@ function OrganizerContent({
         action.kind === "remove"
           ? await removeMember(args)
           : await handOver(args);
-      if (!result.ok) return t.organizer.errors.generic;
+      if (!result.ok) {
+        return organizerErrors[result.reason] ?? t.organizer.errors.generic;
+      }
       posthog.capture("member_management_completed", {
-        action: action.kind,
+        action: action.kind === "transfer" ? "handover" : action.kind,
       });
-      if (action.kind === "handover") {
+      if (action.kind === "transfer") {
         void navigate(khatmaPath(inviteCode), { replace: true });
       }
       return null;
@@ -263,7 +268,7 @@ function OrganizerContent({
           </p>
         )}
 
-        {!archived && (
+        {!archived && access.settings && (
           <>
             <Section
               id="name"
@@ -359,56 +364,76 @@ function OrganizerContent({
           feedback={feedback}
         >
           <ul className="grid gap-3">
-            {settings.members.map((member) => (
-              <li
-                key={member.memberId}
-                className="rounded-ui border border-line bg-card p-4"
-              >
-                <span className="font-medium">{member.displayName}</span>
-                {member.isOrganizer ? (
-                  <span className="ms-2 inline-block rounded-full bg-saffron-soft px-3 py-0.5 text-base font-semibold text-saffron-ink">
-                    {t.organizer.organizerBadge}
-                  </span>
-                ) : archived ? null : (
-                  <div className="mt-3 flex flex-wrap gap-2.5">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      aria-label={`${t.organizer.makeOrganizer}: ${member.displayName}`}
-                      onClick={() =>
-                        setConfirm({
-                          kind: "handover",
-                          memberId: member.memberId,
-                          name: member.displayName,
-                        })
-                      }
-                      className={rowButton}
-                    >
-                      {t.organizer.makeOrganizer}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      aria-label={`${t.organizer.remove}: ${member.displayName}`}
-                      onClick={() =>
-                        setConfirm({
-                          kind: "remove",
-                          memberId: member.memberId,
-                          name: member.displayName,
-                        })
-                      }
-                      className={rowButton}
-                    >
-                      {t.organizer.remove}
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
+            {settings.members.map((member) => {
+              // Only the owner removes someone who runs the khatma (co-organizers spec 4.2).
+              const canRemove =
+                !archived &&
+                access.people &&
+                !member.isOrganizer &&
+                (access.owner || !member.isCoOrganizer);
+              const canTransfer =
+                !archived && access.owner && !member.isOrganizer;
+              return (
+                <li
+                  key={member.memberId}
+                  className="rounded-ui border border-line bg-card p-4"
+                >
+                  <span className="font-medium">{member.displayName}</span>
+                  {member.isOrganizer && (
+                    <span className="ms-2 inline-block rounded-full bg-saffron-soft px-3 py-0.5 text-base font-semibold text-saffron-ink">
+                      {t.organizer.organizerBadge}
+                    </span>
+                  )}
+                  {member.isCoOrganizer && (
+                    <span className="ms-2 inline-block rounded-full bg-paper-2 px-3 py-0.5 text-base font-semibold text-green-deep">
+                      {t.organizer.coOrganizerBadge}
+                    </span>
+                  )}
+                  {(canTransfer || canRemove) && (
+                    <div className="mt-3 flex flex-wrap gap-2.5">
+                      {canTransfer && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          aria-label={`${t.organizer.transfer}: ${member.displayName}`}
+                          onClick={() =>
+                            setConfirm({
+                              kind: "transfer",
+                              memberId: member.memberId,
+                              name: member.displayName,
+                            })
+                          }
+                          className={rowButton}
+                        >
+                          {t.organizer.transfer}
+                        </button>
+                      )}
+                      {canRemove && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          aria-label={`${t.organizer.remove}: ${member.displayName}`}
+                          onClick={() =>
+                            setConfirm({
+                              kind: "remove",
+                              memberId: member.memberId,
+                              name: member.displayName,
+                            })
+                          }
+                          className={rowButton}
+                        >
+                          {t.organizer.remove}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </Section>
 
-        {!archived && settings.blocked.length > 0 && (
+        {!archived && access.people && settings.blocked.length > 0 && (
           <Section
             id="blocked"
             heading={t.organizer.blockedHeading}
@@ -451,7 +476,7 @@ function OrganizerContent({
           </Section>
         )}
 
-        {!archived && (
+        {!archived && access.people && (
           <Section
             id="reset"
             heading={t.organizer.resetHeading}
@@ -467,11 +492,16 @@ function OrganizerContent({
           </Section>
         )}
 
-        {archived ? (
-          <ArchivedSection inviteCode={inviteCode} restart={null} />
-        ) : (
-          <ArchiveSection inviteCode={inviteCode} />
+        {/* Owner only: who else runs the khatma, archiving and deleting (co-organizers spec 4.4). */}
+        {!archived && access.owner && (
+          <CoOrganizersSection inviteCode={inviteCode} />
         )}
+        {access.owner &&
+          (archived ? (
+            <ArchivedSection inviteCode={inviteCode} restart={null} />
+          ) : (
+            <ArchiveSection inviteCode={inviteCode} />
+          ))}
       </main>
 
       {confirm && sheet && (
@@ -499,11 +529,11 @@ function sheetCopy(confirm: Confirm) {
         body: t.organizer.removeBody,
         confirm: t.organizer.remove,
       };
-    case "handover":
+    case "transfer":
       return {
-        title: t.organizer.handoverTitle(confirm.name),
-        body: t.organizer.handoverBody,
-        confirm: t.organizer.makeOrganizer,
+        title: t.organizer.transferTitle(confirm.name),
+        body: t.organizer.transferBody,
+        confirm: t.organizer.transferConfirm,
       };
     case "reset":
       return {

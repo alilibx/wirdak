@@ -38,6 +38,10 @@ const organizerFunctions = {
   startAgain: api.rota.startAgain,
   archive: api.khatmaLifecycle.archive,
   remove: api.khatmaLifecycle.remove,
+  handOver: api.organizer.handOver,
+  coOrganizers: api.coOrganizers.list,
+  setCoOrganizer: api.coOrganizers.set,
+  removeCoOrganizer: api.coOrganizers.remove,
 };
 
 /** The same function, taking a `RotaScope` where the organizer's takes its token and invite code. */
@@ -51,8 +55,18 @@ type Scoped<Fn> =
       >
     : never;
 
-/** What only an organizer does: a screen hides it for a backend that doesn't have it. */
-type OrganizerOnly = "importable" | "importMembers" | "startAgain";
+/**
+ * What only an organizer does: a screen hides it for a backend that doesn't have it. An admin
+ * transfers ownership and manages co-organizers from the admin's own khatma card instead.
+ */
+type OrganizerOnly =
+  | "importable"
+  | "importMembers"
+  | "startAgain"
+  | "handOver"
+  | "coOrganizers"
+  | "setCoOrganizer"
+  | "removeCoOrganizer";
 
 /** The functions behind the rota screens, and the scope they are called with. */
 export type RotaBackend = {

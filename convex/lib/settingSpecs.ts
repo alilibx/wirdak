@@ -210,6 +210,21 @@ export const SETTING_SPECS: { [K in SettingKey]: SettingSpec } = {
   rotaMaxSlotsPerPerson: { kind: "int", min: 1, max: 30, group: "rota" },
   rotaSilenceNoticeDays: { kind: "int", min: 1, max: 30, group: "rota" },
   rotaSilenceStopDays: { kind: "int", min: 2, max: 60, group: "rota" },
+  markDoneForOthersOn: { kind: "bool", group: "switches" },
+  markDoneNameOn: { kind: "bool", group: "switches" },
+  organizerLateMarkOn: { kind: "bool", group: "rota" },
+  namedCountsAsReplyOn: { kind: "bool", group: "rota" },
+  coOrganizersOn: { kind: "bool", group: "switches" },
+  maxCoOrganizers: { kind: "int", min: 1, max: 20, group: "limits" },
+  coOrganizerDefaultReadings: { kind: "bool", group: "switches" },
+  coOrganizerDefaultPeople: { kind: "bool", group: "switches" },
+  coOrganizerDefaultSettings: { kind: "bool", group: "switches" },
+  coOrganizerNotesOn: { kind: "bool", group: "notifications" },
+  coOrganizerWhatsAppOn: { kind: "bool", group: "notifications" },
+  handoverToCoOrganizerOn: { kind: "bool", group: "switches" },
+  oldOwnerStaysOn: { kind: "bool", group: "switches" },
+  rotaSharedSlotsOn: { kind: "bool", group: "rota" },
+  rotaHalfCountsAsSlot: { kind: "bool", group: "rota" },
 };
 
 export type SettingError =
