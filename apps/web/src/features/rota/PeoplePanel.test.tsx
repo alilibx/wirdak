@@ -1,3 +1,4 @@
+import { toArabicDigits } from "@convex/lib/digits";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -396,6 +397,119 @@ describe("PeoplePanel", () => {
     ).toBeInTheDocument();
   });
 
+  describe("freeing one juz'", () => {
+    /** Muna reads juz' 2 and juz' 5. */
+    function twoView() {
+      const view = makeView();
+      view.rows[4] = { juz: 5, participant: { ...shown, slots: 2 } };
+      view.rows[1] = { juz: 2, participant: { ...shown, slots: 2 } };
+      view.participants[1] = { ...shown, juz: [2, 5] };
+      view.freeJuz = view.freeJuz.filter((j) => j !== 5);
+      return view;
+    }
+    const freeButton = (juz: number) => ({
+      name: new RegExp(t.rota.freeThis(juz)),
+    });
+    /** A juz' row, not the row of another juz' that starts with the same digit. */
+    const row = (juz: number) => new RegExp(`^${toArabicDigits(juz)}(?![٠-٩])`);
+
+    it("frees the juz' that was pressed for someone who reads two, and keeps them", async () => {
+      m.view = twoView();
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      // Juz' 5 is Muna's second row.
+      await user.click(screen.getByRole("button", { name: row(5) }));
+      await user.click(screen.getByRole("button", freeButton(5)));
+      expect(m.fns.freeJuz).toHaveBeenCalledWith({
+        sessionToken: "tok",
+        inviteCode: "CODE",
+        participantId: "p2",
+        juz: 5,
+      });
+      expect(m.fns.removeParticipant).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("someone with one juz' is taken out instead, so there is nothing to free", async () => {
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /منى/ }));
+      const sheet = screen.getByRole("dialog", { name: "منى" });
+      expect(within(sheet).queryByRole("button", freeButton(2))).toBeNull();
+    });
+
+    it("an admin frees the organizer's ajza', one at a time", async () => {
+      const view = makeView();
+      // An admin's view: the organizer's row isn't "me".
+      const organizer = { ...hidden, isOrganizer: true };
+      view.rows[0] = { juz: 1, participant: { ...organizer, slots: 2 } };
+      view.rows[2] = { juz: 3, participant: { ...organizer, slots: 2 } };
+      view.participants[0] = { ...organizer, juz: [1, 3] };
+      view.freeJuz = view.freeJuz.filter((j) => j !== 3);
+      m.view = view;
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: row(3) }));
+      await user.click(screen.getByRole("button", freeButton(3)));
+      expect(m.fns.freeJuz).toHaveBeenCalledWith(
+        expect.objectContaining({ participantId: "p1", juz: 3 }),
+      );
+    });
+
+    it("an admin frees the organizer's only juz' too, since the organizer can't be taken out", async () => {
+      const view = makeView();
+      view.rows[0] = {
+        juz: 1,
+        participant: { ...hidden, isOrganizer: true, slots: 1 },
+      };
+      view.participants[0] = { ...hidden, isOrganizer: true, juz: [1] };
+      m.view = view;
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /سعد/ }));
+      await user.click(screen.getByRole("button", freeButton(1)));
+      expect(m.fns.freeJuz).toHaveBeenCalledWith(
+        expect.objectContaining({ participantId: "p1", juz: 1 }),
+      );
+    });
+
+    it("the owner frees one of their own two ajza', besides stopping altogether", async () => {
+      const view = makeView();
+      const me = { ...hidden, isOrganizer: true, isMe: true };
+      view.rows[0] = { juz: 1, participant: { ...me, slots: 2 } };
+      view.rows[2] = { juz: 3, participant: { ...me, slots: 2 } };
+      view.participants[0] = { ...me, juz: [1, 3] };
+      view.freeJuz = view.freeJuz.filter((j) => j !== 3);
+      m.view = view;
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: row(1) }));
+      const sheet = screen.getByRole("dialog", { name: t.rota.me });
+      expect(
+        within(sheet).getByRole("button", {
+          name: new RegExp(t.rota.stopReading),
+        }),
+      ).toBeInTheDocument();
+      await user.click(within(sheet).getByRole("button", freeButton(1)));
+      expect(m.fns.freeJuz).toHaveBeenCalledTimes(1);
+      expect(m.fns.freeJuz).toHaveBeenCalledWith(
+        expect.objectContaining({ participantId: "p1", juz: 1 }),
+      );
+    });
+
+    it("says why a free was refused", async () => {
+      m.view = twoView();
+      m.fns.freeJuz = vi.fn().mockResolvedValue({ error: "is_organizer" });
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: row(5) }));
+      await user.click(screen.getByRole("button", freeButton(5)));
+      expect(
+        await screen.findByText(t.rota.peopleErrors.is_organizer!),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("co-organizers", () => {
     /** Saad owns the khatma, Muna helps run it, and Huda only reads. */
     function runView() {
@@ -447,6 +561,11 @@ describe("PeoplePanel", () => {
         expect(
           within(sheet).queryByRole("button", { name: t.rota.remove }),
         ).toBeNull();
+        expect(
+          within(sheet).queryByRole("button", {
+            name: new RegExp(t.rota.freeThis(name === "سعد" ? 1 : 2)),
+          }),
+        ).toBeNull();
         await user.click(
           within(sheet).getByRole("button", { name: t.sheet.close }),
         );
@@ -460,16 +579,19 @@ describe("PeoplePanel", () => {
       ).toBeInTheDocument();
     });
 
-    it("the owner can remove a co-organizer", async () => {
+    it("the owner can remove a co-organizer, or free their only juz' and keep them", async () => {
       m.view = runView();
       const user = userEvent.setup();
       render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
       await user.click(screen.getByRole("button", { name: /منى/ }));
+      const sheet = screen.getByRole("dialog", { name: "منى" });
       expect(
-        within(screen.getByRole("dialog", { name: "منى" })).getByRole(
-          "button",
-          { name: t.rota.remove },
-        ),
+        within(sheet).getByRole("button", { name: t.rota.remove }),
+      ).toBeInTheDocument();
+      expect(
+        within(sheet).getByRole("button", {
+          name: new RegExp(t.rota.freeThis(2)),
+        }),
       ).toBeInTheDocument();
     });
 

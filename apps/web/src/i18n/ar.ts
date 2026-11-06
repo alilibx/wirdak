@@ -812,6 +812,8 @@ export const ar = {
     renameTitle: "غيّر الاسم",
     renameSave: "احفظ الاسم",
     remove: "أزله من الختمة",
+    freeThis: (juz: number) => `أخلِ الجزء ${toArabicDigits(juz)}`,
+    freeThisHint: "يبقى في الختمة، ويصبح هذا الجزء بلا قارئ.",
     stopReading: "لن أقرأ جزءاً",
     stopReadingHint: "تبقى منظّم الختمة، ويصبح جزؤك بلا قارئ.",
     orGiveTo: "أو أعطه لمن في الختمة",
