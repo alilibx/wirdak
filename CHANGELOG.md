@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.11.0](https://github.com/alilibx/wirdak/compare/v0.10.0...v0.11.0) (2026-11-06)
+
+
+### Features
+
+* **organizer:** co-organizers with permissions and one owner per khatma ([#65](https://github.com/alilibx/wirdak/issues/65)) ([673cce4](https://github.com/alilibx/wirdak/commit/673cce41df51f4a53d931ebbb5fc1c976de4bd07))
+* **rota:** add several saved participants at once, and show people counts ([#68](https://github.com/alilibx/wirdak/issues/68)) ([7aac4b8](https://github.com/alilibx/wirdak/commit/7aac4b80c9e97113f251d62eaf616ea7bb757c74))
+* **web:** ask for «احذف» before a khatma is deleted ([#66](https://github.com/alilibx/wirdak/issues/66)) ([897f428](https://github.com/alilibx/wirdak/commit/897f428a342659cd0bc84ed8f6bf16ce797117e0))
+
+
+### Bug Fixes
+
+* **admin:** show WhatsApp readers in the people list's all tab ([#64](https://github.com/alilibx/wirdak/issues/64)) ([3c0099e](https://github.com/alilibx/wirdak/commit/3c0099ee97b4e62e5c175ab97b00dc5d68c73f6e))
+* **web:** red delete buttons, a clear «٠» on home, and one-line names in the picker ([#69](https://github.com/alilibx/wirdak/issues/69)) ([4f8e0ac](https://github.com/alilibx/wirdak/commit/4f8e0acce90908bb0fb9937e1cae5dd203a0d4d3))
+
 ## [0.10.0](https://github.com/alilibx/wirdak/compare/v0.9.0...v0.10.0) (2026-11-03)
 
 
