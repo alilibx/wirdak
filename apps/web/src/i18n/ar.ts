@@ -814,6 +814,7 @@ export const ar = {
     remove: "أزله من الختمة",
     freeThis: (juz: number) => `أخلِ الجزء ${toArabicDigits(juz)}`,
     freeThisHint: "يبقى في الختمة، ويصبح هذا الجزء بلا قارئ.",
+    freeThisHintMe: "تبقى في الختمة، ويصبح هذا الجزء بلا قارئ.",
     stopReading: "لن أقرأ جزءاً",
     stopReadingHint: "تبقى منظّم الختمة، ويصبح جزؤك بلا قارئ.",
     orGiveTo: "أو أعطه لمن في الختمة",
@@ -822,7 +823,7 @@ export const ar = {
     removeConfirm: "نعم، أزله",
     cancel: "تراجع",
     peopleErrors: {
-      not_found: "لم نجد هذا الشخص. أعد تحميل الصفحة.",
+      not_found: "لم نجد هذا الشخص أو هذا الجزء. أعد تحميل الصفحة.",
       is_me: "لا يمكن إزالة منظّم الختمة منها.",
       is_organizer: "هذا الشخص يدير الختمة، ولا يغيّر مكانه فيها إلا صاحبها.",
       juz_taken: "هذا الجزء له قارئ الآن.",

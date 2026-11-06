@@ -451,8 +451,17 @@ describe("PeoplePanel", () => {
       render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
       await user.click(screen.getByRole("button", { name: row(3) }));
       await user.click(screen.getByRole("button", freeButton(3)));
-      expect(m.fns.freeJuz).toHaveBeenCalledWith(
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await user.click(screen.getByRole("button", { name: row(1) }));
+      await user.click(screen.getByRole("button", freeButton(1)));
+      expect(m.fns.freeJuz).toHaveBeenCalledTimes(2);
+      expect(m.fns.freeJuz).toHaveBeenNthCalledWith(
+        1,
         expect.objectContaining({ participantId: "p1", juz: 3 }),
+      );
+      expect(m.fns.freeJuz).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ participantId: "p1", juz: 1 }),
       );
     });
 
@@ -490,7 +499,10 @@ describe("PeoplePanel", () => {
           name: new RegExp(t.rota.stopReading),
         }),
       ).toBeInTheDocument();
-      await user.click(within(sheet).getByRole("button", freeButton(1)));
+      const free = within(sheet).getByRole("button", freeButton(1));
+      // Said to the owner, not about them.
+      expect(free).toHaveTextContent(t.rota.freeThisHintMe);
+      await user.click(free);
       expect(m.fns.freeJuz).toHaveBeenCalledTimes(1);
       expect(m.fns.freeJuz).toHaveBeenCalledWith(
         expect.objectContaining({ participantId: "p1", juz: 1 }),

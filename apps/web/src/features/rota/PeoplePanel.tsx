@@ -57,10 +57,7 @@ function PersonSheet({
   const runsKhatma = (p: { isOrganizer: boolean; isCoOrganizer: boolean }) =>
     p.isOrganizer || p.isCoOrganizer;
   const canMove = viewerIsOwner || !runsKhatma(person);
-  // Freeing the pressed juz' keeps its reader in the khatma. Someone with one juz' who can be
-  // taken out is taken out instead; the organizer can't be, and a co-organizer taken out stops
-  // running the khatma, so theirs is freed even when it is their only one. The organizer's own
-  // single juz' already has «لن أقرأ جزءاً».
+  // A lone juz' goes with «أزله من الختمة», or «لن أقرأ جزءاً» on the organizer's own row.
   const canFree =
     canMove && (person.juz.length > 1 || (runsKhatma(person) && !person.isMe));
   const others = view.rows.filter(
@@ -226,7 +223,7 @@ function PersonSheet({
             <span>
               <span className="block">{t.rota.freeThis(juz)}</span>
               <span className="block text-base font-normal">
-                {t.rota.freeThisHint}
+                {person.isMe ? t.rota.freeThisHintMe : t.rota.freeThisHint}
               </span>
             </span>
           </Button>
