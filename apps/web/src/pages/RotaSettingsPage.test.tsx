@@ -33,7 +33,9 @@ vi.mock("../lib/session", () => ({
 vi.mock("convex/react", async () => {
   const { getFunctionName } = await import("convex/server");
   return {
-    useQuery: () => m.settings,
+    // The owner-only sections (the transfer picker, co-organizers) wait on queries of their own.
+    useQuery: (ref: never) =>
+      getFunctionName(ref) === "rota:settings" ? m.settings : undefined,
     useMutation: (ref: never) =>
       m.fns[getFunctionName(ref).split(":")[1] as keyof typeof m.fns],
     useAction: () => m.startAgain,
@@ -58,6 +60,7 @@ const baseSettings = {
   upcoming: ["2026-11-27", "2026-11-28", "2026-11-29"],
   quiet: { startHour: 22, endHour: 7 },
   lateTap: { override: null, defaultMs: 28_800_000 },
+  access: { owner: true, readings: true, people: true, settings: true },
   cheer: {
     override: null,
     defaults: {

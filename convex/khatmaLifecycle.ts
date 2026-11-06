@@ -99,7 +99,8 @@ export async function restoreKhatma(
 export const archive = sessionMutation({
   args: { inviteCode: v.string() },
   handler: async (ctx, args): Promise<{ ok: true }> => {
-    const { khatma } = await requireOrganizer(ctx, args.inviteCode);
+    // The owner alone (spec 4.4).
+    const { khatma } = await requireOrganizer(ctx, args.inviteCode, "owner");
     await archiveKhatma(ctx, khatma);
     return { ok: true };
   },
@@ -137,7 +138,8 @@ export const remove = sessionMutation({
     ctx,
     args,
   ): Promise<{ ok: true } | { error: "not_archived" }> => {
-    const { khatma } = await requireOrganizer(ctx, args.inviteCode);
+    // The owner alone (spec 4.4).
+    const { khatma } = await requireOrganizer(ctx, args.inviteCode, "owner");
     if (!isArchived(khatma)) return { error: "not_archived" };
     await deleteKhatma(ctx, khatma);
     return { ok: true };
@@ -201,6 +203,15 @@ const PURGE_STAGES: Purge[] = [
       .query("rotaJoinRequests")
       .withIndex("by_khatma_open", (q) => q.eq("khatmaId", khatmaId))
       .take(PURGE_BATCH),
+  // A co-organizer's number, hidden ones too, goes with the khatma. Only the
+  // `_id`: a role is no reading, so no phone needs refreshing.
+  async (ctx, khatmaId) =>
+    (
+      await ctx.db
+        .query("coOrganizers")
+        .withIndex("by_khatma", (q) => q.eq("khatmaId", khatmaId))
+        .take(PURGE_BATCH)
+    ).map((row) => ({ _id: row._id })),
 ];
 
 /**

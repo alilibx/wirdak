@@ -142,6 +142,15 @@ describe("privacy policy: rotating khatma disclosures", () => {
     }
   });
 
+  it("says the organizer can share a rotating khatma's participant list with co-organizers", () => {
+    expect(flat("من يرى بياناتك")).toContain(
+      "ويستطيع المنظّم أن يشارك قائمة مشاركي الختمة بالتناوب، بأسمائهم وأرقامهم، مع منظّمين مساعدين يختارهم",
+    );
+    expect(flat("Who sees your data")).toContain(
+      "The organizer can share a rotating khatma's participant list, with names and numbers, with co-organizers they choose",
+    );
+  });
+
   it("lists the rotating khatma messages Meta delivers", () => {
     const ar = flat("مزوّدو الخدمة");
     expect(ar).toContain(

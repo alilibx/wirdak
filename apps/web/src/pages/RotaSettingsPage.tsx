@@ -3,6 +3,7 @@ import {
   type ReadingDays,
   type RotaMessages,
 } from "@convex/lib/rota";
+import type { OrganizerAccess } from "@convex/lib/organizerAuth";
 import type { SettingsView } from "@convex/lib/rotaOps";
 import { localDate } from "@convex/lib/wakingTime";
 import { useMutation, useQuery } from "convex/react";
@@ -16,6 +17,7 @@ import {
   ArchiveSection,
 } from "../features/khatma/ArchivedActions";
 import { CheerField } from "../features/khatma/CheerField";
+import { CoOrganizersSection } from "../features/khatma/CoOrganizersSection";
 import { DeletingPage, useDeleting } from "../features/khatma/deleting";
 import { useRotaBackend } from "../features/rota/backend";
 import { DateLine } from "../features/rota/DateLine";
@@ -24,6 +26,7 @@ import { formatIsoDate, formatTime } from "../features/rota/format";
 import { ReadingDaysField } from "../features/rota/ReadingDaysField";
 import { LateTapField } from "../features/rota/LateTapField";
 import { TimeField } from "../features/rota/TimeField";
+import { TransferSection } from "../features/rota/TransferSection";
 import { useRotaCall } from "../features/rota/useRotaCall";
 import { t } from "../i18n/ar";
 import { timeZoneOptions } from "../lib/timeZones";
@@ -110,14 +113,16 @@ export function RotaSettingsPage() {
 
 /**
  * A rotating khatma's settings: pausing, the message times, the days and the name. `headingLevel`
- * is for a page that already has its `h1`.
+ * is for a page that already has its `h1`. The owner (and an admin, whose `access` is the
+ * owner's) also gets the owner-only sections: co-organizers, transfer, archive and delete.
  */
 export function RotaSettingsContent({
   settings,
   inviteCode,
   headingLevel: Heading = "h1",
 }: {
-  settings: SettingsView;
+  /** `access` says who is looking; an admin's backend gives the owner's (co-organizers spec 4.7). */
+  settings: SettingsView & { access: OrganizerAccess };
   inviteCode: string;
   headingLevel?: "h1" | "h2";
 }) {
@@ -145,6 +150,7 @@ export function RotaSettingsContent({
   } | null>(null);
   const args = backend.authArgs();
 
+  const isOwner = settings.access.owner;
   const paused = settings.pausedAt !== null;
   const { quiet } = settings;
   const earliest = quiet.endHour * 60;
@@ -435,15 +441,24 @@ export function RotaSettingsContent({
         </Section>
       </fieldset>
 
-      {/* Outside the fieldset: an archived khatma can still start again or be deleted. */}
-      {settings.archived ? (
-        <ArchivedSection
-          inviteCode={inviteCode}
-          restart={{ days: settings.days, timeZone: settings.timeZone }}
-        />
-      ) : (
-        <ArchiveSection inviteCode={inviteCode} />
+      {/* Owner only (co-organizers spec 4.4). Each hides itself on a backend without it. */}
+      {isOwner && !settings.archived && (
+        <>
+          <CoOrganizersSection inviteCode={inviteCode} />
+          <TransferSection inviteCode={inviteCode} />
+        </>
       )}
+
+      {/* Outside the fieldset: an archived khatma can still start again or be deleted. */}
+      {isOwner &&
+        (settings.archived ? (
+          <ArchivedSection
+            inviteCode={inviteCode}
+            restart={{ days: settings.days, timeZone: settings.timeZone }}
+          />
+        ) : (
+          <ArchiveSection inviteCode={inviteCode} />
+        ))}
 
       {addingDate && (
         <Sheet

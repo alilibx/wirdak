@@ -10,7 +10,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { KhatmaView } from "@convex/khatmas";
 import { t } from "../i18n/ar";
-import { makeTiles, makeView } from "../test/fixtures";
+import { coOrganizerAccess, makeTiles, makeView } from "../test/fixtures";
 import { KhatmaPage } from "./KhatmaPage";
 import { startDelete } from "../features/khatma/deleting";
 import { NotFoundPage } from "./NotFoundPage";
@@ -574,6 +574,22 @@ describe("KhatmaPage", () => {
       unmount();
       useQuery.mockReturnValue(makeView({ isOrganizer: true }));
       renderTabs("/j/CODE");
+      expect(
+        screen.queryByRole("link", { name: t.khatmaSettings.link }),
+      ).toBeNull();
+    });
+
+    it("shows the settings link to a co-organizer too, whatever their switches", () => {
+      useQuery.mockReturnValue(
+        makeView({ organizerAccess: coOrganizerAccess({ readings: true }) }),
+      );
+      const { unmount } = renderTabs("/j/CODE?tab=group");
+      expect(
+        screen.getByRole("link", { name: t.khatmaSettings.link }),
+      ).toHaveAttribute("href", "/j/CODE/settings");
+      unmount();
+      useQuery.mockReturnValue(makeView());
+      renderTabs("/j/CODE?tab=group");
       expect(
         screen.queryByRole("link", { name: t.khatmaSettings.link }),
       ).toBeNull();

@@ -26,12 +26,16 @@ const peopleErrors: Record<string, string> = t.rota.peopleErrors;
 /**
  * Someone's juz' of the next khatma: move it, add a second one, or take them out. The organizer
  * can't leave the khatma, but can stop reading: their ajza' go, and they stay its organizer.
+ * Only the owner takes out or moves someone who runs the khatma, swaps a juz' into theirs, or frees
+ * their own ajza' (co-organizers spec 4.2): a co-organizer looking sees none of it on those rows,
+ * their own included.
  */
 function PersonSheet({
   inviteCode,
   view,
   person,
   juz,
+  viewerIsOwner,
   onClose,
 }: {
   inviteCode: string;
@@ -39,6 +43,7 @@ function PersonSheet({
   person: Person;
   /** The row that was pressed. */
   juz: number;
+  viewerIsOwner: boolean;
   onClose: () => void;
 }) {
   const backend = useRotaBackend(inviteCode);
@@ -47,7 +52,16 @@ function PersonSheet({
   const freeJuz = useMutation(backend.freeJuz);
   const removeParticipant = useMutation(backend.removeParticipant);
   const holderOf = (n: number) => view.rows[n - 1]?.participant ?? null;
-  const others = view.rows.filter((row) => row.juz !== juz);
+  const runsKhatma = (p: { isOrganizer: boolean; isCoOrganizer: boolean }) =>
+    p.isOrganizer || p.isCoOrganizer;
+  const canMove = viewerIsOwner || !runsKhatma(person);
+  const others = view.rows.filter(
+    (row) =>
+      row.juz !== juz &&
+      (viewerIsOwner ||
+        row.participant === null ||
+        !runsKhatma(row.participant)),
+  );
   const free = others.find((row) => row.participant === null);
   const [target, setTarget] = useState(free?.juz ?? others[0]?.juz ?? juz);
   const [confirming, setConfirming] = useState(false);
@@ -113,48 +127,54 @@ function PersonSheet({
     <Sheet title={name} onClose={onClose}>
       <p className="text-ink-soft">{t.rota.juzOf(person.juz)}</p>
 
-      <label htmlFor="rota-move-to" className="mt-4 block font-medium">
-        {t.rota.moveLabel}
-      </label>
-      <select
-        id="rota-move-to"
-        value={target}
-        onChange={(event) => setTarget(Number(event.target.value))}
-        className={fieldClass}
-      >
-        {others.map((row) => (
-          <option key={row.juz} value={row.juz}>
-            {t.rota.moveOption(
-              row.juz,
-              row.participant ? row.participant.name : null,
-            )}
-          </option>
-        ))}
-      </select>
-      {swapWith && (
-        <p className="mt-1.5 text-base text-ink-soft">
-          {swapWith.isMe ? t.rota.swapsWithMe : t.rota.swapsWith(swapWith.name)}
-        </p>
+      {canMove && others.length > 0 && (
+        <>
+          <label htmlFor="rota-move-to" className="mt-4 block font-medium">
+            {t.rota.moveLabel}
+          </label>
+          <select
+            id="rota-move-to"
+            value={target}
+            onChange={(event) => setTarget(Number(event.target.value))}
+            className={fieldClass}
+          >
+            {others.map((row) => (
+              <option key={row.juz} value={row.juz}>
+                {t.rota.moveOption(
+                  row.juz,
+                  row.participant ? row.participant.name : null,
+                )}
+              </option>
+            ))}
+          </select>
+          {swapWith && (
+            <p className="mt-1.5 text-base text-ink-soft">
+              {swapWith.isMe
+                ? t.rota.swapsWithMe
+                : t.rota.swapsWith(swapWith.name)}
+            </p>
+          )}
+          <div className="mt-3">
+            <Button
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () =>
+                    moveJuz({
+                      ...args,
+                      participantId: person.id,
+                      fromJuz: juz,
+                      toJuz: target,
+                    }),
+                  onClose,
+                )
+              }
+            >
+              {t.rota.move}
+            </Button>
+          </div>
+        </>
       )}
-      <div className="mt-3">
-        <Button
-          disabled={busy}
-          onClick={() =>
-            void run(
-              () =>
-                moveJuz({
-                  ...args,
-                  participantId: person.id,
-                  fromJuz: juz,
-                  toJuz: target,
-                }),
-              onClose,
-            )
-          }
-        >
-          {t.rota.move}
-        </Button>
-      </div>
 
       <div className="mt-5 grid gap-3">
         <Button
@@ -184,31 +204,33 @@ function PersonSheet({
             </span>
           </Button>
         )}
-        {person.isMe ? (
-          <Button
-            variant="ghost"
-            disabled={busy}
-            onClick={() => void run(freeAll, onClose)}
-          >
-            <span>
-              <span className="block">{t.rota.stopReading}</span>
-              <span className="block text-base font-normal">
-                {t.rota.stopReadingHint}
-              </span>
-            </span>
-          </Button>
-        ) : (
-          // A khatma keeps its organizer, whoever is looking at it.
-          !person.isOrganizer && (
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={() => setConfirming(true)}
-            >
-              {t.rota.remove}
-            </Button>
-          )
-        )}
+        {person.isMe
+          ? viewerIsOwner && (
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => void run(freeAll, onClose)}
+              >
+                <span>
+                  <span className="block">{t.rota.stopReading}</span>
+                  <span className="block text-base font-normal">
+                    {t.rota.stopReadingHint}
+                  </span>
+                </span>
+              </Button>
+            )
+          : // A khatma keeps its organizer, whoever is looking at it; and only the owner takes
+            // out a co-organizer.
+            !person.isOrganizer &&
+            (viewerIsOwner || !person.isCoOrganizer) && (
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => setConfirming(true)}
+              >
+                {t.rota.remove}
+              </Button>
+            )}
       </div>
       <ErrorLine error={error} />
     </Sheet>
@@ -317,9 +339,12 @@ type Open =
 export function PeoplePanel({
   inviteCode,
   archived,
+  viewerIsOwner,
 }: {
   inviteCode: string;
   archived: boolean;
+  /** False for a co-organizer; the owner and an admin may take out or move anyone. */
+  viewerIsOwner: boolean;
 }) {
   const backend = useRotaBackend(inviteCode);
   const view = useQuery(backend.people, backend.scope);
@@ -393,6 +418,11 @@ export function PeoplePanel({
                   <span className="min-w-0">
                     <span className="block font-medium">
                       {holder.isMe ? t.rota.me : holder.name}
+                      {holder.isCoOrganizer && (
+                        <span className="ms-2 inline-block rounded-full bg-paper-2 px-2.5 py-0.5 text-base font-semibold text-green-deep">
+                          {t.organizer.coOrganizerBadge}
+                        </span>
+                      )}
                     </span>
                     <PersonPhone phone={holder.phone} />
                   </span>
@@ -470,6 +500,7 @@ export function PeoplePanel({
           view={view}
           person={person}
           juz={open.juz}
+          viewerIsOwner={viewerIsOwner}
           onClose={() => setOpen(null)}
         />
       )}

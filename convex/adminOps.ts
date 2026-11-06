@@ -13,7 +13,12 @@ import { writeAudit } from "./lib/audit";
 import { randomToken } from "./lib/crypto";
 import { isArchived } from "./lib/khatma";
 import { notify } from "./notes";
-import { handOverTo, otherMember, resetInviteCode } from "./organizer";
+import {
+  handOverTo,
+  resetInviteCode,
+  transferArgs,
+  transferTarget,
+} from "./organizer";
 import { deleteSession } from "./sessions";
 
 const MAX_NOTE = 500;
@@ -286,20 +291,26 @@ export const resetInvite = action({
   },
 });
 
-/** Hands the organizer role to another active member, telling both (spec 8). */
+/**
+ * Hands the organizer role on, telling both (spec 8), by the owner's own rules
+ * (co-organizers spec 4.5): an active member of a pool khatma, or a rota
+ * participant with an account.
+ */
 export const handOver = adminMutation({
   args: {
     khatmaId: v.id("khatmas"),
-    memberId: v.id("members"),
+    ...transferArgs,
     note: v.optional(v.string()),
   },
   handler: async (
     ctx,
     args,
-  ): Promise<{ ok: true } | { error: "not_found" | "not_member" | "self" }> => {
+  ): Promise<
+    { ok: true } | { error: "not_found" | "not_member" | "self" | "no_account" }
+  > => {
     const khatma = await ctx.db.get(args.khatmaId);
     if (!khatma) return { error: "not_found" };
-    const member = await otherMember(ctx, khatma, args.memberId, "active");
+    const member = await transferTarget(ctx, khatma, args, "admin");
     if (typeof member === "string") return { error: member };
     const previous = await ctx.db.get(khatma.creatorPersonId);
     await handOverTo(ctx, khatma, member, previous);

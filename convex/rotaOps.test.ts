@@ -146,13 +146,19 @@ test("someone an admin adds is saved for the organizer", async () => {
   const t = convexTest(schema, modules);
   const { khatmaId, organizerId } = await setup(t);
   await onKhatma(t, khatmaId, (ctx, khatma, rota) =>
-    ops.addParticipant(ctx, khatma, rota, {
-      name: "سعد",
-      phone: "+971500009002",
-    }),
+    ops.addParticipant(
+      ctx,
+      khatma,
+      rota,
+      {
+        name: "سعد",
+        phone: "+971500009002",
+      },
+      ADMIN,
+    ),
   );
   const saved = await onKhatma(t, khatmaId, (ctx, khatma) =>
-    ops.saved(ctx, khatma),
+    ops.saved(ctx, khatma, ADMIN),
   );
   const contacts = await t.run((ctx) =>
     ctx.db

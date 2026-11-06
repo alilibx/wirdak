@@ -1,3 +1,4 @@
+import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { PeopleView as View } from "@convex/lib/rotaOps";
 import { useMutation, useQuery } from "convex/react";
@@ -7,6 +8,7 @@ import { toArabicDigits } from "@convex/lib/digits";
 import { Button } from "../../components/Button";
 import { Sheet } from "../../components/Sheet";
 import { t } from "../../i18n/ar";
+import { useSessionToken } from "../../lib/session";
 import { AddPersonForm } from "./AddPersonForm";
 import { useRotaBackend, type RotaBackend } from "./backend";
 import { ErrorLine } from "./ErrorLine";
@@ -224,13 +226,17 @@ function BringPeopleIn({
 /**
  * Step 2 of 2: add people in order, hand out the leftover ajza', then start the khatma. Whoever
  * has no People view, and anyone on an archived khatma, is sent to `khatmaPath`, where «تمّ» goes too.
+ * «تمّ» starts the khatma only for someone who may (`canStart`); anyone else it just takes back.
  */
 export function RotaPeopleSetupContent({
   inviteCode,
   khatmaPath,
+  canStart,
 }: {
   inviteCode: string;
   khatmaPath: string;
+  /** The owner, a co-organizer with Settings, or an admin. */
+  canStart: boolean;
 }) {
   const navigate = useNavigate();
   const backend = useRotaBackend(inviteCode);
@@ -353,10 +359,12 @@ export function RotaPeopleSetupContent({
         <Button
           disabled={finishing.busy}
           onClick={() =>
-            void finishing.run(
-              () => finishSetup(backend.authArgs()),
-              () => void navigate(khatmaPath),
-            )
+            canStart
+              ? void finishing.run(
+                  () => finishSetup(backend.authArgs()),
+                  () => void navigate(khatmaPath),
+                )
+              : void navigate(khatmaPath)
           }
         >
           {t.rota.done}
@@ -388,11 +396,17 @@ export function RotaPeopleSetupContent({
 /** The organizer's setup of the khatma in the address. */
 export function RotaPeopleSetup() {
   const { inviteCode = "" } = useParams();
+  const sessionToken = useSessionToken();
+  // The khatma's own view says what the viewer may run here.
+  const found = useQuery(api.khatmas.view, { sessionToken, inviteCode });
+  if (found === undefined) return null;
+  const access = "rota" in found ? found.organizerAccess : null;
   return (
     <main className="mx-auto max-w-xl p-5">
       <RotaPeopleSetupContent
         inviteCode={inviteCode}
         khatmaPath={`/j/${encodeURIComponent(inviteCode)}`}
+        canStart={access?.settings ?? false}
       />
     </main>
   );

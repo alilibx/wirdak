@@ -22,6 +22,13 @@ export type TodayView = {
   archived: boolean;
   /** False until the organizer finishes setup; no day starts before. */
   setupDone: boolean;
+  /**
+   * When each day's message goes out, in minutes after local midnight, and the
+   * khatma's time zone: Today says when the next day starts without the
+   * settings, which a co-organizer with only Readings doesn't get.
+   */
+  dayAt: number;
+  timeZone: string;
   tiles: {
     readId: Id<"rotaReads">;
     juz: number;
@@ -134,6 +141,8 @@ export async function today(
     paused: rota.pausedAt !== null,
     archived: isArchived(khatma),
     setupDone: rota.setupDoneAt !== null,
+    dayAt: rota.messages.dayAt,
+    timeZone: rota.timeZone,
     tiles,
     participants,
   };

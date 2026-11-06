@@ -81,6 +81,7 @@ export function RotaSetupPage() {
       <RotaPeopleSetupContent
         inviteCode={khatmaId}
         khatmaPath={`/khatmas/${khatmaId}/rota`}
+        canStart
       />
     </AdminRotaProvider>
   );

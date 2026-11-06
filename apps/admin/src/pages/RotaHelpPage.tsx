@@ -1,4 +1,5 @@
 import type { Id } from "@convex/_generated/dataModel";
+import type { OrganizerAccess } from "@convex/lib/organizerAuth";
 import type { SettingsView, TodayView } from "@convex/lib/rotaOps";
 import { KhatmaTabs } from "@web/components/KhatmaTabs";
 import { ArchivedBanner } from "@web/features/khatma/ArchivedActions";
@@ -30,7 +31,8 @@ function Panels({
 }: {
   khatmaId: Id<"khatmas">;
   today: TodayView;
-  settings: SettingsView;
+  /** `adminRota.settings` gives the owner's access: an admin can do everything. */
+  settings: SettingsView & { access: OrganizerAccess };
 }) {
   const [tab, setTab] = useState<Tab>("today");
   const ids = useId();
@@ -48,10 +50,16 @@ function Panels({
             view={today}
             dayAt={settings.messages.dayAt}
             timeZone={settings.timeZone}
+            canStart
           />
         )}
         {tab === "people" && (
-          <PeoplePanel inviteCode={khatmaId} archived={today.archived} />
+          // An admin may do everything the owner may.
+          <PeoplePanel
+            inviteCode={khatmaId}
+            archived={today.archived}
+            viewerIsOwner
+          />
         )}
         {tab === "settings" && (
           <div className="mt-6">
