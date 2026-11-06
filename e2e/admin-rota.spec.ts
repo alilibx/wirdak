@@ -114,8 +114,13 @@ test("admin: set up a rotating khatma for someone, help it, archive and delete",
   // --- Delete it -----------------------------------------------------------------------------
   const khatmaPath = new URL(page.url()).pathname.replace(/\/rota$/, "");
   await panel.getByRole("button", { name: webT.archive.delete }).click();
-  await page
-    .getByRole("dialog", { name: webT.archive.deleteTitle })
+  const deleteSheet = page.getByRole("dialog", {
+    name: webT.archive.deleteTitle,
+  });
+  await deleteSheet
+    .getByLabel(webT.archive.deleteTypeLabel)
+    .fill(webT.archive.deleteWord);
+  await deleteSheet
     .getByRole("button", { name: webT.archive.deleteConfirm })
     .click();
   await expect(page).toHaveURL(`${ADMIN_URL}/`);

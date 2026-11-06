@@ -724,6 +724,10 @@ describe("OrganizerPage", () => {
         screen.queryByRole("button", { name: t.archive.restart }),
       ).toBeNull();
       await user.click(screen.getByRole("button", { name: t.archive.delete }));
+      await user.type(
+        screen.getByLabelText(t.archive.deleteTypeLabel),
+        t.archive.deleteWord,
+      );
       const sheet = screen.getByRole("dialog", { name: t.archive.deleteTitle });
       expect(within(sheet).getByText(t.archive.deleteBody)).toBeInTheDocument();
       expect(m.fns.remove).not.toHaveBeenCalled();
@@ -742,6 +746,10 @@ describe("OrganizerPage", () => {
       const user = userEvent.setup();
       const view = renderPage();
       await user.click(screen.getByRole("button", { name: t.archive.delete }));
+      await user.type(
+        screen.getByLabelText(t.archive.deleteTypeLabel),
+        t.archive.deleteWord,
+      );
       await user.click(
         screen.getByRole("button", { name: t.archive.deleteConfirm }),
       );

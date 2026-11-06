@@ -653,6 +653,10 @@ describe("RotaSettingsPage", () => {
       const user = userEvent.setup();
       const view = renderPage();
       await user.click(screen.getByRole("button", { name: t.archive.delete }));
+      await user.type(
+        screen.getByLabelText(t.archive.deleteTypeLabel),
+        t.archive.deleteWord,
+      );
       await user.click(
         screen.getByRole("button", { name: t.archive.deleteConfirm }),
       );
@@ -678,6 +682,10 @@ describe("RotaSettingsPage", () => {
       const user = userEvent.setup();
       renderPage();
       await user.click(screen.getByRole("button", { name: t.archive.delete }));
+      await user.type(
+        screen.getByLabelText(t.archive.deleteTypeLabel),
+        t.archive.deleteWord,
+      );
       expect(m.fns.remove).not.toHaveBeenCalled();
       await user.click(
         screen.getByRole("button", { name: t.archive.deleteConfirm }),

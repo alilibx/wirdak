@@ -1,7 +1,7 @@
 import { addDays, type ReadingDays } from "@convex/lib/rota";
 import { localDate } from "@convex/lib/wakingTime";
 import { useAction, useMutation } from "convex/react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "../../components/Button";
 import { Sheet } from "../../components/Sheet";
@@ -11,6 +11,7 @@ import { useEarliestStart } from "../rota/useEarliestStart";
 import { DateLine } from "../rota/DateLine";
 import { firstReadingDay } from "../rota/dates";
 import { ErrorLine } from "../rota/ErrorLine";
+import { fieldClass } from "../rota/fieldClass";
 import { formatIsoDate } from "../rota/format";
 import { useRotaCall } from "../rota/useRotaCall";
 import {
@@ -46,7 +47,6 @@ function ConfirmSheet({
   busyLabel,
   busy,
   error,
-  danger = false,
   onConfirm,
   onClose,
 }: {
@@ -56,7 +56,6 @@ function ConfirmSheet({
   busyLabel: string;
   busy: boolean;
   error: string | null;
-  danger?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -64,12 +63,7 @@ function ConfirmSheet({
     <Sheet title={title} onClose={onClose}>
       <p className="mt-1 leading-relaxed text-ink-soft">{body}</p>
       <div className="mt-5 grid gap-3">
-        <Button
-          variant={danger ? "ghost" : "primary"}
-          className={danger ? dangerClass : ""}
-          disabled={busy}
-          onClick={onConfirm}
-        >
+        <Button disabled={busy} onClick={onConfirm}>
           {busy ? busyLabel : confirm}
         </Button>
         <Button variant="ghost" onClick={onClose}>
@@ -199,8 +193,24 @@ function RestartSheet({
 }
 
 /**
- * Deletes the archived khatma for good, then goes home. The khatma's pages show `DeletingPage`
- * from the tap until the move, so none of them flashes a dead link or "not found".
+ * Whether `typed` is the word «احذف». Spaces around it, a hamza on the alef (إحذف), tatweel, and
+ * the invisible direction and zero-width marks some keyboards and pastes add still count: the
+ * word is there to slow a tap down, not to test spelling.
+ */
+export function isDeleteWord(typed: string): boolean {
+  return (
+    typed
+      .replace(/[\u0640\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, "")
+      .trim()
+      .replace(/[أإآ]/g, "ا") === t.archive.deleteWord
+  );
+}
+
+/**
+ * Deletes the archived khatma for good, then goes home. It touches everyone in the khatma, so
+ * the sheet says what goes and the button stays off until «احذف» is typed. The khatma's pages
+ * show `DeletingPage` from the tap until the move, so none of them flashes a dead link or
+ * "not found".
  */
 function DeleteSheet({
   inviteCode,
@@ -213,27 +223,60 @@ function DeleteSheet({
   const backend = useRotaBackend(inviteCode);
   const remove = useMutation(backend.remove);
   const deleting = useDeleting(inviteCode);
+  const [typed, setTyped] = useState("");
+  const fieldId = useId();
+  const ready = isDeleteWord(typed);
   return (
-    <ConfirmSheet
-      title={t.archive.deleteTitle}
-      body={t.archive.deleteBody}
-      confirm={t.archive.deleteConfirm}
-      busyLabel={t.archive.deleting}
-      busy={deleting}
-      error={null}
-      danger
-      onConfirm={() =>
-        // A failure is kept by `deleting.tsx` and shown under the buttons; the sheet closes.
-        void startDelete(
-          inviteCode,
-          () => remove(backend.authArgs()),
-          () => void navigate("/", { replace: true }),
-        ).then((deleted) => {
-          if (!deleted) onClose();
-        })
-      }
-      onClose={onClose}
-    />
+    <Sheet title={t.archive.deleteTitle} onClose={onClose}>
+      <p className="mt-1 leading-relaxed text-ink-soft">
+        {t.archive.deleteBody}
+      </p>
+      <p className="mt-4 font-semibold">{t.archive.deleteLosesHeading}</p>
+      <ul className="mt-1 list-disc ps-6 leading-relaxed text-ink-soft">
+        {t.archive.deleteLoses.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      <p className="mt-2 leading-relaxed text-ink-soft">
+        {t.archive.deleteKeeps}
+      </p>
+      <label htmlFor={fieldId} className="mt-5 block font-medium">
+        {t.archive.deleteTypeLabel}
+      </label>
+      <input
+        id={fieldId}
+        type="text"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        value={typed}
+        disabled={deleting}
+        onChange={(event) => setTyped(event.target.value)}
+        className={fieldClass}
+      />
+      <div className="mt-5 grid gap-3">
+        <Button
+          variant="ghost"
+          className={dangerClass}
+          disabled={!ready || deleting}
+          onClick={() =>
+            // A failure is kept by `deleting.tsx` and shown under the buttons; the sheet closes.
+            void startDelete(
+              inviteCode,
+              () => remove(backend.authArgs()),
+              () => void navigate("/", { replace: true }),
+            ).then((deleted) => {
+              if (!deleted) onClose();
+            })
+          }
+        >
+          {deleting ? t.archive.deleting : t.archive.deleteConfirm}
+        </Button>
+        <Button variant="ghost" onClick={onClose}>
+          {t.archive.cancel}
+        </Button>
+      </div>
+    </Sheet>
   );
 }
 

@@ -103,8 +103,13 @@ test("rota: archive, start again, delete", async ({ page }) => {
   await page.goto(`/j/${secondCode}/settings`);
   await archiveFromSettings(page);
   await page.getByRole("button", { name: t.archive.delete }).click();
-  await page
-    .getByRole("dialog", { name: t.archive.deleteTitle })
+  const deleteSheet = page.getByRole("dialog", {
+    name: t.archive.deleteTitle,
+  });
+  await deleteSheet
+    .getByLabel(t.archive.deleteTypeLabel)
+    .fill(t.archive.deleteWord);
+  await deleteSheet
     .getByRole("button", { name: t.archive.deleteConfirm })
     .click();
 
