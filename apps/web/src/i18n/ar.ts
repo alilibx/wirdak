@@ -27,6 +27,17 @@ function counted(
     : `${digits} ${forms.many}`;
 }
 
+/** «ل» before a count of people: `لشخص واحد`, `لشخصين`, `لـ٣ أشخاص`, `لـ١١ شخصاً`. */
+function forPeople(n: number): string {
+  const said = counted(n, {
+    one: "شخص واحد",
+    two: "شخصين",
+    few: "أشخاص",
+    many: "شخصاً",
+  });
+  return n <= 2 ? `ل${said}` : `لـ${said}`;
+}
+
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
@@ -537,6 +548,14 @@ export const ar = {
     startNew: "＋ ابدأ ختمة جديدة",
     startNewPlain: "ابدأ ختمة جديدة",
     settings: "إعداداتي",
+    /** The people in a khatma the viewer runs: `شخص واحد`, `شخصان`, `٣ أشخاص`, `١١ شخصاً`. */
+    peopleCount: (n: number) =>
+      counted(n, {
+        one: "شخص واحد",
+        two: "شخصان",
+        few: "أشخاص",
+        many: "شخصاً",
+      }),
     doneOf: (done: string, total: string) => `${done} من ${total} تمّت`,
     yours: (n: string, name: string) => `جزؤك: الجزء ${n} «${name}»`,
     archived: "المؤرشفة",
@@ -819,6 +838,48 @@ export const ar = {
       already_added: "هذا الشخص مضاف في الختمة.",
       not_found: "لم نجد هذا الشخص. أعد تحميل الصفحة.",
     } as Record<string, string>,
+    savedManyHint: "حدّد من تريد إضافتهم، ويأخذ كلٌّ منهم أول جزء بلا قارئ.",
+    savedActive: "يقرأ معك الآن",
+    savedPickActive: "حدّد من يقرأ معك الآن",
+    /** How many more can be ticked: the ajza' with no reader left. */
+    savedRoom: (n: number) =>
+      n === 0 ? "لم يبقَ جزء بلا قارئ." : `يتّسع ${forPeople(n)}.`,
+    savedAddMany: (n: number) => `أضِف (${toArabicDigits(n)})`,
+    savedManyResult: ({
+      added,
+      noRoom,
+      skipped,
+    }: {
+      added: number;
+      noRoom: number;
+      /** Already in the khatma, or no longer on the caller's list. */
+      skipped: number;
+    }) => {
+      const people = (n: number) =>
+        counted(n, {
+          one: "شخصاً واحداً",
+          two: "شخصين",
+          few: "أشخاص",
+          many: "شخصاً",
+        });
+      const parts = [added > 0 ? `أضفنا ${people(added)}.` : "لم نضف أحداً."];
+      if (noRoom > 0) {
+        parts.push(`لم يتّسع ${forPeople(noRoom)} لأن الأجزاء اكتملت.`);
+      }
+      if (skipped > 0) {
+        parts.push(
+          skipped === 1
+            ? `تركنا ${people(1)} لأنه في الختمة أو لم يعد في قائمتك.`
+            : `تركنا ${people(skipped)} لأنهم في الختمة أو لم يعودوا في قائمتك.`,
+        );
+      }
+      if (added > 0) {
+        parts.push(
+          "لتصلهم رسائل الختمة يرسل كلٌّ منهم رسالة الانضمام من رابط المجموعة.",
+        );
+      }
+      return parts.join(" ");
+    },
     importTitle: (title: string) => `أضف أعضاء ${title}`,
     importCount: (n: number) =>
       `${counted(n, { one: "عضو واحد", two: "عضوان", few: "أعضاء", many: "عضواً" })}، بالأسماء فقط`,

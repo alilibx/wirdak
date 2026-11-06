@@ -115,6 +115,7 @@ const rotaOps = {
   renameParticipant: "غيّر اسم قارئ",
   removeParticipant: "أزال قارئاً",
   addSaved: "أضاف قارئاً من المحفوظين",
+  addSavedMany: "أضاف عدة قرّاء من المحفوظين",
   ensureJoinLink: "أنشأ رابط الانضمام",
   acceptJoinRequest: "قبل طلب انضمام",
   declineJoinRequest: "رفض طلب انضمام",

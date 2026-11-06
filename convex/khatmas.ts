@@ -14,7 +14,7 @@ import { isValidGrace, graceValidator, type Grace } from "./lib/grace";
 import { JUZ, JUZ_COUNT } from "./lib/juz";
 import { accessOf, roleIn, type OrganizerAccess } from "./lib/organizerAuth";
 import { paceDays, personPace } from "./lib/pace";
-import { isArchived, khatmaByInviteCode } from "./lib/khatma";
+import { isArchived, khatmaByInviteCode, memberCount } from "./lib/khatma";
 import { checkRateLimit } from "./lib/rateLimit";
 import { khatmaJoinLink } from "./lib/rotaJoin";
 import { lastRotaDay } from "./lib/rotaPlace";
@@ -524,6 +524,11 @@ export const mine = sessionQuery({
             : (heldAssignment(assignments, personId)?.juz ?? null),
           hasNote: note !== null,
           archived: isArchived(khatma),
+          /** How many are in it, for whoever runs it (the owner or a co-organizer); null for a member. */
+          peopleCount:
+            (await roleIn(ctx, khatma, ctx.person)) === null
+              ? null
+              : await memberCount(ctx, khatma),
         };
       }),
     );

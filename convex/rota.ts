@@ -719,6 +719,23 @@ export const addSaved = sessionMutation({
   },
 });
 
+/** Several saved people at once, each on the lowest free juz'. */
+export const addSavedMany = sessionMutation({
+  args: {
+    inviteCode: v.string(),
+    contactIds: v.array(v.id("rotaContacts")),
+    readsToday: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<ops.AddSavedManyResult> => {
+    const { person, khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    return ops.addSavedMany(ctx, khatma, rota, args, { personId: person._id });
+  },
+});
+
 export const removeSaved = sessionMutation({
   args: { contactId: v.id("rotaContacts") },
   handler: async (

@@ -56,6 +56,7 @@ import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_rota from "../lib/rota.js";
 import type * as lib_rotaJoin from "../lib/rotaJoin.js";
 import type * as lib_rotaOps from "../lib/rotaOps.js";
+import type * as lib_rotaOps_bulk from "../lib/rotaOps/bulk.js";
 import type * as lib_rotaOps_people from "../lib/rotaOps/people.js";
 import type * as lib_rotaOps_settings from "../lib/rotaOps/settings.js";
 import type * as lib_rotaOps_today from "../lib/rotaOps/today.js";
@@ -149,6 +150,7 @@ declare const fullApi: ApiFromModules<{
   "lib/rota": typeof lib_rota;
   "lib/rotaJoin": typeof lib_rotaJoin;
   "lib/rotaOps": typeof lib_rotaOps;
+  "lib/rotaOps/bulk": typeof lib_rotaOps_bulk;
   "lib/rotaOps/people": typeof lib_rotaOps_people;
   "lib/rotaOps/settings": typeof lib_rotaOps_settings;
   "lib/rotaOps/today": typeof lib_rotaOps_today;

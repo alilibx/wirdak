@@ -479,6 +479,15 @@ const ROTA_ROWS: Row<RotaCtx>[] = [
       }),
   },
   {
+    fn: "rota.addSavedMany",
+    need: "people",
+    call: (c, who) =>
+      c.t.mutation(api.rota.addSavedMany, {
+        ...rotaArgs(c, who),
+        contactIds: [c.orgContact],
+      }),
+  },
+  {
     fn: "rota.giveJuz",
     need: "people",
     call: (c, who) =>

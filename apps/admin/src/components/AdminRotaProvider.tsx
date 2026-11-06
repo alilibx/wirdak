@@ -21,6 +21,7 @@ const adminFunctions = {
   renameParticipant: api.adminRota.renameParticipant,
   removeParticipant: api.adminRota.removeParticipant,
   addSaved: api.adminRota.addSaved,
+  addSavedMany: api.adminRota.addSavedMany,
   ensureJoinLink: api.adminRota.ensureJoinLink,
   acceptJoinRequest: api.adminRota.acceptJoinRequest,
   declineJoinRequest: api.adminRota.declineJoinRequest,

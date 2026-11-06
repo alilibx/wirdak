@@ -15,6 +15,7 @@ const card = (over: object = {}) => ({
   holding: null as number | null,
   hasNote: false,
   archived: false,
+  peopleCount: null,
   ...over,
 });
 

@@ -209,12 +209,14 @@ test("saved lists contacts by name with inKhatma, and the organizer sees phones"
       name: "أحمد",
       phone: "+971505550003",
       inKhatma: true,
+      active: false,
     },
     {
       id: expect.any(String),
       name: "يوسف",
       phone: "+971505550002",
       inKhatma: false,
+      active: false,
     },
   ]);
 });
@@ -1004,4 +1006,208 @@ test("starting again keeps the khatma's own late window", async () => {
   await archive(t, s);
   const { inviteCode } = await startAgain(t, s);
   expect((await khatmaOf(t, inviteCode)).rota?.lateTapMs).toBe(3_600_000);
+});
+
+// ---------------------------------------------------------------------------
+// Several at once
+
+/** A saved contact of `owner`, inserted directly. */
+const contact = (
+  t: T,
+  owner: Id<"people">,
+  over: Partial<Doc<"rotaContacts">> & { name: string },
+) =>
+  t.run((ctx) =>
+    ctx.db.insert("rotaContacts", {
+      ownerPersonId: owner,
+      phone: null,
+      personId: null,
+      createdAt: NOW,
+      ...over,
+    }),
+  );
+
+const addMany = (
+  t: T,
+  s: Setup,
+  contactIds: Id<"rotaContacts">[],
+  readsToday?: boolean,
+) =>
+  t.mutation(api.rota.addSavedMany, {
+    sessionToken: s.token,
+    inviteCode: s.inviteCode,
+    contactIds,
+    ...(readsToday === undefined ? {} : { readsToday }),
+  });
+
+test("addSavedMany adds the ticked contacts on the lowest free ajza' in order", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const ids = [
+    await contact(t, s.personId, { name: "يوسف", phone: "+971505551001" }),
+    await contact(t, s.personId, { name: "أحمد", phone: "+971505551002" }),
+    await contact(t, s.personId, { name: "مريم", phone: "+971505551003" }),
+  ];
+
+  expect(await addMany(t, s, ids)).toEqual({
+    ok: true,
+    added: 3,
+    alreadyIn: 0,
+    noRoom: 0,
+    notFound: 0,
+  });
+  const view = await peopleView(t, s);
+  // The organizer holds juz' 1.
+  expect(view?.rows.slice(1, 4).map((r) => r.participant?.name)).toEqual([
+    "يوسف",
+    "أحمد",
+    "مريم",
+  ]);
+  // Nobody joined: each sends the khatma's join message themselves.
+  const rows = await participantRows(t, s.inviteCode);
+  expect(rows.filter((r) => r.joinedAt != null)).toHaveLength(0);
+});
+
+test("addSavedMany counts people already in, removed or foreign contacts, and the ones that don't fit", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const other = await person(t);
+  // Fill all but two free ajza' (juz' 1 is the organizer's).
+  for (let juz = 2; juz <= 28; juz++) await add(t, s, { juz });
+  const inKhatma = (await saved(t, s))!.find((c) => c.inKhatma)!.id;
+  const ids = [
+    inKhatma,
+    await contact(t, s.personId, {
+      name: "محذوف",
+      phone: "+971505552001",
+      removedAt: NOW,
+    }),
+    await contact(t, other.personId, { name: "غريب", phone: "+971505552002" }),
+    await contact(t, s.personId, { name: "أ", phone: "+971505552003" }),
+    await contact(t, s.personId, { name: "ب", phone: "+971505552004" }),
+    await contact(t, s.personId, { name: "ج", phone: "+971505552005" }),
+  ];
+
+  expect(await addMany(t, s, ids)).toEqual({
+    ok: true,
+    added: 2,
+    alreadyIn: 1,
+    noRoom: 1,
+    notFound: 2,
+  });
+  const view = await peopleView(t, s);
+  expect(view?.rows[28]?.participant?.name).toBe("أ");
+  expect(view?.rows[29]?.participant?.name).toBe("ب");
+  expect(view?.participants.map((p) => p.name)).not.toContain("ج");
+});
+
+test("addSavedMany adds a repeated id once", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const id = await contact(t, s.personId, {
+    name: "يوسف",
+    phone: "+971505553001",
+  });
+  expect(await addMany(t, s, [id, id])).toMatchObject({ ok: true, added: 1 });
+  const rows = await participantRows(t, s.inviteCode);
+  expect(rows.filter((r) => r.name === "يوسف")).toHaveLength(1);
+});
+
+test("addSavedMany keeps an imported contact's number hidden", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const [member] = await members(t, 1);
+  const id = await contact(t, s.personId, {
+    name: "عضو 1",
+    personId: member!.personId,
+  });
+  expect(await addMany(t, s, [id])).toMatchObject({ ok: true, added: 1 });
+  const row = (await participantRows(t, s.inviteCode)).find(
+    (r) => r.name === "عضو 1",
+  );
+  expect(row).toMatchObject({ phone: member!.phone, phoneHidden: true });
+  expect(JSON.stringify(await peopleView(t, s))).not.toContain(
+    digits(member!.phone),
+  );
+});
+
+test("addSavedMany refuses more than 30 ids", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const id = await contact(t, s.personId, {
+    name: "يوسف",
+    phone: "+971505554001",
+  });
+  await expect(
+    addMany(
+      t,
+      s,
+      Array.from({ length: 31 }, () => id),
+    ),
+  ).rejects.toThrow(/too_many/);
+});
+
+test("saved marks people who read in the organizer's other live khatmas and lists them first", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const otherCode = await rota(t, s);
+  const other = await khatmaOf(t, otherCode);
+  const phone = (n: number) => `+97150557${String(n).padStart(4, "0")}`;
+  await t.run(async (ctx) => {
+    await ctx.db.patch(other._id, {
+      rota: { ...other.rota!, setupDoneAt: NOW },
+    });
+    // A copy of it, archived.
+    const copy: Partial<Doc<"khatmas">> = { ...other };
+    delete copy._id;
+    delete copy._creationTime;
+    const archivedId = await ctx.db.insert("khatmas", {
+      ...(copy as Omit<Doc<"khatmas">, "_id" | "_creationTime">),
+      inviteCode: "archivedCode",
+      rota: { ...other.rota!, setupDoneAt: NOW },
+      archivedAt: NOW,
+    });
+    const reader = async (
+      khatmaId: Id<"khatmas">,
+      n: number,
+      over: Partial<Doc<"rotaParticipants">>,
+      slot: number | null,
+    ) => {
+      const id = await ctx.db.insert("rotaParticipants", {
+        khatmaId,
+        name: "x",
+        phone: phone(n),
+        personId: null,
+        addedAt: NOW,
+        removedAt: null,
+        joinedAt: NOW,
+        ...over,
+      });
+      if (slot !== null) {
+        await ctx.db.insert("rotaSlots", { khatmaId, slot, participantId: id });
+      }
+    };
+    await reader(other._id, 1, {}, 5); // reads now
+    await reader(other._id, 2, {}, null); // holds nothing
+    await reader(other._id, 3, { stoppedAt: NOW }, 6); // sent «إيقاف»
+    await reader(archivedId, 4, {}, 7); // only in an archived khatma
+    const names = ["ياسر", "باسم", "جمال", "دانة", "هالة"];
+    for (const [i, name] of names.entries()) {
+      await ctx.db.insert("rotaContacts", {
+        ownerPersonId: s.personId,
+        name,
+        phone: phone(i + 1),
+        personId: null,
+        createdAt: NOW,
+      });
+    }
+  });
+
+  expect((await saved(t, s))?.map((c) => [c.name, c.active])).toEqual([
+    ["ياسر", true],
+    ["باسم", false],
+    ["جمال", false],
+    ["دانة", false],
+    ["هالة", false],
+  ]);
 });
