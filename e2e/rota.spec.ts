@@ -102,3 +102,64 @@ test("rota: create, place people, run a day", async ({ page }) => {
   await page.goBack();
   await expect(page.getByText(t.rota.pausedBanner)).toBeVisible();
 });
+
+// The people from a first khatma come back in a second one in one press: A types three people
+// into a first rota, starts a second, ticks all three in «من ختمات سابقة», and adds them at once.
+// Home then shows how many are in the second khatma.
+test("rota: add several saved people to a new khatma in one press", async ({
+  page,
+}) => {
+  const aName = `منى ${Math.floor(Math.random() * 1e6)}`;
+  const aPhone = randomPhone();
+  await blockExternal(page.context());
+  await page.goto("/");
+  await page.getByRole("button", { name: t.signIn.button }).click();
+  await verifyInSheet(page, aName, aPhone);
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await allowRota(aPhone);
+
+  const startRota = async (name: string) => {
+    await page.goto("/new");
+    await page
+      .getByRole("link", { name: new RegExp(t.rota.rotaTitle) })
+      .click();
+    await page.getByLabel(t.rota.nameQuestion).fill(name);
+    await page.getByRole("button", { name: t.rota.next }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: t.rota.setupTitle }),
+    ).toBeVisible();
+  };
+  const readers = ["سارة", "خالد", "هدى"];
+
+  await startRota("الختمة الأولى");
+  const people = page.getByRole("list", { name: t.rota.peopleList });
+  for (const name of readers) {
+    await page.getByLabel(t.rota.personName).fill(name);
+    await page.getByLabel(t.rota.personPhone).fill(`+${randomPhone()}`);
+    await page.getByRole("button", { name: t.rota.add, exact: true }).click();
+    await expect(people.getByText(name)).toBeVisible();
+  }
+
+  await startRota("الختمة الثانية");
+  await page.getByRole("button", { name: t.rota.savedFrom }).click();
+  const picker = page.getByRole("dialog", { name: t.rota.savedTitle });
+  for (const name of readers) {
+    await picker.getByRole("checkbox", { name: new RegExp(name) }).check();
+  }
+  await picker
+    .getByRole("button", { name: t.rota.savedAddMany(readers.length) })
+    .click();
+  await expect(picker).toBeHidden();
+  await expect(
+    page.getByText(t.rota.savedManyResult(readers.length, 0)),
+  ).toBeVisible();
+  // A holds juz' 1; the three take the next ones, in the list's order.
+  await expect(people.getByRole("listitem")).toHaveCount(4);
+  for (const name of readers) {
+    await expect(people.getByText(name)).toBeVisible();
+  }
+
+  await page.goto("/");
+  const second = page.getByRole("link", { name: /الختمة الثانية/ });
+  await expect(second).toContainText(t.home.peopleCount(4));
+});
