@@ -425,6 +425,47 @@ test("from 18:00 the organizer says if someone reads today, and nobody is added 
   expect(people?.participants).toHaveLength(1);
 });
 
+test("addSavedMany asks once late in the day, before anyone is added", async () => {
+  const t = convexTest(schema, modules);
+  const s = await runningKhatma(t);
+  const contactIds = await t.run(async (ctx) => [
+    await ctx.db.insert("rotaContacts", {
+      ownerPersonId: s.personId,
+      name: "جديد",
+      phone: `+${LATE}`,
+      personId: null,
+      createdAt: Date.now(),
+    }),
+    await ctx.db.insert("rotaContacts", {
+      ownerPersonId: s.personId,
+      name: "آخر",
+      phone: "+971505556001",
+      personId: null,
+      createdAt: Date.now(),
+    }),
+  ]);
+  vi.setSystemTime(dubai("2027-01-16T18:00"));
+  const addMany = (readsToday?: boolean) =>
+    t.mutation(api.rota.addSavedMany, {
+      ...s.auth,
+      contactIds,
+      ...(readsToday === undefined ? {} : { readsToday }),
+    });
+
+  expect(await addMany()).toEqual({ error: "ask_today" });
+  expect((await t.query(api.rota.people, s.auth))?.participants).toHaveLength(
+    1,
+  );
+
+  const readers = async () =>
+    (await readsOf(t, s.day._id)).map((r) => [r.juz, r.readerId]);
+  const before = await readers();
+  expect(await addMany(false)).toMatchObject({ ok: true, added: 2 });
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+  // Starting tomorrow, they took none of today's free ajza'.
+  expect(await readers()).toEqual(before);
+});
+
 test("someone who reads today takes the free juz' when they join", async () => {
   const t = convexTest(schema, modules);
   const s = await runningKhatma(t);

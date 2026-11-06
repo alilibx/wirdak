@@ -415,7 +415,7 @@ export async function placeNewParticipant(
  * today's juz', so the organizer should say if they do. Someone already joined
  * takes it only with a welcome that goes at once.
  */
-async function lateInTheDay(
+export async function lateInTheDay(
   ctx: QueryCtx,
   khatma: Doc<"khatmas">,
   phone: string,

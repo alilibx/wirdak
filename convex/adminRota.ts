@@ -401,6 +401,26 @@ export const addSaved = adminMutation({
   },
 });
 
+/** As `rota.addSavedMany`, from the owner's list; recorded only when someone was added. */
+export const addSavedMany = adminMutation({
+  args: {
+    khatmaId: v.id("khatmas"),
+    contactIds: v.array(v.id("rotaContacts")),
+    readsToday: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<ops.AddSavedManyResult> => {
+    const { khatma, rota } = await requireLiveRota(ctx, args.khatmaId);
+    const result = await ops.addSavedMany(ctx, khatma, rota, args, ADMIN);
+    return audited(
+      ctx,
+      args,
+      "addSavedMany",
+      result,
+      "ok" in result && result.added > 0,
+    );
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Joining
 

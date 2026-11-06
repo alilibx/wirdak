@@ -559,6 +559,36 @@ test("an admin works from the organizer's saved list", async () => {
   expect(added).toMatchObject({ ok: true });
 });
 
+test("an admin adds several saved people in one call, with one audit row", async () => {
+  const t = convexTest(schema, modules);
+  const { khatmaId, readerId } = await running(t);
+  const args = { adminToken, khatmaId };
+  await t.mutation(api.adminRota.removeParticipant, {
+    ...args,
+    participantId: readerId,
+  });
+  const saved = await t.query(api.adminRota.saved, args);
+  const before = (await auditRows(t)).length;
+
+  const added = await t.mutation(api.adminRota.addSavedMany, {
+    ...args,
+    contactIds: saved!.map((c) => c.id),
+  });
+  expect(added).toMatchObject({ ok: true, added: 1 });
+  const rows = await auditRows(t);
+  expect(rows).toHaveLength(before + 1);
+  expect(JSON.stringify(rows.at(-1))).toContain("addSavedMany");
+
+  // Nobody left to add: nothing changed, nothing recorded.
+  expect(
+    await t.mutation(api.adminRota.addSavedMany, {
+      ...args,
+      contactIds: saved!.map((c) => c.id),
+    }),
+  ).toMatchObject({ ok: true, added: 0, alreadyIn: 1 });
+  expect(await auditRows(t)).toHaveLength(before + 1);
+});
+
 test("a day runs from the admin's screens: today, a reassign, a mark", async () => {
   const t = convexTest(schema, modules);
   // Today, so the day can start, which the admin's start-tomorrow rule would refuse.
@@ -957,6 +987,12 @@ test("every admin rota mutation refuses anyone but an admin, and is on this list
         adminToken: "nope",
         khatmaId,
         contactId: ids.contactId,
+      }),
+    addSavedMany: () =>
+      t.mutation(api.adminRota.addSavedMany, {
+        adminToken: "nope",
+        khatmaId,
+        contactIds: [ids.contactId],
       }),
     ensureJoinLink: () =>
       t.mutation(api.adminRota.ensureJoinLink, {
