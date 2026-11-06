@@ -57,7 +57,10 @@ function renderPage(url = "/people") {
 }
 
 beforeEach(() => {
-  m.rows = { "adminLists:people": [person] };
+  m.rows = {
+    "adminLists:people": [person],
+    "adminLists:everyone": [{ kind: "person", ...person }],
+  };
   m.status = "Exhausted";
   m.loadMore.mockReset();
   m.calls = [];
@@ -67,7 +70,7 @@ describe("PeoplePage", () => {
   it("lists everyone, newest first, with a link and a masked number", () => {
     renderPage();
     expect(last()).toMatchObject({
-      name: "adminLists:people",
+      name: "adminLists:everyone",
       args: { adminToken: "tok", sort: "created", order: "desc" },
     });
     expect(last().args).not.toHaveProperty("tab");
@@ -81,8 +84,9 @@ describe("PeoplePage", () => {
   });
 
   it("names a status, and someone who never signed in", () => {
-    m.rows["adminLists:people"] = [
+    m.rows["adminLists:everyone"] = [
       {
+        kind: "person",
         ...person,
         status: "notJoined",
         lastSeenAt: 0,
@@ -119,7 +123,7 @@ describe("PeoplePage", () => {
 
   it("falls back to everyone for a tab it doesn't know", () => {
     renderPage("/people?tab=nope");
-    expect(last().name).toBe("adminLists:people");
+    expect(last().name).toBe("adminLists:everyone");
   });
 
   it("sorts by name, last seen, joined and created, and turns round", async () => {
@@ -187,6 +191,32 @@ describe("PeoplePage", () => {
     m.status = "Exhausted";
     renderPage();
     expect(screen.getByText(t.lists.empty)).toBeInTheDocument();
+  });
+
+  it("lists WhatsApp readers in the all tab, marked, with no number where it's hidden", () => {
+    m.rows["adminLists:everyone"] = [
+      { kind: "person", ...person },
+      {
+        kind: "reader",
+        readerId: "r1",
+        name: "زهرة",
+        phoneMasked: null,
+        khatmaCount: 2,
+        khatmas: [],
+        lastReplyAt: null,
+        createdAt: Date.UTC(2026, 8, 2),
+        blocked: false,
+      },
+    ];
+    renderPage();
+    expect(screen.getByRole("link", { name: "سارة" })).toBeInTheDocument();
+    const row = screen.getByText("زهرة").closest("tr")!;
+    expect(within(row).getByText(t.people.whatsappReader)).toBeInTheDocument();
+    expect(within(row).getByText(t.people.numberHidden)).toBeInTheDocument();
+    expect(within(row).queryByRole("link")).toBeNull();
+    expect(
+      within(row).getByText(`${t.people.lastReply}: ${t.people.noReply}`),
+    ).toBeInTheDocument();
   });
 
   it("switches to the blocked list, which says who has no account", async () => {
