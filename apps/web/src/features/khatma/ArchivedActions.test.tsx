@@ -11,7 +11,11 @@ import { ConvexError } from "convex/values";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { t } from "../../i18n/ar";
-import { ArchiveSection, ArchivedSection } from "./ArchivedActions";
+import {
+  ArchiveSection,
+  ArchivedSection,
+  isDeleteWord,
+} from "./ArchivedActions";
 import { resetDeleting, startDelete, useDeleteFailure } from "./deleting";
 
 const m = vi.hoisted(() => ({
@@ -233,40 +237,87 @@ describe("ArchivedSection", () => {
     },
   );
 
-  it("delete says it can't be undone and that saved participants stay", async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  /** Opens the delete sheet, types `word` into its field, and returns the sheet. */
+  async function openDelete(
+    user: ReturnType<typeof userEvent.setup>,
+    word: string | null = t.archive.deleteWord,
+  ) {
     renderIn(<ArchivedSection inviteCode="CODE" restart={null} />);
     await user.click(screen.getByRole("button", { name: t.archive.delete }));
     const confirm = sheet(t.archive.deleteTitle);
+    if (word !== null) {
+      await user.type(
+        within(confirm).getByLabelText(t.archive.deleteTypeLabel),
+        word,
+      );
+    }
+    return confirm;
+  }
+  const deleteButton = (confirm: HTMLElement) =>
+    within(confirm).getByRole("button", { name: t.archive.deleteConfirm });
+
+  it("delete says what everyone loses, that it can't be undone, and that saved participants stay", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const confirm = await openDelete(user, null);
     expect(within(confirm).getByText(t.archive.deleteBody)).toBeInTheDocument();
     expect(t.archive.deleteBody).toContain("لا يمكن التراجع");
-    expect(t.archive.deleteBody).toContain("المشاركون المحفوظون");
+    expect(t.archive.deleteBody).toContain("مؤرشفة");
+    for (const line of t.archive.deleteLoses) {
+      expect(within(confirm).getByText(line)).toBeInTheDocument();
+    }
+    expect(
+      within(confirm).getByText(t.archive.deleteKeeps),
+    ).toBeInTheDocument();
+    expect(t.archive.deleteKeeps).toContain("المشاركون المحفوظون");
     expect(m.remove).not.toHaveBeenCalled();
   });
 
-  it("deletes after the confirmation and goes home", async () => {
+  it("keeps the delete button off until «احذف» is typed", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    renderIn(<ArchivedSection inviteCode="CODE" restart={null} />);
-    await user.click(screen.getByRole("button", { name: t.archive.delete }));
-    await user.click(
-      within(sheet(t.archive.deleteTitle)).getByRole("button", {
-        name: t.archive.deleteConfirm,
-      }),
-    );
+    const confirm = await openDelete(user, null);
+    expect(deleteButton(confirm)).toBeDisabled();
+    const field = within(confirm).getByLabelText(t.archive.deleteTypeLabel);
+    await user.type(field, "احذ");
+    expect(deleteButton(confirm)).toBeDisabled();
+    await user.click(deleteButton(confirm));
+    expect(m.remove).not.toHaveBeenCalled();
+    await user.type(field, "ف");
+    expect(deleteButton(confirm)).toBeEnabled();
+  });
+
+  it.each([
+    ["the word", "احذف", true],
+    ["spaces around it", "  احذف ", true],
+    ["a hamza on the alef", "إحذف", true],
+    ["another word", "حذف", false],
+    ["nothing", "", false],
+    ["the word and more", "احذف الختمة", false],
+  ])("isDeleteWord takes %s: %s", (_, typed, expected) => {
+    expect(isDeleteWord(typed)).toBe(expected);
+  });
+
+  it("deletes once «احذف» is typed and confirmed, and goes home", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const confirm = await openDelete(user);
+    await user.click(deleteButton(confirm));
     expect(m.remove).toHaveBeenCalledWith(args);
     expect(where()).toBe("/");
+  });
+
+  it("backing out of delete deletes nothing", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const confirm = await openDelete(user);
+    await user.click(
+      within(confirm).getByRole("button", { name: t.archive.cancel }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(m.remove).not.toHaveBeenCalled();
   });
 
   it("a khatma that is not archived is not deleted, and says so", async () => {
     m.remove.mockResolvedValue({ error: "not_archived" });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    renderIn(<ArchivedSection inviteCode="CODE" restart={null} />);
-    await user.click(screen.getByRole("button", { name: t.archive.delete }));
-    await user.click(
-      within(sheet(t.archive.deleteTitle)).getByRole("button", {
-        name: t.archive.deleteConfirm,
-      }),
-    );
+    await user.click(deleteButton(await openDelete(user)));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       t.rota.errors.not_archived ?? "",
     );
