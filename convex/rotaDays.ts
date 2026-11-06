@@ -5,6 +5,7 @@ import { internalMutation, type MutationCtx } from "./_generated/server";
 import { archiveKhatma } from "./khatmaLifecycle";
 import { changeCompletedDays } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
+import { organizerRecipients } from "./lib/organizerRecipients";
 import { clearNotes, notify } from "./notes";
 import { enqueue, windowOpen } from "./rotaOutbox";
 import {
@@ -213,13 +214,10 @@ async function sendJuzMessages(
 async function clearOlderOrganizerNotes(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
+  personId: Id<"people">,
 ): Promise<void> {
   for (const kind of ["rotaUnread", "rotaSummary"] as const) {
-    await clearNotes(ctx, {
-      khatmaId: khatma._id,
-      personId: khatma.creatorPersonId,
-      kind,
-    });
+    await clearNotes(ctx, { khatmaId: khatma._id, personId, kind });
   }
 }
 
@@ -249,26 +247,32 @@ async function sendOrganizerNotes(
   if (wantsUnread) {
     const juz = reads.filter((r) => r.doneAt === null).map((r) => r.juz);
     if (juz.length > 0) {
-      await clearOlderOrganizerNotes(ctx, khatma);
-      await notify(ctx, {
-        personId: khatma.creatorPersonId,
-        khatmaId: khatma._id,
-        kind: "rotaUnread",
-        juz,
-      });
+      for (const r of await organizerRecipients(ctx, khatma, "readings")) {
+        await clearOlderOrganizerNotes(ctx, khatma, r.personId);
+        await notify(ctx, {
+          personId: r.personId,
+          khatmaId: khatma._id,
+          kind: "rotaUnread",
+          juz,
+          whatsappOff: r.whatsappOff,
+        });
+      }
     }
     await ctx.db.patch(day._id, { unreadSentAt: now });
   }
   if (wantsSummary) {
     const done = reads.filter((r) => r.doneAt !== null);
-    await clearOlderOrganizerNotes(ctx, khatma);
-    await notify(ctx, {
-      personId: khatma.creatorPersonId,
-      khatmaId: khatma._id,
-      kind: "rotaSummary",
-      count: done.length,
-      juz: done.map((r) => r.juz),
-    });
+    for (const r of await organizerRecipients(ctx, khatma, "readings")) {
+      await clearOlderOrganizerNotes(ctx, khatma, r.personId);
+      await notify(ctx, {
+        personId: r.personId,
+        khatmaId: khatma._id,
+        kind: "rotaSummary",
+        count: done.length,
+        juz: done.map((j) => j.juz),
+        whatsappOff: r.whatsappOff,
+      });
+    }
     await ctx.db.patch(day._id, { summarySentAt: now });
   }
 }
@@ -354,22 +358,28 @@ async function countSilentDay(
     // The notice goes once, when the count first reaches the threshold, and
     // not at all when the participant is silenced at the same time.
     if (!silence && before < noticeDays && silentDays >= noticeDays) {
-      await notify(ctx, {
-        personId: khatma.creatorPersonId,
-        khatmaId: khatma._id,
-        kind: "rotaSilent",
-        name: p.name,
-        count: silentDays,
-      });
+      for (const r of await organizerRecipients(ctx, khatma, "people")) {
+        await notify(ctx, {
+          personId: r.personId,
+          khatmaId: khatma._id,
+          kind: "rotaSilent",
+          name: p.name,
+          count: silentDays,
+          whatsappOff: r.whatsappOff,
+        });
+      }
     }
     if (silence) {
       await ctx.db.patch(p._id, { silencedAt: now });
-      await notify(ctx, {
-        personId: khatma.creatorPersonId,
-        khatmaId: khatma._id,
-        kind: "rotaSilenced",
-        name: p.name,
-      });
+      for (const r of await organizerRecipients(ctx, khatma, "people")) {
+        await notify(ctx, {
+          personId: r.personId,
+          khatmaId: khatma._id,
+          kind: "rotaSilenced",
+          name: p.name,
+          whatsappOff: r.whatsappOff,
+        });
+      }
     }
   }
 }

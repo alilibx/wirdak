@@ -269,11 +269,14 @@ export const ar = {
     suggested: (amount: string) => `المقترح لهذا الموعد: ${amount}`,
     membersHeading: "الأعضاء",
     organizerBadge: "المنظّم",
-    makeOrganizer: "اجعله المنظّم",
+    coOrganizerBadge: "منظّم مساعد",
+    transfer: "انقل ملكية الختمة",
+    transferHint: "اختر من يصبح صاحب الختمة بدلاً منك.",
+    transferTitle: (name: string) => `انقل ملكية الختمة إلى ${name}؟`,
+    transferBody:
+      "يصبح صاحب الختمة بدلاً منك، ويقرّر هو ما تستطيع فعله فيها بعد ذلك.",
+    transferConfirm: "انقل الملكية",
     remove: "إزالة",
-    handoverTitle: (name: string) => `اجعل ${name} المنظّم؟`,
-    handoverBody:
-      "ستصبح عضواً عادياً، ولن تستطيع بعد ذلك تغيير إعدادات الختمة.",
     removeTitle: (name: string) => `إزالة ${name}؟`,
     removeBody:
       "سيعود جزؤه إلى الختمة، ولن يستطيع الانضمام مرة أخرى حتى تسمح له.",
@@ -290,7 +293,38 @@ export const ar = {
       network: commonErrors.network,
       generic: commonErrors.generic,
       archived: "هذه الختمة مؤرشفة، فلا يمكن تغييرها.",
+      is_organizer: "هذا الشخص يدير الختمة، ولا يزيله منها إلا صاحبها.",
+      no_account:
+        "لم يسجّل هذا المشارك الدخول إلى وِردك بعد، فلا يمكن نقل الملكية إليه.",
     },
+  },
+  coOrganizers: {
+    heading: "المنظّمون المساعدون",
+    hint: "يساعدونك في إدارة الختمة بالصلاحيات التي تختارها لكلٍّ منهم.",
+    none: "لا يوجد منظّمون مساعدون بعد.",
+    add: "أضف منظّماً مساعداً",
+    pick: "اختر الشخص",
+    noCandidates: "لا يوجد في الختمة الآن من يمكن إضافته.",
+    full: "وصلتَ إلى العدد الأقصى من المنظّمين المساعدين.",
+    switchesLegend: "الصلاحيات",
+    switches: {
+      readings: "القراءة",
+      people: "المشاركون",
+      settings: "الإعدادات",
+    },
+    /** The switches a co-organizer has, in words: «القراءة والمشاركون». */
+    permissions: (names: string[]) =>
+      names.length === 0 ? "بلا صلاحيات" : names.join(" و"),
+    pending: "لم يسجّل الدخول بعد",
+    save: "حفظ",
+    remove: "أزل من المنظّمين المساعدين",
+    errors: {
+      disabled: "إضافة المنظّمين المساعدين متوقفة الآن.",
+      full: "وصلتَ إلى العدد الأقصى من المنظّمين المساعدين.",
+      not_member: "لم يعد هذا الشخص في الختمة. أعد تحميل الصفحة.",
+      self: "أنت صاحب الختمة.",
+      not_found: "لم نجد هذا المنظّم المساعد. أعد تحميل الصفحة.",
+    } as Record<string, string>,
   },
   archive: {
     banner: "هذه الختمة مؤرشفة",
@@ -310,10 +344,19 @@ export const ar = {
     restartConfirm: "ابدأ الختمة الجديدة",
     starting: "جارٍ البدء",
     delete: "احذف الختمة",
-    deleteTitle: "حذف الختمة؟",
+    deleteTitle: "حذف الختمة نهائيًا؟",
     deleteBody:
-      "لا يمكن التراجع عن الحذف. تُحذف الختمة ورابطها، ويبقى المشاركون المحفوظون عندك.",
-    deleteConfirm: "نعم، احذف الختمة",
+      "الختمة مؤرشفة الآن ولا تصل منها رسائل، فلا داعي لحذفها إلا إن أردت أن تختفي تمامًا. لا يمكن التراجع عن الحذف.",
+    deleteLosesHeading: "يضيع بالحذف، عند الجميع:",
+    deleteLoses: [
+      "رابط الختمة، فلا يفتحها أحد بعدها",
+      "مكانها في قائمة كل من فيها",
+      "جولاتها وأدوارها وملاحظاتها",
+    ],
+    deleteKeeps: "ويبقى المشاركون المحفوظون عندك.",
+    deleteWord: "احذف",
+    deleteTypeLabel: "للتأكيد، اكتب كلمة «احذف»",
+    deleteConfirm: "احذف الختمة نهائيًا",
     deleting: "جارٍ الحذف",
     deleteBusy: "نحذف ختمة أخرى الآن. حاول بعد ثوانٍ.",
     cancel: "تراجع",
@@ -691,6 +734,8 @@ export const ar = {
       "الختمة موقوفة الآن. لا رسائل ولا يتقدّم رقم الختمة حتى تعيد تشغيلها.",
     archivedSettings: "هذه الختمة مؤرشفة، فلا يمكن تغيير إعداداتها.",
     setupNotDone: "أضف من سيقرأ معك، ثم اضغط «ابدأ الختمة».",
+    setupNotDoneViewer:
+      "لم تبدأ الختمة بعد. يبدؤها صاحبها أو من لديه صلاحية الإعدادات.",
     startKhatma: "ابدأ الختمة",
     completeBanner: (number: number) =>
       `اكتملت الختمة ${toArabicDigits(number)}. تقبّل الله منكم.`,
@@ -758,6 +803,7 @@ export const ar = {
     peopleErrors: {
       not_found: "لم نجد هذا الشخص. أعد تحميل الصفحة.",
       is_me: "لا يمكن إزالة منظّم الختمة منها.",
+      is_organizer: "هذا الشخص يدير الختمة، ولا يغيّر مكانه فيها إلا صاحبها.",
       juz_taken: "هذا الجزء له قارئ الآن.",
       too_many: "لا يمكنه أن يقرأ أكثر من هذا.",
       bad_name: "اكتب اسم الشخص.",

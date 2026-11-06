@@ -824,6 +824,17 @@ test("remove purges every row of a rota khatma, in batches", async () => {
   const kept = await rotaKhatma(t, org);
   // More rows than one purge run takes, in one stage.
   await t.run(async (ctx) => {
+    // A co-organizer row holds a real number, even a hidden one: it goes too.
+    for (const khatmaId of [gone.khatmaId, kept.khatmaId]) {
+      await ctx.db.insert("coOrganizers", {
+        khatmaId,
+        phone: "+971570008888",
+        readings: true,
+        people: true,
+        settings: true,
+        addedAt: NOW,
+      });
+    }
     for (let i = 0; i < 450; i++) {
       await ctx.db.insert("rotaOutbox", {
         khatmaId: gone.khatmaId,
@@ -852,8 +863,10 @@ test("remove purges every row of a rota khatma, in batches", async () => {
       ...(await ctx.db.query("rotaReads").collect()),
       ...(await ctx.db.query("rotaOutbox").collect()),
       ...(await ctx.db.query("rotaJoinRequests").collect()),
+      ...(await ctx.db.query("coOrganizers").collect()),
     ].map((row) => row.khatmaId);
     expect(new Set(khatmaIds)).toEqual(new Set([kept.khatmaId]));
+    expect(await ctx.db.query("coOrganizers").collect()).toHaveLength(1);
   });
 });
 

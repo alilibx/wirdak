@@ -33,7 +33,7 @@ export const plan = internalQuery({
   > => {
     const note = await ctx.db.get(args.noteId);
     if (!note || note.clearedAt !== null || note.whatsappSentAt) return null;
-    if (NOTE_TEMPLATES[note.kind] === null) return null;
+    if (NOTE_TEMPLATES[note.kind] === null || note.whatsappOff) return null;
     const member = await activeMembership(ctx, note.khatmaId, note.personId);
     if (!member?.notificationsOn) return null;
     const person = await ctx.db.get(note.personId);

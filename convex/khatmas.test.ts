@@ -581,6 +581,7 @@ test("view of a rota khatma says so, before looking for a round", async () => {
     name: "ختمة التناوب",
     joinLink: null,
     archived: false,
+    organizerAccess: null,
   });
   expect(
     await t.query(api.khatmas.view, {
@@ -592,6 +593,13 @@ test("view of a rota khatma says so, before looking for a round", async () => {
     name: "ختمة التناوب",
     joinLink: null,
     archived: false,
+    // the owner runs it all
+    organizerAccess: {
+      owner: true,
+      readings: true,
+      people: true,
+      settings: true,
+    },
   });
 });
 
@@ -613,6 +621,7 @@ test("view of a rota khatma has its join link for anyone, once it has a code and
       name: "ختمة التناوب",
       joinLink: `https://wa.me/971500000000?text=${encodeURIComponent("انضمام إلى ختمة التناوب · ABC234")}`,
       archived: false,
+      organizerAccess: null,
     });
   } finally {
     vi.unstubAllEnvs();
@@ -640,6 +649,7 @@ test("view of an archived rota khatma has no join link, so nothing offers it", a
       name: "ختمة التناوب",
       joinLink: null,
       archived: true,
+      organizerAccess: null,
     });
   } finally {
     vi.unstubAllEnvs();

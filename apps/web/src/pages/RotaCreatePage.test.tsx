@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RotaPeopleSetup } from "../features/rota/RotaPeopleSetup";
 import { t } from "../i18n/ar";
+import { OWNER_ACCESS } from "../test/fixtures";
 import { RotaCreatePage } from "./RotaCreatePage";
 
 type Person = {
@@ -53,6 +54,9 @@ vi.mock("convex/react", async () => {
       );
       if (getFunctionName(ref) === "publicSettings:get")
         return m.publicSettings;
+      // The owner, who may start the khatma.
+      if (getFunctionName(ref) === "khatmas:view")
+        return { rota: true, organizerAccess: OWNER_ACCESS };
       return getFunctionName(ref) === "people:me" ? m.me : people;
     },
     useAction: () => m.create,

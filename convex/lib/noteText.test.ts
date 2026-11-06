@@ -80,6 +80,12 @@ test("the rota participant notes name them and count days in Arabic digits", () 
   );
 });
 
+test("the coOrganizerNow note tells a named person their new role", () => {
+  expect(noteText({ ...base, kind: "coOrganizerNow" })).toBe(
+    "أصبحت منظّماً مساعداً في هذه الختمة",
+  );
+});
+
 test("the rotaEnabled note tells the organizer what they can now do", () => {
   expect(noteText({ ...base, kind: "rotaEnabled" })).toBe(
     "جديد لك: يمكنك الآن إنشاء ختمة بالتناوب: لكل شخص جزء ثابت يتقدّم مع كل ختمة، ويصله على واتساب.",

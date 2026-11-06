@@ -50,7 +50,7 @@ async function person(t: T, phone: string, name: string) {
     ctx.db.insert("people", {
       phone,
       displayName: name,
-      verifiedAt: 0,
+      verifiedAt: NOW,
       timeZone: "Asia/Dubai",
       lastSeenAt: 0,
     }),
@@ -595,4 +595,207 @@ test("unblockMember makes a blocked member a former one", async () => {
   expect(await audit(t)).toMatchObject([
     { action: "khatma.unblockMember", targetId: khatmaId },
   ]);
+});
+
+const setSetting = (t: T, key: string, value: unknown) =>
+  t.run((ctx) => ctx.db.insert("settings", { key, value, updatedAt: 0 }));
+
+test("an admin names a co-organizer past the cap and the change is audited", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  await setSetting(t, "maxCoOrganizers", 1);
+  await setSetting(t, "coOrganizersOn", false);
+  const { khatmaId, readerMember } = await pool(t);
+  const third = await person(t, "+971500000003", "خالد");
+  const thirdMember = await t.run((ctx) =>
+    ctx.db.insert("members", {
+      khatmaId,
+      personId: third,
+      joinedAt: 2,
+      shareToken: "share2",
+      status: "active",
+      notificationsOn: false,
+      lastNudgeAt: null,
+      lastCelebratedRound: 0,
+    }),
+  );
+  const named = (candidateId: string) =>
+    t.mutation(api.adminKhatmas.setCoOrganizer, {
+      ...auth,
+      khatmaId,
+      candidateId,
+      readings: true,
+      people: false,
+      settings: true,
+      note: "طلب المنظّم",
+    });
+
+  expect(await named(`m:${readerMember}`)).toEqual({ ok: true });
+  expect(await named(`m:${thirdMember}`)).toEqual({ ok: true });
+  const rows = await t.run((ctx) => ctx.db.query("coOrganizers").collect());
+  expect(rows).toHaveLength(2);
+  expect(rows[0]).toMatchObject({
+    readings: true,
+    people: false,
+    settings: true,
+  });
+
+  const log = await audit(t);
+  expect(log).toHaveLength(2);
+  expect(log[1]).toMatchObject({
+    action: "khatma.coOrganizerSet",
+    targetKind: "khatma",
+    targetId: khatmaId,
+    note: "طلب المنظّم",
+  });
+  expect(log[1]!.before).toHaveLength(1);
+  expect(log[1]!.after).toHaveLength(2);
+
+  // it changes the switches too, and the khatma view lists them
+  expect(
+    await t.mutation(api.adminKhatmas.setCoOrganizer, {
+      ...auth,
+      khatmaId,
+      coOrganizerId: rows[0]!._id,
+      readings: false,
+      people: true,
+      settings: false,
+    }),
+  ).toEqual({ ok: true });
+  const view = await t.query(api.adminLookup.khatma, { ...auth, khatmaId });
+  expect(view!.coOrganizers).toMatchObject([
+    {
+      name: "سارة",
+      readings: false,
+      people: true,
+      settings: false,
+      pending: false,
+    },
+    { name: "خالد", readings: true, people: false, settings: true },
+  ]);
+  expect(view!.coOrganizerCandidates).toEqual([]);
+  expect(
+    await t.mutation(api.adminKhatmas.setCoOrganizer, {
+      ...auth,
+      khatmaId,
+      candidateId: "m:nonsense",
+      readings: true,
+      people: true,
+      settings: true,
+    }),
+  ).toEqual({ error: "not_member" });
+});
+
+test("an admin removes one, audited", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  const { khatmaId, readerMember } = await pool(t);
+  await t.mutation(api.adminKhatmas.setCoOrganizer, {
+    ...auth,
+    khatmaId,
+    candidateId: `m:${readerMember}`,
+    readings: true,
+    people: true,
+    settings: true,
+  });
+  const [row] = await t.run((ctx) => ctx.db.query("coOrganizers").collect());
+  expect(
+    await t.mutation(api.adminKhatmas.removeCoOrganizer, {
+      ...auth,
+      khatmaId,
+      coOrganizerId: row!._id,
+      note: "غادر",
+    }),
+  ).toEqual({ ok: true });
+  expect(await t.run((ctx) => ctx.db.query("coOrganizers").collect())).toEqual(
+    [],
+  );
+  expect((await audit(t)).at(-1)).toMatchObject({
+    action: "khatma.coOrganizerRemove",
+    targetId: khatmaId,
+    note: "غادر",
+    after: [],
+  });
+  expect(
+    await t.mutation(api.adminKhatmas.removeCoOrganizer, {
+      ...auth,
+      khatmaId,
+      coOrganizerId: row!._id,
+    }),
+  ).toEqual({ error: "not_found" });
+  await expect(
+    t.mutation(api.adminKhatmas.removeCoOrganizer, {
+      adminToken: "nope",
+      khatmaId,
+      coOrganizerId: row!._id,
+    }),
+  ).rejects.toThrow();
+});
+
+test("a rota khatma offers its participants with an account as hand-over targets", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  const owner = await person(t, "+971500000001", "علي");
+  const sara = await person(t, "+971500000002", "سارة");
+  const khatmaId = await t.run(async (ctx) => {
+    const id = await ctx.db.insert("khatmas", {
+      name: "ختمة",
+      schedule: "weekly",
+      grace: { value: 2, unit: "days" },
+      creatorPersonId: owner,
+      inviteCode: "rotaCode0001",
+      completedRounds: 0,
+      createdAt: 0,
+      kind: "rota",
+      rota: rotaConfig(null),
+    });
+    const add = (
+      name: string,
+      phone: string,
+      personId: Id<"people"> | null,
+      removedAt: number | null = null,
+    ) =>
+      ctx.db.insert("rotaParticipants", {
+        khatmaId: id,
+        name,
+        phone,
+        personId,
+        addedAt: 0,
+        removedAt,
+      });
+    await add("علي", "+971500000001", owner);
+    await add("سارة", "+971500000002", sara);
+    await add("بلا حساب", "+971500000009", null);
+    await add("مُزال", "+971500000002", sara, 5);
+    return id;
+  });
+  const view = await t.query(api.adminLookup.khatma, { ...auth, khatmaId });
+  expect(view!.handOverCandidates).toMatchObject([{ name: "سارة" }]);
+  expect(view!.handOverCandidates[0]).toHaveProperty("participantId");
+  const noAccount = await t.run(
+    async (ctx) =>
+      (await ctx.db.query("rotaParticipants").collect()).find(
+        (p) => p.name === "بلا حساب",
+      )!._id,
+  );
+  expect(
+    await t.mutation(api.adminOps.handOver, {
+      ...auth,
+      khatmaId,
+      participantId: noAccount,
+    }),
+  ).toEqual({ error: "no_account" });
+});
+
+test("the khatma view carries the default switches for a new co-organizer", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  await setSetting(t, "coOrganizerDefaultPeople", false);
+  const { khatmaId } = await pool(t);
+  const view = await t.query(api.adminLookup.khatma, { ...auth, khatmaId });
+  expect(view!.coOrganizerDefaults).toEqual({
+    readings: true,
+    people: false,
+    settings: true,
+  });
 });

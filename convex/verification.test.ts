@@ -1371,3 +1371,104 @@ test("a blocked number gets 'no code found' and the code stays unused", async ()
   expect(sent.map((s) => s.body)).toEqual([NO_MATCH]);
   expect((await status(t, v)).status).toBe("pending");
 });
+
+/** A rota khatma whose owner hasn't signed in, with E164 a participant named co-organizer. */
+async function namedInRota(t: T): Promise<Id<"khatmas">> {
+  return await t.run(async (ctx) => {
+    const ownerId = await ctx.db.insert("people", {
+      phone: "+971500000001",
+      displayName: "المنظم",
+      verifiedAt: 0,
+      timeZone: "Asia/Dubai",
+      lastSeenAt: 0,
+    });
+    const khatmaId = await ctx.db.insert("khatmas", {
+      name: "ختمة",
+      schedule: "none",
+      grace: { value: 7, unit: "days" },
+      creatorPersonId: ownerId,
+      inviteCode: "rotacode",
+      completedRounds: 0,
+      createdAt: 0,
+      kind: "rota",
+      rota: {
+        days: { kind: "daily" },
+        firstDate: "2027-01-15",
+        endDate: null,
+        timeZone: "Asia/Dubai",
+        messages: {
+          dayAt: 480,
+          reminder: { at: 960, on: true },
+          unread: { at: 1140, on: true },
+          summary: { at: 1260, on: false },
+        },
+        pausedAt: null,
+        pauseDates: [],
+        archivedAt: null,
+      },
+    });
+    await ctx.db.insert("rotaParticipants", {
+      khatmaId,
+      name: "أم أحمد",
+      phone: E164,
+      personId: null,
+      addedAt: 0,
+      removedAt: null,
+    });
+    await ctx.db.insert("coOrganizers", {
+      khatmaId,
+      phone: E164,
+      readings: true,
+      people: true,
+      settings: true,
+      addedAt: 0,
+    });
+    return khatmaId;
+  });
+}
+
+test("a new account on a number named as a rota co-organizer joins that khatma's home list", async () => {
+  const t = convexTest(schema, modules);
+  const khatmaId = await namedInRota(t);
+  const v = await start(t, "أم أحمد");
+  await send(t, v.message);
+  const res = await claim(t, v);
+  if (!("sessionToken" in res)) throw new Error(JSON.stringify(res));
+  expect(
+    (await t.query(api.khatmas.mine, { sessionToken: res.sessionToken })).map(
+      (k) => k.inviteCode,
+    ),
+  ).toEqual(["rotacode"]);
+  const member = await t.run((ctx) =>
+    ctx.db
+      .query("members")
+      .withIndex("by_khatma", (q) => q.eq("khatmaId", khatmaId))
+      .unique(),
+  );
+  expect(member).toMatchObject({ status: "active", notificationsOn: true });
+});
+
+test("an organizer an admin set up, named a rota co-organizer, joins that khatma's home list once they sign in", async () => {
+  const t = convexTest(schema, modules);
+  // What adminRota leaves for a number that hasn't signed in: no account yet.
+  await addPerson(t, E164, "أم أحمد");
+  const khatmaId = await namedInRota(t);
+  expect(
+    await t.run((ctx) =>
+      ctx.db
+        .query("members")
+        .withIndex("by_khatma", (q) => q.eq("khatmaId", khatmaId))
+        .collect(),
+    ),
+  ).toEqual([]);
+
+  const v = await start(t, "");
+  await send(t, v.message);
+  const res = await confirmPin(t, v, pinsSent()[0]!);
+  if (!("sessionToken" in res)) throw new Error(JSON.stringify(res));
+  expect(
+    (await t.query(api.khatmas.mine, { sessionToken: res.sessionToken })).map(
+      (k) => k.inviteCode,
+    ),
+  ).toEqual(["rotacode"]);
+});

@@ -12,6 +12,7 @@ import { randomToken } from "./lib/crypto";
 import { nameFields, refreshPerson } from "./lib/directory";
 import { isValidGrace, graceValidator, type Grace } from "./lib/grace";
 import { JUZ, JUZ_COUNT } from "./lib/juz";
+import { accessOf, roleIn, type OrganizerAccess } from "./lib/organizerAuth";
 import { paceDays, personPace } from "./lib/pace";
 import { isArchived, khatmaByInviteCode } from "./lib/khatma";
 import { checkRateLimit } from "./lib/rateLimit";
@@ -57,7 +58,10 @@ export type KhatmaView = {
   createdAt: number;
   schedule: Schedule;
   grace: Grace;
+  /** The viewer is the owner. */
   isOrganizer: boolean;
+  /** What the viewer may run here: null for anyone who isn't the owner or a co-organizer. */
+  organizerAccess: OrganizerAccess | null;
   roundNumber: number;
   targetEndAt: number | null;
   completedRounds: number;
@@ -279,6 +283,7 @@ export const view = sessionQuery({
         name: string | null;
         joinLink: string | null;
         archived: boolean;
+        organizerAccess: OrganizerAccess | null;
       }
   > => {
     const khatma = await khatmaByInviteCode(ctx, args.inviteCode);
@@ -288,6 +293,7 @@ export const view = sessionQuery({
         name: khatma.name,
         joinLink: khatmaJoinLink(khatma, env("WHATSAPP_PUBLIC_NUMBER")),
         archived: isArchived(khatma),
+        organizerAccess: accessOf(await roleIn(ctx, khatma, ctx.person)),
       };
     }
     if (!khatma || !khatma.currentRoundId) return { notFound: true };
@@ -348,6 +354,7 @@ export const view = sessionQuery({
       schedule: khatma.schedule,
       grace: khatma.grace,
       isOrganizer: personId !== null && khatma.creatorPersonId === personId,
+      organizerAccess: accessOf(await roleIn(ctx, khatma, ctx.person)),
       roundNumber: round.number,
       targetEndAt: round.targetEndAt,
       completedRounds: khatma.completedRounds,

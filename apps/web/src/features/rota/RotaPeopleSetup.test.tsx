@@ -3,10 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { t } from "../../i18n/ar";
+import { coOrganizerAccess, OWNER_ACCESS } from "../../test/fixtures";
 import { RotaPeopleSetup } from "./RotaPeopleSetup";
 
 const m = vi.hoisted(() => ({
   view: undefined as unknown,
+  khatma: undefined as unknown,
   saved: undefined as unknown,
   importable: undefined as unknown,
   fns: {} as Record<string, ReturnType<typeof vi.fn>>,
@@ -23,6 +25,7 @@ vi.mock("convex/react", async () => {
       const name = getFunctionName(ref);
       if (name === "rota:saved") return m.saved;
       if (name === "rota:importable") return m.importable;
+      if (name === "khatmas:view") return m.khatma;
       return m.view;
     },
     useMutation: (ref: never) => {
@@ -79,6 +82,7 @@ function renderSetup() {
 beforeEach(() => {
   m.fns = {};
   m.view = makeView();
+  m.khatma = { rota: true, organizerAccess: OWNER_ACCESS };
   m.saved = [
     { id: "c1", name: "أم خالد", phone: "+971509998877", inKhatma: false },
   ];
@@ -94,6 +98,31 @@ describe("RotaPeopleSetup: an archived khatma", () => {
       screen.queryByRole("heading", { name: t.rota.setupTitle }),
     ).toBeNull();
     expect(m.fns.ensureJoinLink ?? vi.fn()).not.toHaveBeenCalled();
+  });
+});
+
+describe("RotaPeopleSetup: «تمّ»", () => {
+  it("starts the khatma for the owner, then goes to its page", async () => {
+    const user = userEvent.setup();
+    renderSetup();
+    await user.click(screen.getByRole("button", { name: t.rota.done }));
+    expect(m.fns.finishSetup).toHaveBeenCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+    });
+    expect(await screen.findByText("khatma page")).toBeInTheDocument();
+  });
+
+  it("only takes a co-organizer without Settings back to the khatma's page", async () => {
+    m.khatma = {
+      rota: true,
+      organizerAccess: coOrganizerAccess({ people: true }),
+    };
+    const user = userEvent.setup();
+    renderSetup();
+    await user.click(screen.getByRole("button", { name: t.rota.done }));
+    expect(await screen.findByText("khatma page")).toBeInTheDocument();
+    expect(m.fns.finishSetup ?? vi.fn()).not.toHaveBeenCalled();
   });
 });
 

@@ -112,6 +112,21 @@ test("defaults match the spec", () => {
     rotaMaxSlotsPerPerson: 3,
     rotaSilenceNoticeDays: 3,
     rotaSilenceStopDays: 7,
+    markDoneForOthersOn: true,
+    markDoneNameOn: true,
+    organizerLateMarkOn: true,
+    namedCountsAsReplyOn: true,
+    coOrganizersOn: true,
+    maxCoOrganizers: 5,
+    coOrganizerDefaultReadings: true,
+    coOrganizerDefaultPeople: true,
+    coOrganizerDefaultSettings: true,
+    coOrganizerNotesOn: true,
+    coOrganizerWhatsAppOn: false,
+    handoverToCoOrganizerOn: true,
+    oldOwnerStaysOn: true,
+    rotaSharedSlotsOn: true,
+    rotaHalfCountsAsSlot: true,
   });
 });
 

@@ -24,6 +24,12 @@ import {
   type ReadingDays,
   type RotaMessages,
 } from "./lib/rota";
+import {
+  accessOf,
+  type Need,
+  type OrganizerAccess,
+  type OrganizerRole,
+} from "./lib/organizerAuth";
 import * as ops from "./lib/rotaOps";
 import { earliestFirstDate, type RotaConfig } from "./lib/rotaPlace";
 import type { SessionContext } from "./lib/session";
@@ -332,8 +338,13 @@ export const insertAgain = internalMutation({
     }
     const person = await ctx.db.get(args.personId);
     if (!person) throw new ConvexError({ code: "not_signed_in" });
-    // The organizer runs one already, so `rotaAllowed` isn't asked again.
-    const found = await organizerOf(ctx, args.sourceInviteCode, person);
+    // The owner runs one already, so `rotaAllowed` isn't asked again.
+    const found = await organizerOf(
+      ctx,
+      args.sourceInviteCode,
+      person,
+      "owner",
+    );
     const rota = found?.khatma.rota;
     if (!found || found.khatma.kind !== "rota" || !rota) {
       throw new ConvexError({ code: "forbidden" });
@@ -490,36 +501,47 @@ export async function ensureJoinCode(
 
 /**
  * The organizer, their rota khatma and its settings, for every change the
- * organizer makes: `forbidden` for anyone else (and for a pool khatma), and
- * `archived` once the khatma is archived, which leaves it read-only.
+ * organizer makes: `forbidden` unless their role meets `need` (and for a pool
+ * khatma), and `archived` once the khatma is archived, which leaves it read-only.
  */
 async function requireRotaOrganizer(
   ctx: MutationCtx & SessionContext,
   inviteCode: string,
+  need: Need = "owner",
 ): Promise<{
   person: Doc<"people">;
   khatma: Doc<"khatmas">;
   rota: RotaConfig;
+  role: OrganizerRole;
 }> {
-  const { person, khatma } = await requireOrganizer(ctx, inviteCode);
+  const { person, khatma, role } = await requireOrganizer(
+    ctx,
+    inviteCode,
+    need,
+  );
   const rota = khatma.rota;
   if (khatma.kind !== "rota" || !rota) {
     throw new ConvexError({ code: "forbidden" });
   }
   if (isArchived(khatma)) throw new ConvexError({ code: "archived" });
-  return { person, khatma, rota };
+  return { person, khatma, rota, role };
 }
 
-/** The organizer's rota khatma, to read: null for anyone else, and for a pool khatma. */
+/**
+ * The organizer's rota khatma, to read: null unless their role meets `need`,
+ * and for a pool khatma.
+ */
 async function organizerRota(
   ctx: QueryCtx & SessionContext,
   inviteCode: string,
+  need: Need,
 ): Promise<{
   person: Doc<"people">;
   khatma: Doc<"khatmas">;
   rota: RotaConfig;
+  role: OrganizerRole;
 } | null> {
-  const found = await organizerOf(ctx, inviteCode, ctx.person);
+  const found = await organizerOf(ctx, inviteCode, ctx.person, need);
   const rota = found?.khatma.rota;
   if (!found || found.khatma.kind !== "rota" || !rota) return null;
   return { ...found, rota };
@@ -528,19 +550,24 @@ async function organizerRota(
 // ---------------------------------------------------------------------------
 // People
 
+/** The owner, and a co-organizer with Settings: starting the khatma's days is a setting. */
 export const finishSetup = sessionMutation({
   args: { inviteCode: v.string() },
   handler: async (ctx, args): ReturnType<typeof ops.finishSetup> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "settings",
+    );
     return ops.finishSetup(ctx, khatma, rota);
   },
 });
 
-/** Organizer only. */
+/** The owner, and a co-organizer with People. */
 export const people = sessionQuery({
   args: { inviteCode: v.string() },
   handler: async (ctx, args): Promise<ops.PeopleView | null> => {
-    const found = await organizerRota(ctx, args.inviteCode);
+    const found = await organizerRota(ctx, args.inviteCode, "people");
     if (!found) return null;
     const { person, khatma, rota } = found;
     return ops.people(ctx, khatma, rota, { personId: person._id });
@@ -556,8 +583,14 @@ export const addParticipant = sessionMutation({
     readsToday: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.addParticipant> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
-    return ops.addParticipant(ctx, khatma, rota, args);
+    const { person, khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    return ops.addParticipant(ctx, khatma, rota, args, {
+      personId: person._id,
+    });
   },
 });
 
@@ -568,7 +601,11 @@ export const giveJuz = sessionMutation({
     juz: v.number(),
   },
   handler: async (ctx, args): ReturnType<typeof ops.giveJuz> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
     return ops.giveJuz(ctx, khatma, rota, args);
   },
 });
@@ -576,7 +613,11 @@ export const giveJuz = sessionMutation({
 export const spreadFreeJuz = sessionMutation({
   args: { inviteCode: v.string() },
   handler: async (ctx, args): ReturnType<typeof ops.spreadFreeJuz> => {
-    const { khatma } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
     return ops.spreadFreeJuz(ctx, khatma);
   },
 });
@@ -589,8 +630,12 @@ export const moveJuz = sessionMutation({
     toJuz: v.number(),
   },
   handler: async (ctx, args): ReturnType<typeof ops.moveJuz> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
-    return ops.moveJuz(ctx, khatma, rota, args);
+    const { khatma, rota, role } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    return ops.moveJuz(ctx, khatma, rota, args, role);
   },
 });
 
@@ -601,8 +646,12 @@ export const freeJuz = sessionMutation({
     juz: v.number(),
   },
   handler: async (ctx, args): ReturnType<typeof ops.freeJuz> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
-    return ops.freeJuz(ctx, khatma, rota, args);
+    const { khatma, rota, role } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    return ops.freeJuz(ctx, khatma, rota, args, role);
   },
 });
 
@@ -613,8 +662,14 @@ export const renameParticipant = sessionMutation({
     name: v.string(),
   },
   handler: async (ctx, args): ReturnType<typeof ops.renameParticipant> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
-    return ops.renameParticipant(ctx, khatma, rota, args);
+    const { person, khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    return ops.renameParticipant(ctx, khatma, rota, args, {
+      personId: person._id,
+    });
   },
 });
 
@@ -624,20 +679,26 @@ export const removeParticipant = sessionMutation({
     participantId: v.id("rotaParticipants"),
   },
   handler: async (ctx, args): ReturnType<typeof ops.removeParticipant> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
-    return ops.removeParticipant(ctx, khatma, rota, args);
+    const { khatma, rota, role } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    return ops.removeParticipant(ctx, khatma, rota, args, role);
   },
 });
 
 // ---------------------------------------------------------------------------
 // Saved participants
 
-/** Organizer only. */
+/** The caller's own saved list: the owner's, or a co-organizer's with People. */
 export const saved = sessionQuery({
   args: { inviteCode: v.string() },
   handler: async (ctx, args): Promise<ops.SavedContact[] | null> => {
-    const found = await organizerRota(ctx, args.inviteCode);
-    return found && ops.saved(ctx, found.khatma);
+    const found = await organizerRota(ctx, args.inviteCode, "people");
+    return (
+      found && ops.saved(ctx, found.khatma, { personId: found.person._id })
+    );
   },
 });
 
@@ -649,8 +710,12 @@ export const addSaved = sessionMutation({
     readsToday: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.addSaved> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
-    return ops.addSaved(ctx, khatma, rota, args);
+    const { person, khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    return ops.addSaved(ctx, khatma, rota, args, { personId: person._id });
   },
 });
 
@@ -689,7 +754,7 @@ export const importable = sessionQuery({
     ctx,
     args,
   ): Promise<{ inviteCode: string; title: string; memberCount: number }[]> => {
-    const found = await organizerOf(ctx, args.inviteCode, ctx.person);
+    const found = await organizerOf(ctx, args.inviteCode, ctx.person, "people");
     if (!found || found.khatma.kind !== "rota") return [];
     const { person } = found;
     const { phones, personIds } = await ops.activeIdentities(
@@ -748,8 +813,18 @@ export const importMembers = sessionMutation({
   ): Promise<
     { ok: true; added: number; skipped: number } | { error: "not_found" }
   > => {
-    const { person, khatma } = await requireRotaOrganizer(ctx, args.inviteCode);
-    const source = await organizerOf(ctx, args.sourceInviteCode, person);
+    const { person, khatma } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    // The caller must own the pool khatma they bring people from.
+    const source = await organizerOf(
+      ctx,
+      args.sourceInviteCode,
+      person,
+      "owner",
+    );
     if (!source || source.khatma.kind === "rota" || isArchived(source.khatma)) {
       return { error: "not_found" };
     }
@@ -805,7 +880,11 @@ export const importMembers = sessionMutation({
 export const ensureJoinLink = sessionMutation({
   args: { inviteCode: v.string() },
   handler: async (ctx, args): Promise<{ ok: true }> => {
-    const { khatma } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
     await ensureJoinCode(ctx, khatma);
     return { ok: true };
   },
@@ -820,15 +899,25 @@ export const acceptJoinRequest = sessionMutation({
     readsToday: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.acceptJoinRequest> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
-    return ops.acceptJoinRequest(ctx, khatma, rota, args);
+    const { person, khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
+    return ops.acceptJoinRequest(ctx, khatma, rota, args, {
+      personId: person._id,
+    });
   },
 });
 
 export const declineJoinRequest = sessionMutation({
   args: { inviteCode: v.string(), requestId: v.id("rotaJoinRequests") },
   handler: async (ctx, args): ReturnType<typeof ops.declineJoinRequest> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "people",
+    );
     return ops.declineJoinRequest(ctx, khatma, rota, args);
   },
 });
@@ -836,11 +925,11 @@ export const declineJoinRequest = sessionMutation({
 // ---------------------------------------------------------------------------
 // Today
 
-/** Organizer only. */
+/** The owner, and a co-organizer with Readings. */
 export const today = sessionQuery({
   args: { inviteCode: v.string() },
   handler: async (ctx, args): Promise<ops.TodayView | null> => {
-    const found = await organizerRota(ctx, args.inviteCode);
+    const found = await organizerRota(ctx, args.inviteCode, "readings");
     if (!found) return null;
     const { person, khatma, rota } = found;
     return ops.today(ctx, khatma, rota, { personId: person._id });
@@ -854,7 +943,11 @@ export const reassign = sessionMutation({
     participantId: v.id("rotaParticipants"),
   },
   handler: async (ctx, args): ReturnType<typeof ops.reassign> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "readings",
+    );
     return ops.reassign(ctx, khatma, rota, args);
   },
 });
@@ -865,6 +958,7 @@ export const markDone = sessionMutation({
     const { person, khatma, rota } = await requireRotaOrganizer(
       ctx,
       args.inviteCode,
+      "readings",
     );
     return ops.markDone(ctx, khatma, rota, args, { personId: person._id });
   },
@@ -873,7 +967,11 @@ export const markDone = sessionMutation({
 export const markNotDone = sessionMutation({
   args: { inviteCode: v.string(), readId: v.id("rotaReads") },
   handler: async (ctx, args): ReturnType<typeof ops.markNotDone> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "readings",
+    );
     return ops.markNotDone(ctx, khatma, rota, args);
   },
 });
@@ -881,12 +979,20 @@ export const markNotDone = sessionMutation({
 // ---------------------------------------------------------------------------
 // Settings
 
-/** Organizer only. */
+/** The owner, and a co-organizer with Settings; `access` says what else is theirs. */
 export const settings = sessionQuery({
   args: { inviteCode: v.string() },
-  handler: async (ctx, args): Promise<ops.SettingsView | null> => {
-    const found = await organizerRota(ctx, args.inviteCode);
-    return found && ops.settings(ctx, found.khatma, found.rota);
+  handler: async (
+    ctx,
+    args,
+  ): Promise<(ops.SettingsView & { access: OrganizerAccess }) | null> => {
+    const found = await organizerRota(ctx, args.inviteCode, "settings");
+    const access = found && accessOf(found.role);
+    if (!found || !access) return null;
+    return {
+      ...(await ops.settings(ctx, found.khatma, found.rota)),
+      access,
+    };
   },
 });
 
@@ -903,7 +1009,11 @@ export const update = sessionMutation({
     cheer: v.optional(v.union(cheerConfigValidator, v.null())),
   },
   handler: async (ctx, args): ReturnType<typeof ops.update> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "settings",
+    );
     return ops.update(ctx, khatma, rota, args);
   },
 });
@@ -911,7 +1021,11 @@ export const update = sessionMutation({
 export const setPaused = sessionMutation({
   args: { inviteCode: v.string(), paused: v.boolean() },
   handler: async (ctx, args): ReturnType<typeof ops.setPaused> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "settings",
+    );
     return ops.setPaused(ctx, khatma, rota, args);
   },
 });
@@ -919,7 +1033,11 @@ export const setPaused = sessionMutation({
 export const addPauseDate = sessionMutation({
   args: { inviteCode: v.string(), date: v.string() },
   handler: async (ctx, args): ReturnType<typeof ops.addPauseDate> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "settings",
+    );
     return ops.addPauseDate(ctx, khatma, rota, args);
   },
 });
@@ -927,7 +1045,11 @@ export const addPauseDate = sessionMutation({
 export const removePauseDate = sessionMutation({
   args: { inviteCode: v.string(), date: v.string() },
   handler: async (ctx, args): ReturnType<typeof ops.removePauseDate> => {
-    const { khatma, rota } = await requireRotaOrganizer(ctx, args.inviteCode);
+    const { khatma, rota } = await requireRotaOrganizer(
+      ctx,
+      args.inviteCode,
+      "settings",
+    );
     return ops.removePauseDate(ctx, khatma, rota, args);
   },
 });

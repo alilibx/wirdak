@@ -59,6 +59,8 @@ export const NOTE_TEMPLATES: Record<NoteKind, string | null> = {
   rotaStopped: null,
   // An announcement of a new feature, which Meta would count as marketing.
   rotaEnabled: null,
+  // Told in the app and by push only: a new template needs Meta's approval.
+  coOrganizerNow: null,
 };
 /** "Open for help" with two or more ajza': Arabic agreement needs its own body. */
 export const OPEN_FOR_HELP_MANY = "wirdak_open_for_help_many_v3";
@@ -130,7 +132,7 @@ function noteParams(note: NoteTextInput, now: number): string[] {
       return [toArabicDigits(note.count ?? 0)];
     case "rotaJoinRequest":
       return [note.name ?? ""];
-    // no body values (`cheer`, `rotaSilent`, `rotaSilenced`, `rotaStopped` and `rotaEnabled`
+    // no body values (`cheer`, `rotaSilent`, `rotaSilenced`, `rotaStopped`, `rotaEnabled` and `coOrganizerNow`
     // never reach WhatsApp: `NOTE_TEMPLATES` is null for them)
     case "cheer":
     case "completed":
@@ -140,6 +142,7 @@ function noteParams(note: NoteTextInput, now: number): string[] {
     case "rotaSilenced":
     case "rotaStopped":
     case "rotaEnabled":
+    case "coOrganizerNow":
       return [];
   }
 }
