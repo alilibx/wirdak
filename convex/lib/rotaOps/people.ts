@@ -4,6 +4,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import {
   enqueue,
+  reachable,
   slotFreeToday,
   takeFreeJuzToday,
   welcomeGoesNow,
@@ -847,7 +848,46 @@ export type SavedContact = {
   phone: string | null;
   /** They are an active participant of this khatma. */
   inKhatma: boolean;
+  /** They read now in another of the list owner's live khatmas. */
+  active: boolean;
 };
+
+/**
+ * Whether `phone` reads now in a live rota khatma `owner` runs, other than
+ * `except`: set up, on its list, joined, not stopped or silenced, and holding
+ * a juz'. Someone who holds nothing was taken off on purpose (`spreadFreeJuz`
+ * gives them nothing either).
+ */
+async function readsWith(
+  ctx: QueryCtx,
+  phone: string,
+  owner: Id<"people">,
+  except: Id<"khatmas">,
+): Promise<boolean> {
+  const rows = await ctx.db
+    .query("rotaParticipants")
+    .withIndex("by_phone", (q) => q.eq("phone", phone))
+    .collect();
+  for (const row of rows) {
+    if (row.khatmaId === except || !reachable(row)) continue;
+    const khatma = await ctx.db.get(row.khatmaId);
+    if (
+      !khatma ||
+      khatma.kind !== "rota" ||
+      khatma.creatorPersonId !== owner ||
+      isArchived(khatma) ||
+      khatma.rota?.setupDoneAt == null
+    ) {
+      continue;
+    }
+    const slot = await ctx.db
+      .query("rotaSlots")
+      .withIndex("by_participant", (q) => q.eq("participantId", row._id))
+      .first();
+    if (slot) return true;
+  }
+  return false;
+}
 
 /** Active participants of a khatma, by phone and by linked person. */
 export async function activeIdentities(
@@ -880,17 +920,29 @@ export async function saved(
     .query("rotaContacts")
     .withIndex("by_owner", (q) => q.eq("ownerPersonId", owner))
     .collect();
-  return contacts
-    .filter((c) => c.removedAt === undefined)
-    .map((c) => ({
+  const list: SavedContact[] = [];
+  for (const c of contacts) {
+    if (c.removedAt !== undefined) continue;
+    // A hidden number is looked up through the linked person, never returned.
+    const phone =
+      c.phone ??
+      (c.personId === null ? null : (await ctx.db.get(c.personId))?.phone) ??
+      null;
+    list.push({
       id: c._id,
       name: c.name,
       phone: c.phone,
       inKhatma:
         (c.phone !== null && phones.has(c.phone)) ||
         (c.personId !== null && personIds.has(c.personId)),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name, "ar"));
+      active:
+        phone !== null && (await readsWith(ctx, phone, owner, khatma._id)),
+    });
+  }
+  return list.sort(
+    (a, b) =>
+      Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, "ar"),
+  );
 }
 
 /** Adds a saved contact to the khatma, as `addParticipant` does for a typed one. */

@@ -209,12 +209,14 @@ test("saved lists contacts by name with inKhatma, and the organizer sees phones"
       name: "أحمد",
       phone: "+971505550003",
       inKhatma: true,
+      active: false,
     },
     {
       id: expect.any(String),
       name: "يوسف",
       phone: "+971505550002",
       inKhatma: false,
+      active: false,
     },
   ]);
 });
@@ -1143,4 +1145,67 @@ test("addSavedMany refuses more than 30 ids", async () => {
       Array.from({ length: 31 }, () => id),
     ),
   ).rejects.toThrow(/too_many/);
+});
+
+test("saved marks people who read in the organizer's other live khatmas and lists them first", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const otherCode = await rota(t, s);
+  const other = await khatmaOf(t, otherCode);
+  const phone = (n: number) => `+97150557${String(n).padStart(4, "0")}`;
+  await t.run(async (ctx) => {
+    await ctx.db.patch(other._id, {
+      rota: { ...other.rota!, setupDoneAt: NOW },
+    });
+    // A copy of it, archived.
+    const { _id, _creationTime, ...copy } = other;
+    const archivedId = await ctx.db.insert("khatmas", {
+      ...copy,
+      inviteCode: "archivedCode",
+      rota: { ...other.rota!, setupDoneAt: NOW },
+      archivedAt: NOW,
+    });
+    const reader = async (
+      khatmaId: Id<"khatmas">,
+      n: number,
+      over: Partial<Doc<"rotaParticipants">>,
+      slot: number | null,
+    ) => {
+      const id = await ctx.db.insert("rotaParticipants", {
+        khatmaId,
+        name: "x",
+        phone: phone(n),
+        personId: null,
+        addedAt: NOW,
+        removedAt: null,
+        joinedAt: NOW,
+        ...over,
+      });
+      if (slot !== null) {
+        await ctx.db.insert("rotaSlots", { khatmaId, slot, participantId: id });
+      }
+    };
+    await reader(other._id, 1, {}, 5); // reads now
+    await reader(other._id, 2, {}, null); // holds nothing
+    await reader(other._id, 3, { stoppedAt: NOW }, 6); // sent «إيقاف»
+    await reader(archivedId, 4, {}, 7); // only in an archived khatma
+    const names = ["ياسر", "باسم", "جمال", "دانة", "هالة"];
+    for (const [i, name] of names.entries()) {
+      await ctx.db.insert("rotaContacts", {
+        ownerPersonId: s.personId,
+        name,
+        phone: phone(i + 1),
+        personId: null,
+        createdAt: NOW,
+      });
+    }
+  });
+
+  expect((await saved(t, s))?.map((c) => [c.name, c.active])).toEqual([
+    ["ياسر", true],
+    ["باسم", false],
+    ["جمال", false],
+    ["دانة", false],
+    ["هالة", false],
+  ]);
 });
