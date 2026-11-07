@@ -103,7 +103,7 @@ A reading day's assignments are fixed when its juz' message goes out. After that
 
 The list has 30 rows, one per juz' of that khatma. Each row shows the reader's name and whether they've joined. An empty row says «+ أضف قارئاً للجزء ٧». Tapping it opens a sheet that adds a new person (name and WhatsApp number) or picks someone from the saved list. The sheet spells out what follows: «يقرأ الجزء ٧ في الختمة ١٢، ثم ٨ في الختمة ١٣، وهكذا». Wirdak works out the slot from the juz' and khatma number.
 
-Tapping a filled row offers: move to another juz' (a free one, or swap with the person there), give a second juz', and remove from this khatma. A change takes effect from the khatma the page shows.
+Tapping a filled row offers: move to another juz' (a free one, or swap with the person there), give a second juz', free this juz', and remove from this khatma. Freeing keeps the reader in the khatma; it shows for someone who holds more than one juz', and for the organizer or a co-organizer seen by whoever may change their ajza' (the owner, or an admin), since the organizer can't be removed. A change takes effect from the khatma the page shows.
 
 ### 3.4 Reading day timeline
 

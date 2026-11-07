@@ -24,8 +24,10 @@ type Person = View["participants"][number];
 const peopleErrors: Record<string, string> = t.rota.peopleErrors;
 
 /**
- * Someone's juz' of the next khatma: move it, add a second one, or take them out. The organizer
- * can't leave the khatma, but can stop reading: their ajza' go, and they stay its organizer.
+ * Someone's juz' of the next khatma: move it, add a second one, free it, or take them out. The
+ * organizer can't leave the khatma, but can stop reading: their ajza' go, and they stay its
+ * organizer. Whoever else may change the organizer's ajza' (the owner or an admin) frees them one
+ * at a time.
  * Only the owner takes out or moves someone who runs the khatma, swaps a juz' into theirs, or frees
  * their own ajza' (co-organizers spec 4.2): a co-organizer looking sees none of it on those rows,
  * their own included.
@@ -55,6 +57,9 @@ function PersonSheet({
   const runsKhatma = (p: { isOrganizer: boolean; isCoOrganizer: boolean }) =>
     p.isOrganizer || p.isCoOrganizer;
   const canMove = viewerIsOwner || !runsKhatma(person);
+  // A lone juz' goes with «أزله من الختمة», or «لن أقرأ جزءاً» on the organizer's own row.
+  const canFree =
+    canMove && (person.juz.length > 1 || (runsKhatma(person) && !person.isMe));
   const others = view.rows.filter(
     (row) =>
       row.juz !== juz &&
@@ -200,6 +205,25 @@ function PersonSheet({
               <span className="block">{t.rota.giveMore}</span>
               <span className="block text-base font-normal">
                 {t.rota.giveMoreHint(nextFree)}
+              </span>
+            </span>
+          </Button>
+        )}
+        {canFree && (
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                () => freeJuz({ ...args, participantId: person.id, juz }),
+                onClose,
+              )
+            }
+          >
+            <span>
+              <span className="block">{t.rota.freeThis(juz)}</span>
+              <span className="block text-base font-normal">
+                {person.isMe ? t.rota.freeThisHintMe : t.rota.freeThisHint}
               </span>
             </span>
           </Button>

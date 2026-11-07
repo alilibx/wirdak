@@ -519,6 +519,34 @@ test("the organizer's row is an ordinary row to an admin, who can't remove it", 
   expect(await auditRows(t)).toHaveLength(before);
 });
 
+test("an admin gives the organizer a second juz' and frees each, and the organizer stays", async () => {
+  const t = convexTest(schema, modules);
+  const { khatmaId } = await running(t);
+  const args = { adminToken, khatmaId };
+  const first = await t.query(api.adminRota.people, args);
+  const organizer = first?.participants.find((p) => p.isOrganizer);
+  const participantId = organizer!.id;
+  expect(organizer?.juz).toEqual([1]);
+  expect(
+    await t.mutation(api.adminRota.giveJuz, { ...args, participantId, juz: 2 }),
+  ).toEqual({ ok: true });
+
+  const before = (await auditRows(t)).length;
+  for (const juz of [2, 1]) {
+    expect(
+      await t.mutation(api.adminRota.freeJuz, { ...args, participantId, juz }),
+    ).toEqual({ ok: true });
+  }
+  const view = await t.query(api.adminRota.people, args);
+  const after = view?.participants.find((p) => p.id === participantId);
+  expect(after?.juz).toEqual([]);
+  expect(after?.isOrganizer).toBe(true);
+  expect(view?.freeJuz).toEqual(expect.arrayContaining([1, 2]));
+  const rows = await auditRows(t);
+  expect(rows).toHaveLength(before + 2);
+  expect(rows.at(-1)).toMatchObject({ note: "freeJuz" });
+});
+
 test("an admin's rename is audited, and a refused one isn't", async () => {
   const t = convexTest(schema, modules);
   const { khatmaId, readerId } = await running(t);
