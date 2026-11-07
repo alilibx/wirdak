@@ -34,8 +34,13 @@ vi.mock("convex/react", async () => {
   const { getFunctionName } = await import("convex/server");
   return {
     // The owner-only sections (the transfer picker, co-organizers) wait on queries of their own.
-    useQuery: (ref: never) =>
-      getFunctionName(ref) === "rota:settings" ? m.settings : undefined,
+    useQuery: (ref: never) => {
+      const name = getFunctionName(ref);
+      if (name === "rota:settings") return m.settings;
+      // Signed in, on the old layout.
+      if (name === "sessions:me") return { rotaNewLayout: false };
+      return undefined;
+    },
     useMutation: (ref: never) =>
       m.fns[getFunctionName(ref).split(":")[1] as keyof typeof m.fns],
     useAction: () => m.startAgain,

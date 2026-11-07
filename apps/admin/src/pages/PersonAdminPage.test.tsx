@@ -19,7 +19,11 @@ vi.mock("convex/react", async () => {
 });
 vi.mock("../lib/adminSession", () => ({ useAdminToken: () => "tok" }));
 
-const person = (blocked: boolean, rotaAllowed = false) => ({
+const person = (
+  blocked: boolean,
+  rotaAllowed = false,
+  rotaNewLayout = false,
+) => ({
   displayName: "سارة",
   phone: "+971500000002",
   timeZone: "Asia/Dubai",
@@ -37,6 +41,7 @@ const person = (blocked: boolean, rotaAllowed = false) => ({
   sessions: [{ deviceLabel: "iPhone · Safari", lastUsedAt: 0 }],
   helpRequests: [],
   rotaAllowed,
+  rotaNewLayout,
   whatsappNotes: false,
   blocked,
 });
@@ -134,6 +139,41 @@ describe("PersonAdminPage", () => {
       adminToken: "tok",
       personId: "p2",
       allowed: false,
+    });
+  });
+
+  it("turns the new rota layout on after a confirmation", async () => {
+    renderPage();
+    const toggle = screen.getByRole("switch", { name: t.ops.rotaNewLayout });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    await userEvent.click(toggle);
+    expect(m.mutation).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole("button", { name: t.ops.rotaNewLayoutOn }),
+    );
+    expect(m.mutation).toHaveBeenCalledWith("adminOps:setRotaNewLayout", {
+      adminToken: "tok",
+      personId: "p2",
+      on: true,
+    });
+  });
+
+  it("turns the new rota layout off for someone who has it", async () => {
+    m.person = person(false, false, true);
+    renderPage();
+    const toggle = screen.getByRole("switch", { name: t.ops.rotaNewLayout });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByRole("switch", { name: t.ops.rotaAllowed }),
+    ).toHaveAttribute("aria-checked", "false");
+    await userEvent.click(toggle);
+    await userEvent.click(
+      screen.getByRole("button", { name: t.ops.rotaNewLayoutOff }),
+    );
+    expect(m.mutation).toHaveBeenCalledWith("adminOps:setRotaNewLayout", {
+      adminToken: "tok",
+      personId: "p2",
+      on: false,
     });
   });
 });

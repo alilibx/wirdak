@@ -162,6 +162,8 @@ export type PeopleView = {
   maxSlots: number;
   /** A local number from the organizer's country, for the phone field's hint. */
   phoneExample: string | null;
+  /** The list opens with the box about juz' left without a reader (`rotaLeftoverBoxOn`). */
+  leftoverBox: boolean;
 };
 
 /** A number typed without a country code is one from the organizer's country. */
@@ -344,6 +346,7 @@ export async function people(
     freeJuz: freeJuzOf(byJuz),
     maxSlots: await getSetting(ctx, "rotaMaxSlotsPerPerson"),
     phoneExample: localPhoneExample(homeCountry(organizer)),
+    leftoverBox: await getSetting(ctx, "rotaLeftoverBoxOn"),
   };
 }
 

@@ -717,6 +717,73 @@ test("an admin turns rotating khatmas on and off for a person, with one audit ro
   expect(await audit(t)).toHaveLength(2);
 });
 
+test("an admin turns the new rota layout on and off for a person, audited and with no note", async () => {
+  const t = convexTest(schema, modules);
+  const adminId = await admin(t);
+  const sara = await person(t, "+971500000002", "سارة");
+  const flag = () =>
+    t.run(async (ctx) => (await ctx.db.get(sara))?.rotaNewLayout);
+  const lookup = () =>
+    t.query(api.adminLookup.person, { adminToken: "admin", personId: sara });
+
+  expect(await lookup()).toMatchObject({ rotaNewLayout: false });
+  expect(
+    await t.mutation(api.adminOps.setRotaNewLayout, {
+      adminToken: "admin",
+      personId: sara,
+      on: true,
+      note: "trying it early",
+    }),
+  ).toEqual({ ok: true });
+  expect(await flag()).toBe(true);
+  expect(await lookup()).toMatchObject({ rotaNewLayout: true });
+  expect(await audit(t)).toMatchObject([
+    {
+      adminId,
+      action: "person.rotaNewLayout",
+      targetKind: "person",
+      targetId: sara,
+      before: { rotaNewLayout: false },
+      after: { rotaNewLayout: true },
+      note: "trying it early",
+    },
+  ]);
+  expect(await t.run((ctx) => ctx.db.query("notes").collect())).toEqual([]);
+
+  await t.mutation(api.adminOps.setRotaNewLayout, {
+    adminToken: "admin",
+    personId: sara,
+    on: false,
+  });
+  expect(await flag()).toBe(false);
+  expect(await audit(t)).toMatchObject([
+    { after: { rotaNewLayout: true } },
+    { before: { rotaNewLayout: true }, after: { rotaNewLayout: false } },
+  ]);
+});
+
+test("setting the new rota layout for a person who is gone is not_found, and needs an admin", async () => {
+  const t = convexTest(schema, modules);
+  await admin(t);
+  const sara = await person(t, "+971500000002", "سارة");
+  await expect(
+    t.mutation(api.adminOps.setRotaNewLayout, {
+      adminToken: "member",
+      personId: sara,
+      on: true,
+    }),
+  ).rejects.toThrow(/not_admin/);
+  await t.run((ctx) => ctx.db.delete(sara));
+  expect(
+    await t.mutation(api.adminOps.setRotaNewLayout, {
+      adminToken: "admin",
+      personId: sara,
+      on: true,
+    }),
+  ).toEqual({ error: "not_found" });
+  expect(await audit(t)).toHaveLength(0);
+});
+
 test("turning rotating khatmas on tells the person on their newest khatma, once, and not when turning off", async () => {
   const t = convexTest(schema, modules);
   await admin(t);

@@ -380,8 +380,9 @@ export function PeoplePanel({
 
       {!archived && <JoinRequests inviteCode={inviteCode} view={view} />}
 
-      {/* Above the 30 rows, so the organizer sees what is left without scrolling. */}
-      {!archived && view.freeJuz.length > 0 && (
+      {/* Above the 30 rows, so the organizer sees what is left without scrolling. An admin
+          can turn the box off; the open rows still invite an add. */}
+      {!archived && view.leftoverBox && view.freeJuz.length > 0 && (
         <section className="mt-4 grid gap-3 rounded-ui border-2 border-gold bg-[#FBF1D9] p-4">
           <p className="font-medium">{t.rota.leftover(view.freeJuz)}</p>
           <SpreadFreeJuz

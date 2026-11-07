@@ -704,7 +704,7 @@ export const ar = {
       not_found: "لم نجد هذا الشخص.",
     } as Record<string, string>,
     done: "تمّ",
-    tabs: { today: "اليوم", people: "المشاركون" },
+    tabs: { today: "اليوم", people: "المشاركون", settings: "الإعدادات" },
     whatsappOnly: "هذه الختمة تعمل على واتساب. يصلك جزؤك كل يوم مع زرّين.",
     imOrganizer: "أنت المنظّم؟ سجّل الدخول",
     joinOnWhatsApp: "انضمّ عبر واتساب",
@@ -759,6 +759,11 @@ export const ar = {
     completeBanner: (number: number) =>
       `اكتملت الختمة ${toArabicDigits(number)}. تقبّل الله منكم.`,
     gridLabel: "أجزاء اليوم",
+    /** The day card's button, read out in full: the visible card is a summary. */
+    dayCardOpen: (number: number, done: number, total: number) =>
+      `الختمة ${toArabicDigits(number)}: ${toArabicDigits(done)} من ${toArabicDigits(total)} تمّت قراءتها. افتح الأجزاء`,
+    dayCardMore: "الأجزاء",
+    startCardHeading: "موعد البداية",
     legendDone: "تمّ",
     legendUnread: "لم يُقرأ",
     legendReassigned: "أُسند",

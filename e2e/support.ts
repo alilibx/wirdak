@@ -81,6 +81,11 @@ export async function allowRota(phone: string): Promise<void> {
   await convexRun("dev:allowRota", { phone: `+${phone}` });
 }
 
+/** Turns the new rota page layout on for the verified person who sent from `phone` (digits only), as an admin would (dev-only helper). */
+export async function rotaNewLayout(phone: string): Promise<void> {
+  await convexRun("dev:rotaNewLayout", { phone: `+${phone}` });
+}
+
 /** A session token for the admin with this number, who is made if new (dev-only helper). */
 export async function adminSession(phone: string): Promise<string> {
   const stdout = await convexRun("dev:adminSession", { phone });

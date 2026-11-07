@@ -12,6 +12,7 @@ import {
   sessionMutation,
   sessionQuery,
 } from "./lib/session";
+import { getSetting } from "./lib/settings";
 import { maskPhone } from "./lib/text";
 
 /** Inserts a session row; callers pass hashes, never raw tokens. */
@@ -72,6 +73,10 @@ export const me = sessionQuery({
       displayName: ctx.person.displayName,
       maskedPhone: maskPhone(ctx.person.phone),
       whatsappNotes: ctx.person.whatsappNotes === true,
+      /** The new rota page layout: on for everyone, or for this person by an admin. */
+      rotaNewLayout:
+        (await getSetting(ctx, "rotaNewLayoutOn")) ||
+        ctx.person.rotaNewLayout === true,
     };
   },
 });

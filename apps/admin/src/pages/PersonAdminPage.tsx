@@ -13,7 +13,14 @@ import { t } from "../i18n/ar";
 import { useAdminToken } from "../lib/adminSession";
 import { opsError, withNote } from "../lib/opsError";
 
-type Op = "signOutAll" | "block" | "unblock" | "rotaAllowOn" | "rotaAllowOff";
+type Op =
+  | "signOutAll"
+  | "block"
+  | "unblock"
+  | "rotaAllowOn"
+  | "rotaAllowOff"
+  | "rotaNewLayoutOn"
+  | "rotaNewLayoutOff";
 
 /** A person's account for an admin: never their reading (spec 8). */
 export function PersonAdminPage() {
@@ -24,8 +31,10 @@ export function PersonAdminPage() {
   const block = useMutation(api.adminOps.blockPhone);
   const unblock = useMutation(api.adminOps.unblockPhone);
   const setRotaAllowed = useMutation(api.adminOps.setRotaAllowed);
+  const setRotaNewLayout = useMutation(api.adminOps.setRotaNewLayout);
   const update = useMutation(api.adminPeople.update);
   const rotaLabelId = useId();
+  const layoutLabelId = useId();
   const [op, setOp] = useState<Op | null>(null);
   const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -46,12 +55,23 @@ export function PersonAdminPage() {
               ? await unblock(
                   withNote({ adminToken, phone: person.phone }, note),
                 )
-              : await setRotaAllowed(
-                  withNote(
-                    { adminToken, personId, allowed: which === "rotaAllowOn" },
-                    note,
-                  ),
-                );
+              : which === "rotaNewLayoutOn" || which === "rotaNewLayoutOff"
+                ? await setRotaNewLayout(
+                    withNote(
+                      { adminToken, personId, on: which === "rotaNewLayoutOn" },
+                      note,
+                    ),
+                  )
+                : await setRotaAllowed(
+                    withNote(
+                      {
+                        adminToken,
+                        personId,
+                        allowed: which === "rotaAllowOn",
+                      },
+                      note,
+                    ),
+                  );
       setMessage("error" in res ? opsError(String(res.error)) : t.ops.done);
     } catch {
       setMessage(opsError("generic"));
@@ -148,6 +168,16 @@ export function PersonAdminPage() {
           checked={p.rotaAllowed}
           labelledBy={rotaLabelId}
           onToggle={() => setOp(p.rotaAllowed ? "rotaAllowOff" : "rotaAllowOn")}
+        />
+      </section>
+      <section className="flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
+        <span id={layoutLabelId}>{t.ops.rotaNewLayout}</span>
+        <RotaSwitch
+          checked={p.rotaNewLayout}
+          labelledBy={layoutLabelId}
+          onToggle={() =>
+            setOp(p.rotaNewLayout ? "rotaNewLayoutOff" : "rotaNewLayoutOn")
+          }
         />
       </section>
 

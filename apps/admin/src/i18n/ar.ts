@@ -89,6 +89,8 @@ const labels: Record<SettingKey, string> = {
   oldOwnerStaysOn: "بقاء المالك السابق منظّماً مساعداً بعد النقل",
   rotaSharedSlotsOn: "قارئ ثانٍ لجزء في الختمة بالتناوب",
   rotaHalfCountsAsSlot: "النصف يُحسب جزءاً في حدّ القارئ",
+  rotaNewLayoutOn: "الشكل الجديد لصفحة الختمة بالتناوب للجميع",
+  rotaLeftoverBoxOn: "مربع الأجزاء التي بلا قارئ في قائمة المشاركين",
 };
 
 const groups: Record<SettingGroup, string> = {
@@ -153,6 +155,7 @@ const actions: Record<AuditAction, string> = {
   "khatma.coOrganizerRemove": "أزال منظّمًا مساعدًا من ختمة",
   "person.update": "عدّل بيانات شخص",
   "person.rotaAllowed": "غيّر السماح بالختمة بالتناوب",
+  "person.rotaNewLayout": "غيّر الشكل الجديد لصفحة الختمة بالتناوب",
   "rota.adminCreate": "أنشأ ختمة بالتناوب نيابة عن منظّم",
   "rota.adminChange": "غيّر ختمة بالتناوب",
 };
@@ -434,6 +437,13 @@ export const ar = {
     rotaAllowOff: "إيقاف الختمة بالتناوب",
     rotaAllowOffBody:
       "لا يستطيع إنشاء ختمات جديدة بالتناوب. تبقى ختماته الحالية كما هي.",
+    rotaNewLayout: "الشكل الجديد لصفحة الختمة بالتناوب",
+    rotaNewLayoutOn: "تشغيل الشكل الجديد",
+    rotaNewLayoutOnBody:
+      "يرى هذا الشخص الشكل الجديد لصفحة الختمة بالتناوب في ختماته. لا تصله رسالة بذلك.",
+    rotaNewLayoutOff: "إيقاف الشكل الجديد",
+    rotaNewLayoutOffBody:
+      "يعود إلى الشكل الحالي، إلا إذا كان الشكل الجديد مفعّلاً للجميع في الإعدادات.",
     signOutAll: "إنهاء كل الجلسات",
     signOutAllBody:
       "يخرج هذا الشخص من كل أجهزته الآن، ويتوقف وصول التنبيهات إليها.",

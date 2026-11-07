@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { OrganizerAccess } from "@convex/lib/organizerAuth";
+import type { TodayView } from "@convex/lib/rotaOps";
 import type { NoteView } from "@convex/notes";
 import { useMutation, useQuery } from "convex/react";
 import { useId, useState } from "react";
@@ -17,18 +18,34 @@ import { DeletingPage, useDeleting } from "../features/khatma/deleting";
 import { useSignInSheet } from "../features/verify/useSignInSheet";
 import { useRotaBackend } from "../features/rota/backend";
 import { ErrorLine } from "../features/rota/ErrorLine";
+import { DayCard } from "../features/rota/DayCard";
 import { PeoplePanel } from "../features/rota/PeoplePanel";
-import { TodayPanel } from "../features/rota/TodayPanel";
+import {
+  noDayLine,
+  StartKhatma,
+  TodayPanel,
+} from "../features/rota/TodayPanel";
 import { useRotaCall } from "../features/rota/useRotaCall";
 import { t } from "../i18n/ar";
 import { getSessionToken, useSessionToken } from "../lib/session";
+import { RotaSettingsContent } from "./RotaSettingsPage";
 
-type RotaTab = "today" | "people";
+type RotaTab = "today" | "people" | "settings";
 
 const TABS = [
   { id: "today", label: t.rota.tabs.today },
   { id: "people", label: t.rota.tabs.people },
 ] as const satisfies readonly { id: RotaTab; label: string }[];
+
+/** The new layout's tabs: the people first, then the settings; the day is a card above them. */
+const NEW_TABS = [
+  { id: "people", label: t.rota.tabs.people },
+  { id: "settings", label: t.rota.tabs.settings },
+] as const satisfies readonly { id: RotaTab; label: string }[];
+
+/** The `?tab=` value, whichever layout reads it. */
+const parseRotaTab = (value: string | null): RotaTab =>
+  value === "people" || value === "settings" ? value : "today";
 
 /** Whether this access opens the organizer's page: the owner, or a co-organizer with a switch on. */
 const runsKhatma = (
@@ -145,6 +162,59 @@ function RotaNotes({ notes }: { notes: NoteView[] }) {
 }
 
 /**
+ * The new layout's day, above the tabs: the pause banner, the start button while setup is
+ * unfinished, and the open day as a card. With no open day, only the line that the days have
+ * ended, or when the khatma starts when the viewer has no Settings tab to read it in.
+ */
+function AboveTabs({
+  inviteCode,
+  view,
+  canStart,
+  sayStart,
+}: {
+  inviteCode: string;
+  view: TodayView;
+  canStart: boolean;
+  sayStart: boolean;
+}) {
+  const unfinished = !view.setupDone && !view.archived;
+  const line = noDayLine(view, view.dayAt);
+  const showLine =
+    view.day === null &&
+    !unfinished &&
+    line !== null &&
+    (sayStart || view.next.date === null);
+  return (
+    <>
+      {view.paused && !view.archived && (
+        <p
+          role="note"
+          className="mt-4 rounded-ui border-2 border-gold bg-[#FBF1D9] p-3 font-medium"
+        >
+          {t.rota.pausedBanner}
+        </p>
+      )}
+      {unfinished && (
+        <div className="mt-4">
+          <StartKhatma inviteCode={inviteCode} canStart={canStart} />
+        </div>
+      )}
+      {showLine && (
+        <p className="mt-4 rounded-ui border-2 border-line bg-card p-4 text-xl leading-relaxed">
+          {line}
+        </p>
+      )}
+      <DayCard
+        inviteCode={inviteCode}
+        view={view}
+        dayAt={view.dayAt}
+        timeZone={view.timeZone}
+      />
+    </>
+  );
+}
+
+/**
  * A rotating khatma's page: the organizer's Today and People tabs, or the short WhatsApp page for
  * anyone else. A co-organizer gets the tabs their switches open: Today with Readings, People with
  * People, the settings link with Settings; with none on, the WhatsApp page like any member.
@@ -183,16 +253,22 @@ export function RotaKhatmaPage({
     api.notes.forKhatma,
     organizer ? { sessionToken, inviteCode } : "skip",
   );
-  const tabs = TABS.filter((item) =>
-    item.id === "today" ? organizer?.readings : organizer?.people,
-  );
-  const asked: RotaTab = search.get("tab") === "people" ? "people" : "today";
-  // A tab the viewer can't open falls back to the one they can.
-  const tab: RotaTab = tabs.some((item) => item.id === asked)
-    ? asked
-    : (tabs[0]?.id ?? "today");
   const mine = useQuery(api.khatmas.mine, { sessionToken });
   const me = useQuery(api.sessions.me, { sessionToken });
+  // The new layout, while it is tried: an admin turns it on for everyone or for one person.
+  const newLayout = me?.rotaNewLayout === true;
+  const tabs: readonly { id: RotaTab; label: string }[] = newLayout
+    ? NEW_TABS.filter((item) =>
+        item.id === "people" ? organizer?.people : organizer?.settings,
+      )
+    : TABS.filter((item) =>
+        item.id === "today" ? organizer?.readings : organizer?.people,
+      );
+  const asked = parseRotaTab(search.get("tab"));
+  // A tab the viewer can't open falls back to the first one they can.
+  const tab: RotaTab | null = tabs.some((item) => item.id === asked)
+    ? asked
+    : (tabs[0]?.id ?? null);
   const signIn = useSignInSheet();
   const [switching, setSwitching] = useState(false);
   const deleting = useDeleting(inviteCode);
@@ -202,7 +278,8 @@ export function RotaKhatmaPage({
     setSearch(
       (current) => {
         const params = new URLSearchParams(current);
-        if (next === "today") params.delete("tab");
+        // Each layout's first tab is the plain address.
+        if (next === (newLayout ? "people" : "today")) params.delete("tab");
         else params.set("tab", next);
         return params;
       },
@@ -271,7 +348,8 @@ export function RotaKhatmaPage({
           {settings?.name ?? name ?? t.app.name}
         </h1>
         <div className="mt-2 flex flex-wrap gap-2">
-          {organizer.settings && (
+          {/* The new layout has Settings as a tab instead. */}
+          {organizer.settings && !newLayout && (
             <Link
               to={`/j/${encodeURIComponent(inviteCode)}/settings`}
               className={pill}
@@ -291,10 +369,24 @@ export function RotaKhatmaPage({
         </div>
 
         {isArchived && <ArchivedBanner />}
-        {tabs.length > 1 && (
+        {newLayout && (
+          <>
+            <RotaNotes notes={notes ?? []} />
+            {today && (
+              <AboveTabs
+                inviteCode={inviteCode}
+                view={today}
+                canStart={organizer.settings}
+                // Settings says when the khatma starts; without it, this is the only place.
+                sayStart={!organizer.settings}
+              />
+            )}
+          </>
+        )}
+        {tabs.length > 1 && tab !== null && (
           <KhatmaTabs tab={tab} onChange={setTab} idPrefix={ids} tabs={tabs} />
         )}
-        {tabs.length > 0 && (
+        {tab !== null && (
           <section
             {...(tabs.length > 1
               ? {
@@ -304,7 +396,14 @@ export function RotaKhatmaPage({
                 }
               : {})}
           >
-            {tab === "today" && today ? (
+            {tab === "settings" && settings ? (
+              <RotaSettingsContent
+                settings={settings}
+                inviteCode={inviteCode}
+                headingLevel="h2"
+                inTab
+              />
+            ) : tab === "today" && today ? (
               <>
                 <RotaNotes notes={notes ?? []} />
                 <TodayPanel
@@ -318,7 +417,9 @@ export function RotaKhatmaPage({
             ) : (
               <>
                 {/* Without Today, the notes their switches bring them sit here. */}
-                {!organizer.readings && <RotaNotes notes={notes ?? []} />}
+                {!newLayout && !organizer.readings && (
+                  <RotaNotes notes={notes ?? []} />
+                )}
                 <PeoplePanel
                   inviteCode={inviteCode}
                   archived={isArchived}
@@ -328,7 +429,8 @@ export function RotaKhatmaPage({
             )}
           </section>
         )}
-        {isArchived && organizer.owner && settings && (
+        {/* The Settings tab has these itself. */}
+        {isArchived && organizer.owner && settings && tab !== "settings" && (
           <ArchivedSection
             inviteCode={inviteCode}
             restart={{ days: settings.days, timeZone: settings.timeZone }}

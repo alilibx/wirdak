@@ -74,8 +74,43 @@ test("me returns null without a session and the person with one", async () => {
     displayName: "علي",
     maskedPhone: "+971 50 ••• 4567",
     whatsappNotes: false,
+    rotaNewLayout: false,
   });
   expect(await t.query(api.sessions.me, { sessionToken: "wrong" })).toBeNull();
+});
+
+test("me has the new rota layout when it is on for everyone or for the person", async () => {
+  const t = convexTest(schema, modules);
+  const personId = await addPerson(t, "+971501234567");
+  await addSession(t, personId, "tok_1", "al_1");
+  const newLayout = async () =>
+    (await t.query(api.sessions.me, { sessionToken: "tok_1" }))?.rotaNewLayout;
+  const setGlobal = (value: boolean) =>
+    t.run(async (ctx) => {
+      const row = await ctx.db
+        .query("settings")
+        .withIndex("by_key", (q) => q.eq("key", "rotaNewLayoutOn"))
+        .first();
+      if (row) await ctx.db.patch(row._id, { value });
+      else
+        await ctx.db.insert("settings", {
+          key: "rotaNewLayoutOn",
+          value,
+          updatedAt: 0,
+        });
+    });
+
+  expect(await newLayout()).toBe(false);
+  await t.run((ctx) => ctx.db.patch(personId, { rotaNewLayout: true }));
+  expect(await newLayout()).toBe(true);
+  await t.run((ctx) => ctx.db.patch(personId, { rotaNewLayout: false }));
+  await setGlobal(true);
+  expect(await newLayout()).toBe(true);
+  await t.run((ctx) => ctx.db.patch(personId, { rotaNewLayout: true }));
+  expect(await newLayout()).toBe(true);
+  await setGlobal(false);
+  await t.run((ctx) => ctx.db.patch(personId, { rotaNewLayout: false }));
+  expect(await newLayout()).toBe(false);
 });
 
 test("me is null when the session's person no longer exists", async () => {

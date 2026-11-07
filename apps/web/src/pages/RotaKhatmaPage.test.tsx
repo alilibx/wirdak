@@ -99,6 +99,8 @@ vi.mock("convex/react", async () => {
       if (name === "sessions:me") return m.me;
       if (name === "notes:forKhatma") return m.notes;
       if (name === "publicSettings:get") return undefined;
+      // The Settings tab's co-organizer list waits on its own query.
+      if (name.includes("oOrganizers")) return undefined;
       throw new Error(`unexpected query ${name}`);
     },
     useMutation: (ref: never) =>
@@ -224,6 +226,7 @@ function peopleView(
       (j) => !byJuz.has(j),
     ),
     maxSlots: 3,
+    leftoverBox: true,
     phoneExample: null,
   };
 }
@@ -1515,5 +1518,200 @@ describe("People", () => {
         screen.queryByRole("region", { name: t.rota.requestsHeading }),
       ).toBeNull();
     });
+  });
+});
+
+describe("the new layout", () => {
+  const ownerSettings = { ...settings, access: OWNER, archived: false };
+  beforeEach(() => {
+    m.me = { displayName: "علي", rotaNewLayout: true };
+    m.settings = ownerSettings;
+  });
+  const tabNames = () =>
+    screen.getAllByRole("tab").map((tab) => tab.textContent);
+  const openCard = (user: ReturnType<typeof userEvent.setup>) =>
+    user.click(
+      screen.getByRole("button", { name: t.rota.dayCardOpen(12, 27, 30) }),
+    );
+
+  it("opens on the people, with Settings as the second tab and no settings link", () => {
+    renderAt();
+    expect(tabNames()).toEqual([t.rota.tabs.people, t.rota.tabs.settings]);
+    expect(
+      screen.getByRole("tab", { name: t.rota.tabs.people }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(
+      screen.queryByRole("link", { name: t.khatmaSettings.link }),
+    ).toBeNull();
+    expect(screen.getByText(t.rota.addReader(5))).toBeInTheDocument();
+  });
+
+  it("shows the open day as a card above the tabs", () => {
+    renderAt();
+    const card = screen.getByRole("region", {
+      name: "الختمة ١٢ · الثلاثاء ١٠ نوفمبر",
+    });
+    expect(card).toHaveTextContent("٢٧ / ٣٠");
+    expect(card).toHaveTextContent("التالي: الختمة ١٣ · غداً ٨:٠٠ ص");
+    expect(
+      card.compareDocumentPosition(screen.getByRole("tablist")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByRole("region", { name: t.rota.gridLabel })).toBeNull();
+  });
+
+  it("the card opens the 30 ajza', a tile opens its sheet, and closing it goes back to the tiles", async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await openCard(user);
+    expect(within(grid()).getAllByRole("button")).toHaveLength(30);
+    await user.click(
+      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+    );
+    const sheet = screen.getByRole("dialog", { name: "الجزء ٨ لم يُقرأ بعد" });
+    expect(within(sheet).getByText("صاحبه اليوم: سارة")).toBeInTheDocument();
+    await user.click(
+      within(sheet).getByRole("button", { name: t.sheet.close }),
+    );
+    expect(within(grid()).getAllByRole("button")).toHaveLength(30);
+  });
+
+  it("marks a juz' done from the card's tiles", async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await openCard(user);
+    await user.click(
+      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+    );
+    await user.click(screen.getByRole("button", { name: t.rota.markDone }));
+    expect(m.fns.markDone).toHaveBeenCalledWith({ ...args, readId: "r8" });
+  });
+
+  it("says when the day is complete, under the card", () => {
+    m.today = todayView({
+      day: {
+        number: 12,
+        cycle: 1,
+        date: "2026-11-10",
+        doneCount: 30,
+        completedAt: 1,
+      },
+    });
+    renderAt();
+    expect(screen.getByText(/^اكتملت الختمة ١٢/)).toHaveAttribute(
+      "role",
+      "status",
+    );
+  });
+
+  it("before the first day shows no card and no start line, and Settings says when it starts", async () => {
+    m.today = todayView({
+      day: null,
+      tiles: [],
+      next: { number: 1, date: "2026-10-30" },
+    });
+    m.settings = { ...ownerSettings, firstDatePassed: false };
+    const user = userEvent.setup();
+    renderAt();
+    const start = "تبدأ الختمة ١ يوم الجمعة ٣٠ أكتوبر الساعة ٨:٠٠ ص";
+    expect(screen.queryByText(start)).toBeNull();
+    expect(screen.queryByRole("button", { name: /افتح الأجزاء/ })).toBeNull();
+    await user.click(screen.getByRole("tab", { name: t.rota.tabs.settings }));
+    const card = screen.getByRole("region", { name: t.rota.startCardHeading });
+    expect(card).toHaveTextContent(start);
+    expect(
+      screen.queryByRole("heading", { name: t.khatmaSettings.link }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("region", { name: t.rota.pauseHeading }),
+    ).toBeInTheDocument();
+  });
+
+  it("Settings has no start card once the khatma has started", () => {
+    renderAt("/j/CODE?tab=settings");
+    expect(
+      screen.getByRole("tab", { name: t.rota.tabs.settings }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(
+      screen.queryByRole("region", { name: t.rota.startCardHeading }),
+    ).toBeNull();
+  });
+
+  it("asks to start an unfinished khatma above the tabs", async () => {
+    m.today = todayView({
+      day: null,
+      tiles: [],
+      setupDone: false,
+      next: { number: 1, date: "2026-11-10" },
+    });
+    const user = userEvent.setup();
+    renderAt();
+    expect(screen.getByText(t.rota.setupNotDone)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: t.rota.startKhatma }));
+    expect(m.fns.finishSetup).toHaveBeenCalledWith(args);
+  });
+
+  it("shows the pause banner and the notes above the tabs, whichever tab is open", () => {
+    m.today = todayView({
+      day: null,
+      tiles: [],
+      paused: true,
+      next: { number: 13, date: null },
+    });
+    m.notes = [
+      {
+        noteId: "n1",
+        kind: "rotaSummary",
+        juz: [1],
+        count: 1,
+        until: null,
+        createdAt: 1,
+      },
+    ];
+    renderAt("/j/CODE?tab=settings");
+    expect(screen.getByText(t.rota.pausedBanner)).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: t.notes.heading }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(t.rota.ended)).toBeNull();
+  });
+
+  it("says the days have ended above the tabs", () => {
+    m.today = todayView({
+      day: null,
+      tiles: [],
+      next: { number: 13, date: null },
+    });
+    renderAt();
+    expect(screen.getByText(t.rota.ended)).toBeInTheDocument();
+  });
+
+  it("a co-organizer with only Readings gets the card and no tabs, and is told when it starts", () => {
+    m.access = coOrganizer({ readings: true });
+    m.today = todayView({
+      day: null,
+      tiles: [],
+      next: { number: 1, date: "2026-10-30" },
+    });
+    renderAt();
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(
+      screen.getByText("تبدأ الختمة ١ يوم الجمعة ٣٠ أكتوبر الساعة ٨:٠٠ ص"),
+    ).toBeInTheDocument();
+  });
+
+  it("a co-organizer with People and Settings gets both tabs but no card without Readings", () => {
+    m.access = coOrganizer({ people: true, settings: true });
+    m.settings = { ...ownerSettings, access: m.access };
+    renderAt();
+    expect(tabNames()).toEqual([t.rota.tabs.people, t.rota.tabs.settings]);
+    expect(screen.queryByRole("button", { name: /افتح الأجزاء/ })).toBeNull();
+  });
+
+  it("an old link to the Today tab opens the people", () => {
+    renderAt("/j/CODE?tab=today");
+    expect(
+      screen.getByRole("tab", { name: t.rota.tabs.people }),
+    ).toHaveAttribute("aria-selected", "true");
   });
 });
