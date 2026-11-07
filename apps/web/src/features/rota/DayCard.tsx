@@ -1,6 +1,6 @@
 import type { Id } from "@convex/_generated/dataModel";
 import type { TodayView } from "@convex/lib/rotaOps";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Sheet } from "../../components/Sheet";
 import { t } from "../../i18n/ar";
 import { formatIsoDate } from "./format";
@@ -31,6 +31,7 @@ export function DayCard({
 }) {
   const [gridOpen, setGridOpen] = useState(false);
   const [openRead, setOpenRead] = useState<Id<"rotaReads"> | null>(null);
+  const cardButton = useRef<HTMLButtonElement>(null);
   const { day } = view;
   if (day === null) return null;
   const total = view.tiles.length;
@@ -45,6 +46,7 @@ export function DayCard({
     >
       <button
         type="button"
+        ref={cardButton}
         aria-haspopup="dialog"
         aria-label={t.rota.dayCardOpen(day.number, day.doneCount, total)}
         onClick={() => setGridOpen(true)}
@@ -108,7 +110,14 @@ export function DayCard({
       )}
 
       {gridOpen && open === null && (
-        <Sheet title={heading} onClose={() => setGridOpen(false)}>
+        <Sheet
+          title={heading}
+          onClose={() => {
+            setGridOpen(false);
+            // After a tile's sheet the grid's own opener is gone: focus goes back to the card.
+            requestAnimationFrame(() => cardButton.current?.focus());
+          }}
+        >
           <p className="text-ink-soft">
             {t.rota.progress(day.doneCount, total)} {t.rota.readToday}
           </p>

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ConvexError } from "convex/values";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -1674,6 +1674,41 @@ describe("the new layout", () => {
       screen.getByRole("region", { name: t.notes.heading }),
     ).toBeInTheDocument();
     expect(screen.queryByText(t.rota.ended)).toBeNull();
+  });
+
+  it("between reading days tells the owner when the next one starts", () => {
+    m.today = todayView({
+      day: null,
+      tiles: [],
+      next: { number: 13, date: "2026-11-17" },
+    });
+    renderAt();
+    expect(
+      screen.getByText("تبدأ الختمة ١٣ يوم الثلاثاء ١٧ نوفمبر الساعة ٨:٠٠ ص"),
+    ).toBeInTheDocument();
+  });
+
+  it("waits for who is looking before drawing either layout", () => {
+    m.me = undefined;
+    renderAt();
+    expect(screen.getByText(t.common.loading)).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).toBeNull();
+  });
+
+  it("closing the tiles gives focus back to the day card, also after a tile's sheet", async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await openCard(user);
+    await user.click(
+      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+    );
+    await user.click(screen.getByRole("button", { name: t.sheet.close }));
+    await user.click(screen.getByRole("button", { name: t.sheet.close }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: t.rota.dayCardOpen(12, 27, 30) }),
+      ).toHaveFocus(),
+    );
   });
 
   it("says the days have ended above the tabs", () => {

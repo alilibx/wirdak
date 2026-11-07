@@ -246,6 +246,18 @@ export function StartKhatma({
   );
 }
 
+/** The note that the khatma is paused: no messages, and the khatma number stays. */
+export function PausedBanner({ className = "" }: { className?: string }) {
+  return (
+    <p
+      role="note"
+      className={`rounded-ui border-2 border-gold bg-[#FBF1D9] p-3 font-medium ${className}`}
+    >
+      {t.rota.pausedBanner}
+    </p>
+  );
+}
+
 /**
  * With no open day: when the first or next one starts, or that the dates have run out. Null
  * while paused, which has its own banner.
@@ -335,14 +347,7 @@ export function TodayPanel({
 
   return (
     <div className="mt-4">
-      {view.paused && !view.archived && (
-        <p
-          role="note"
-          className="mb-3 rounded-ui border-2 border-gold bg-[#FBF1D9] p-3 font-medium"
-        >
-          {t.rota.pausedBanner}
-        </p>
-      )}
+      {view.paused && !view.archived && <PausedBanner className="mb-3" />}
 
       {day === null ? (
         noDay

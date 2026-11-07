@@ -22,6 +22,7 @@ import { DayCard } from "../features/rota/DayCard";
 import { PeoplePanel } from "../features/rota/PeoplePanel";
 import {
   noDayLine,
+  PausedBanner,
   StartKhatma,
   TodayPanel,
 } from "../features/rota/TodayPanel";
@@ -163,8 +164,8 @@ function RotaNotes({ notes }: { notes: NoteView[] }) {
 
 /**
  * The new layout's day, above the tabs: the pause banner, the start button while setup is
- * unfinished, and the open day as a card. With no open day, only the line that the days have
- * ended, or when the khatma starts when the viewer has no Settings tab to read it in.
+ * unfinished, and the open day as a card. With no open day, the line of when the next day comes or
+ * that the days have ended; before khatma 1 only for a viewer with no Settings tab to read it in.
  */
 function AboveTabs({
   inviteCode,
@@ -179,21 +180,13 @@ function AboveTabs({
 }) {
   const unfinished = !view.setupDone && !view.archived;
   const line = noDayLine(view, view.dayAt);
+  // Before khatma 1 the Settings tab says when it starts; between later days, only this does.
+  const first = view.next.number === 1 && view.next.date !== null;
   const showLine =
-    view.day === null &&
-    !unfinished &&
-    line !== null &&
-    (sayStart || view.next.date === null);
+    view.day === null && !unfinished && line !== null && (sayStart || !first);
   return (
     <>
-      {view.paused && !view.archived && (
-        <p
-          role="note"
-          className="mt-4 rounded-ui border-2 border-gold bg-[#FBF1D9] p-3 font-medium"
-        >
-          {t.rota.pausedBanner}
-        </p>
-      )}
+      {view.paused && !view.archived && <PausedBanner className="mt-4" />}
       {unfinished && (
         <div className="mt-4">
           <StartKhatma inviteCode={inviteCode} canStart={canStart} />
@@ -294,7 +287,9 @@ export function RotaKhatmaPage({
   if (
     organizer &&
     ((organizer.readings && today === undefined) ||
-      (organizer.settings && settings === undefined))
+      (organizer.settings && settings === undefined) ||
+      // Which layout to draw: without it the old one would flash first.
+      me === undefined)
   ) {
     return <Loading />;
   }
