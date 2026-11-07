@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.0](https://github.com/alilibx/wirdak/compare/v0.11.0...v0.12.0) (2026-11-07)
+
+
+### Features
+
+* **rota:** members-first organizer page with the day as a card, behind a switch ([#71](https://github.com/alilibx/wirdak/issues/71)) ([ca0b529](https://github.com/alilibx/wirdak/commit/ca0b529ccb391b82bbc173a853eb2f33c786cb9b))
+
+
+### Bug Fixes
+
+* **rota:** free one juz' from a reader's sheet, the organizer's too ([#70](https://github.com/alilibx/wirdak/issues/70)) ([f4fc195](https://github.com/alilibx/wirdak/commit/f4fc195f99595c0cde633876ecfd1bd047dd9d1f))
+
 ## [0.11.0](https://github.com/alilibx/wirdak/compare/v0.10.0...v0.11.0) (2026-11-06)
 
 
