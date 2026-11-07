@@ -26,6 +26,7 @@ export const auditActionValidator = v.union(
   v.literal("khatma.coOrganizerRemove"),
   v.literal("person.update"),
   v.literal("person.rotaAllowed"),
+  v.literal("person.rotaNewLayout"),
   v.literal("rota.adminCreate"),
   v.literal("rota.adminChange"),
 );

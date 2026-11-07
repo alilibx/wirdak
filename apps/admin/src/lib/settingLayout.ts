@@ -26,7 +26,8 @@ export type SettingSection =
   | "markDone"
   | "coOrganizers"
   | "coOrganizerNotes"
-  | "sharedReading";
+  | "sharedReading"
+  | "rotaPage";
 
 /**
  * Where each setting sits on the settings page. A missing group is a type
@@ -190,5 +191,6 @@ export const SETTING_LAYOUT: Record<
         "rotaHalfCountsAsSlot",
       ],
     },
+    { section: "rotaPage", keys: ["rotaNewLayoutOn", "rotaLeftoverBoxOn"] },
   ],
 };

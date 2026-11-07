@@ -632,6 +632,20 @@ test("people says how often the khatma is read, for the share message", async ()
   expect(await kindFor({ kind: "monthly", days: [1] })).toBe("monthly");
 });
 
+test("people shows the leftover box unless the admin turned it off", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  expect((await people(t, s))?.leftoverBox).toBe(true);
+  await t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaLeftoverBoxOn",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
+  expect((await people(t, s))?.leftoverBox).toBe(false);
+});
+
 test("people has the join link built from the code and the public number", async () => {
   vi.stubEnv("WHATSAPP_PUBLIC_NUMBER", PUBLIC_NUMBER);
   const t = convexTest(schema, modules);

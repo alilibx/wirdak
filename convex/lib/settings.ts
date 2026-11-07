@@ -133,6 +133,10 @@ export const SETTING_DEFAULTS = {
   rotaSharedSlotsOn: true,
   /** a half counts as a slot in rotaMaxSlotsPerPerson */
   rotaHalfCountsAsSlot: true,
+  /** every organizer gets the new rota page layout; off leaves it to each person's `rotaNewLayout` */
+  rotaNewLayoutOn: false,
+  /** the rota People list opens with the box about juz' left without a reader */
+  rotaLeftoverBoxOn: true,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

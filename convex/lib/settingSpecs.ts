@@ -225,6 +225,8 @@ export const SETTING_SPECS: { [K in SettingKey]: SettingSpec } = {
   oldOwnerStaysOn: { kind: "bool", group: "switches" },
   rotaSharedSlotsOn: { kind: "bool", group: "rota" },
   rotaHalfCountsAsSlot: { kind: "bool", group: "rota" },
+  rotaNewLayoutOn: { kind: "bool", group: "rota" },
+  rotaLeftoverBoxOn: { kind: "bool", group: "rota" },
 };
 
 export type SettingError =

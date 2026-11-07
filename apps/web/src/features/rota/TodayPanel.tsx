@@ -13,7 +13,7 @@ import { ErrorLine } from "./ErrorLine";
 import { useRotaCall } from "./useRotaCall";
 import { formatIsoDate, formatTime } from "./format";
 
-type Tile = TodayView["tiles"][number];
+export type Tile = TodayView["tiles"][number];
 
 const todayErrors: Record<string, string> = t.rota.todayErrors;
 const swatch = "me-1.5 inline-block size-3 rounded-full align-[-1px]";
@@ -31,7 +31,7 @@ const WORD: Record<Tile["state"], string> = {
 };
 
 /** One juz' of the day: its number, and its state as a border and a word for screen readers. */
-function GridTile({
+export function GridTile({
   tile,
   disabled,
   onPress,
@@ -69,7 +69,7 @@ function GridTile({
 }
 
 /** What the organizer can do with one juz' of today: who reads it, give it away, or record it. */
-function TileSheet({
+export function TileSheet({
   inviteCode,
   view,
   tile,
@@ -200,7 +200,7 @@ function TileSheet({
 }
 
 /** The line about the next reading day: «التالي: الختمة ١٣ · غداً ٨:٠٠ ص». */
-function nextLine(view: TodayView, dayAt: number, timeZone: string) {
+export function nextLine(view: TodayView, dayAt: number, timeZone: string) {
   if (view.next.date === null) return null;
   const tomorrow = addDays(localDate(Date.now(), timeZone), 1);
   const time = formatTime(dayAt);
@@ -216,7 +216,7 @@ function nextLine(view: TodayView, dayAt: number, timeZone: string) {
  * Setup was left unfinished: no day starts until the organizer starts the khatma here. Only
  * someone with Settings may start it; anyone else is only told.
  */
-function StartKhatma({
+export function StartKhatma({
   inviteCode,
   canStart,
 }: {
@@ -246,6 +246,73 @@ function StartKhatma({
   );
 }
 
+/** The note that the khatma is paused: no messages, and the khatma number stays. */
+export function PausedBanner({ className = "" }: { className?: string }) {
+  return (
+    <p
+      role="note"
+      className={`rounded-ui border-2 border-gold bg-[#FBF1D9] p-3 font-medium ${className}`}
+    >
+      {t.rota.pausedBanner}
+    </p>
+  );
+}
+
+/**
+ * With no open day: when the first or next one starts, or that the dates have run out. Null
+ * while paused, which has its own banner.
+ */
+export function noDayLine(view: TodayView, dayAt: number): string | null {
+  if (view.next.date !== null) {
+    return t.rota.notStarted(
+      view.next.number,
+      formatIsoDate(view.next.date),
+      formatTime(dayAt),
+    );
+  }
+  return view.paused && !view.archived ? null : t.rota.ended;
+}
+
+/** The day's 30 ajza' as tiles to press, under a legend of their three states. */
+export function DayGrid({
+  view,
+  className = "",
+  onPress,
+}: {
+  view: TodayView;
+  className?: string;
+  onPress: (tile: Tile) => void;
+}) {
+  return (
+    <section aria-label={t.rota.gridLabel} className={className}>
+      <ul className="mb-3 flex flex-wrap gap-3 px-0.5 text-base text-ink-soft">
+        <li>
+          <i className={`${swatch} border-2 border-dashed border-[#8A7D62]`} />
+          {t.rota.legendUnread}
+        </li>
+        <li>
+          <i className={`${swatch} bg-saffron`} />
+          {t.rota.legendReassigned}
+        </li>
+        <li>
+          <i className={`${swatch} bg-green`} />
+          {t.rota.legendDone}
+        </li>
+      </ul>
+      <div className="grid grid-cols-6 gap-1.5">
+        {view.tiles.map((tile) => (
+          <GridTile
+            key={tile.readId}
+            tile={tile}
+            disabled={view.archived}
+            onPress={() => onPress(tile)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /** The organizer's Today screen: the day, how many are done, and the 30 ajza' to tap. */
 export function TodayPanel({
   inviteCode,
@@ -266,17 +333,7 @@ export function TodayPanel({
   const { day } = view;
   const open = view.tiles.find((tile) => tile.readId === openRead) ?? null;
   const next = nextLine(view, dayAt, timeZone);
-  // With no open day: when the first or next one starts, or that the dates have run out.
-  const before =
-    view.next.date !== null
-      ? t.rota.notStarted(
-          view.next.number,
-          formatIsoDate(view.next.date),
-          formatTime(dayAt),
-        )
-      : view.paused && !view.archived
-        ? null
-        : t.rota.ended;
+  const before = noDayLine(view, dayAt);
   const noDay =
     !view.setupDone && !view.archived ? (
       <StartKhatma inviteCode={inviteCode} canStart={canStart} />
@@ -290,14 +347,7 @@ export function TodayPanel({
 
   return (
     <div className="mt-4">
-      {view.paused && !view.archived && (
-        <p
-          role="note"
-          className="mb-3 rounded-ui border-2 border-gold bg-[#FBF1D9] p-3 font-medium"
-        >
-          {t.rota.pausedBanner}
-        </p>
-      )}
+      {view.paused && !view.archived && <PausedBanner className="mb-3" />}
 
       {day === null ? (
         noDay
@@ -329,34 +379,11 @@ export function TodayPanel({
       {day !== null && next && <p className="mt-2 text-ink-soft">{next}</p>}
 
       {day !== null && (
-        <section aria-label={t.rota.gridLabel} className="mt-5">
-          <ul className="mb-3 flex flex-wrap gap-3 px-0.5 text-base text-ink-soft">
-            <li>
-              <i
-                className={`${swatch} border-2 border-dashed border-[#8A7D62]`}
-              />
-              {t.rota.legendUnread}
-            </li>
-            <li>
-              <i className={`${swatch} bg-saffron`} />
-              {t.rota.legendReassigned}
-            </li>
-            <li>
-              <i className={`${swatch} bg-green`} />
-              {t.rota.legendDone}
-            </li>
-          </ul>
-          <div className="grid grid-cols-6 gap-1.5">
-            {view.tiles.map((tile) => (
-              <GridTile
-                key={tile.readId}
-                tile={tile}
-                disabled={view.archived}
-                onPress={() => setOpenRead(tile.readId)}
-              />
-            ))}
-          </div>
-        </section>
+        <DayGrid
+          view={view}
+          className="mt-5"
+          onPress={(tile) => setOpenRead(tile.readId)}
+        />
       )}
 
       {open && (

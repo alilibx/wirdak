@@ -127,6 +127,8 @@ test("defaults match the spec", () => {
     oldOwnerStaysOn: true,
     rotaSharedSlotsOn: true,
     rotaHalfCountsAsSlot: true,
+    rotaNewLayoutOn: false,
+    rotaLeftoverBoxOn: true,
   });
 });
 

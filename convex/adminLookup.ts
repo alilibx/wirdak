@@ -292,6 +292,7 @@ export const person = adminQuery({
       phone: p.phone,
       timeZone: p.timeZone,
       rotaAllowed: p.rotaAllowed === true,
+      rotaNewLayout: p.rotaNewLayout === true,
       verifiedAt: p.verifiedAt,
       lastSeenAt: p.lastSeenAt,
       khatmas,

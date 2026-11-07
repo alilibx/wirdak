@@ -117,6 +117,7 @@ const people = {
   participants: [{ ...organizer, juz: [1] }],
   freeJuz: Array.from({ length: 29 }, (_, i) => i + 2),
   maxSlots: 3,
+  leftoverBox: true,
 };
 
 function renderPage() {

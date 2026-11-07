@@ -20,6 +20,8 @@ export default defineSchema({
     whatsappNotes: v.optional(v.boolean()),
     // An admin allowed this person to create rotating khatmas (missing means no).
     rotaAllowed: v.optional(v.boolean()),
+    // An admin turned the new rota page layout on for this person early (missing means no).
+    rotaNewLayout: v.optional(v.boolean()),
     // What the admin lists read; `refreshPhone` keeps them, missing means not yet.
     /** Khatmas they organize. Shown and filtered on, never sorted by. */
     organizesCount: v.optional(v.number()),

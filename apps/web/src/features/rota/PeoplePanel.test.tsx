@@ -74,6 +74,7 @@ function makeView() {
     freeJuz: Array.from({ length: 28 }, (_, i) => i + 3),
     phoneExample: null,
     maxSlots: 2,
+    leftoverBox: true,
   };
 }
 
@@ -92,6 +93,14 @@ beforeEach(() => {
 });
 
 describe("PeoplePanel", () => {
+  it("shows no leftover box when an admin turned it off, and the open rows still invite an add", () => {
+    m.view = { ...makeView(), leftoverBox: false };
+    render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+    expect(screen.queryByText("بقي ٢٨ جزءاً بلا قارئ")).toBeNull();
+    expect(screen.queryByRole("button", { name: t.rota.spread })).toBeNull();
+    expect(screen.getByText(t.rota.addReader(3))).toBeInTheDocument();
+  });
+
   it("says how many ajza' have no reader above the 30 rows, and spreads them in one press", async () => {
     m.fns.spreadFreeJuz = vi
       .fn()

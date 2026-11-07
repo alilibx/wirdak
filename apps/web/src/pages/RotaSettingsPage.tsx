@@ -6,6 +6,7 @@ import {
 import type { OrganizerAccess } from "@convex/lib/organizerAuth";
 import type { SettingsView } from "@convex/lib/rotaOps";
 import { localDate } from "@convex/lib/wakingTime";
+import { api } from "@convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { useState, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router";
@@ -29,6 +30,7 @@ import { TimeField } from "../features/rota/TimeField";
 import { TransferSection } from "../features/rota/TransferSection";
 import { useRotaCall } from "../features/rota/useRotaCall";
 import { t } from "../i18n/ar";
+import { useSessionToken } from "../lib/session";
 import { timeZoneOptions } from "../lib/timeZones";
 
 type SectionId = "pause" | "messages" | "cheer" | "details";
@@ -79,11 +81,13 @@ export function RotaSettingsPage() {
   const { inviteCode = "" } = useParams();
   const backend = useRotaBackend(inviteCode);
   const settings = useQuery(backend.settings, backend.scope);
+  const me = useQuery(api.sessions.me, { sessionToken: useSessionToken() });
   const deleting = useDeleting(inviteCode);
 
   // Deleted from here: the settings are about to turn null, and this page must not show that.
   if (deleting) return <DeletingPage />;
-  if (settings === undefined) {
+  // Waits for who is looking too, so the new layout's tab opens without this page flashing.
+  if (settings === undefined || me === undefined) {
     return (
       <main aria-busy="true" className="mx-auto max-w-xl p-5">
         <p className="py-16 text-center text-xl text-ink-soft">
@@ -95,6 +99,10 @@ export function RotaSettingsPage() {
   // Only the organizer has settings.
   if (settings === null) {
     return <Navigate to={khatmaPath(inviteCode)} replace />;
+  }
+  // The new layout has the settings as a tab of the khatma's page.
+  if (me?.rotaNewLayout) {
+    return <Navigate to={`${khatmaPath(inviteCode)}?tab=settings`} replace />;
   }
   return (
     <main className="mx-auto max-w-xl p-5">
@@ -120,11 +128,17 @@ export function RotaSettingsContent({
   settings,
   inviteCode,
   headingLevel: Heading = "h1",
+  inTab = false,
 }: {
   /** `access` says who is looking; an admin's backend gives the owner's (co-organizers spec 4.7). */
   settings: SettingsView & { access: OrganizerAccess };
   inviteCode: string;
   headingLevel?: "h1" | "h2";
+  /**
+   * Shown as the khatma page's Settings tab: the tab names it, so no heading, and the card of
+   * when the khatma starts opens the tab (the page has no Today screen to say it).
+   */
+  inTab?: boolean;
 }) {
   const backend = useRotaBackend(inviteCode);
   const update = useMutation(backend.update);
@@ -224,9 +238,28 @@ export function RotaSettingsContent({
 
   return (
     <>
-      <Heading className="font-display text-4xl leading-tight text-green-deep">
-        {t.khatmaSettings.link}
-      </Heading>
+      {!inTab && (
+        <Heading className="font-display text-4xl leading-tight text-green-deep">
+          {t.khatmaSettings.link}
+        </Heading>
+      )}
+      {inTab && !settings.archived && !settings.firstDatePassed && (
+        <section
+          aria-label={t.rota.startCardHeading}
+          className="mt-4 rounded-ui border-2 border-green bg-card p-4"
+        >
+          <h2 className="text-base font-semibold text-green">
+            {t.rota.startCardHeading}
+          </h2>
+          <p className="mt-1 text-xl leading-relaxed">
+            {t.rota.notStarted(
+              1,
+              formatIsoDate(settings.firstDate),
+              formatTime(settings.messages.dayAt),
+            )}
+          </p>
+        </section>
+      )}
       {settings.archived && (
         <p
           role="note"

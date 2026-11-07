@@ -85,6 +85,26 @@ export const allowRota = internalMutation({
   },
 });
 
+/**
+ * Dev-only: turns the new rota page layout on for the person with this number, as an admin's
+ * switch would (without the audit entry), so one test can see it while the rest keep the old one:
+ * `bun run convex run dev:rotaNewLayout '{"phone":"+971501234567"}'`.
+ */
+export const rotaNewLayout = internalMutation({
+  args: { phone: v.string() },
+  handler: async (ctx, args): Promise<void> => {
+    if (!isDev()) {
+      throw new Error("rotaNewLayout runs only when WIRDAK_ENV is dev");
+    }
+    const person = await ctx.db
+      .query("people")
+      .withIndex("by_phone", (q) => q.eq("phone", args.phone))
+      .unique();
+    if (!person) throw new Error("no such person");
+    await ctx.db.patch(person._id, { rotaNewLayout: true });
+  },
+});
+
 /** Dev-only: the admin with this number, made if there is none, and a session for them. */
 export const insertAdminSession = internalMutation({
   args: {

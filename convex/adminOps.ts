@@ -131,6 +131,37 @@ export const setRotaAllowed = adminMutation({
   },
 });
 
+/**
+ * Turns the new rota page layout on or off for one person, to try it before
+ * `rotaNewLayoutOn` turns it on for everyone. No note: nothing changes for them
+ * but how the page looks.
+ */
+export const setRotaNewLayout = adminMutation({
+  args: {
+    personId: v.id("people"),
+    on: v.boolean(),
+    note: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: true } | { error: "not_found" }> => {
+    const person = await ctx.db.get(args.personId);
+    if (!person) return { error: "not_found" };
+    await ctx.db.patch(person._id, { rotaNewLayout: args.on });
+    await writeAudit(ctx, {
+      actor: ctx.admin,
+      action: "person.rotaNewLayout",
+      targetKind: "person",
+      targetId: person._id,
+      before: { rotaNewLayout: person.rotaNewLayout === true },
+      after: { rotaNewLayout: args.on },
+      note: cleanNote(args.note),
+    });
+    return { ok: true };
+  },
+});
+
 /** Blocks a number app-wide and signs it out everywhere. Khatmas and roles stay. */
 export const blockPhone = adminMutation({
   args: { phone: v.string(), note: v.optional(v.string()) },
