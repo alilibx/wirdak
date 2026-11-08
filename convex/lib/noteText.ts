@@ -42,10 +42,12 @@ const DAY_MS = 86_400_000;
 const TEXT_TZ = "Asia/Dubai";
 
 const weekdayFormat = new Intl.DateTimeFormat("ar", {
+  numberingSystem: "latn",
   timeZone: TEXT_TZ,
   weekday: "long",
 });
 const dayMonthFormat = new Intl.DateTimeFormat("ar", {
+  numberingSystem: "latn",
   timeZone: TEXT_TZ,
   day: "numeric",
   month: "long",
@@ -99,10 +101,7 @@ function ajzaa(n: number): string {
 /** The weekday within 6 days, otherwise the day and month. */
 function when(until: number, now: number): string {
   if (until - now <= 6 * DAY_MS) return weekdayFormat.format(until);
-  return dayMonthFormat
-    .formatToParts(until)
-    .map((p) => (p.type === "day" ? toWesternDigits(p.value) : p.value))
-    .join("");
+  return toWesternDigits(dayMonthFormat.format(until));
 }
 
 /** `3 أجزاء قبل الخميس`, or just `3 أجزاء` with no target end ahead. */

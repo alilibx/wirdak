@@ -2,6 +2,7 @@ import { toWesternDigits } from "@convex/lib/digits";
 import { t } from "../i18n/ar";
 
 const dateFormat = new Intl.DateTimeFormat("ar", {
+  numberingSystem: "latn",
   weekday: "long",
   day: "numeric",
   month: "long",

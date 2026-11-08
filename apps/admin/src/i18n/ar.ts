@@ -365,7 +365,7 @@ export const ar = {
         { few: "أيام", many: "يوماً", other: "يوم" },
         formatDecimal(n),
       ),
-    percent: (n: string) => `${n}٪`,
+    percent: (n: string) => `${n}%`,
     periods: { 7: "7 أيام", 30: "30 يوماً", 365: "سنة" },
     period: "المدة",
     metric: "المقياس",

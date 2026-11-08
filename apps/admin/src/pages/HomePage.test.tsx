@@ -67,7 +67,7 @@ describe("dashboard", () => {
 
   it("shows the six tiles in Western digits", () => {
     renderPage();
-    for (const text of ["104", "1,038", "214", "3", "5", "4 أيام", "92٪"]) {
+    for (const text of ["104", "1,038", "214", "3", "5", "4 أيام", "92%"]) {
       expect(screen.getAllByText(text).length).toBeGreaterThan(0);
     }
     expect(screen.getByText(t.stats.newThisWeek("140"))).toBeInTheDocument();

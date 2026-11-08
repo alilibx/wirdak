@@ -17,7 +17,7 @@ describe("schedule labels", () => {
 });
 
 describe("separators next to numbers", () => {
-  // "·" beside Eastern Arabic digits reads as the digit zero (٠).
+  // A comma or a space separates a number from the words after it, never a middle dot.
   it("never put a middle dot beside a number", () => {
     expect(t.home.yours("14", "ربما")).toBe("جزؤك: الجزء 14 «ربما»");
     expect(t.celebration.subtitle("ختمة العائلة", "12")).toBe(

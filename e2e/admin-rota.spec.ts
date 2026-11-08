@@ -92,7 +92,7 @@ test("admin: set up a rotating khatma for someone, help it, archive and delete",
   await expect(
     page.getByRole("tab", { name: webT.rota.tabs.today }),
   ).toHaveAttribute("aria-selected", "true");
-  await expect(panel.getByText(/الختمة 1/).first()).toBeVisible();
+  await expect(panel.getByText(/الختمة 1(?!\d)/).first()).toBeVisible();
   await page.getByRole("tab", { name: webT.rota.tabs.people }).click();
   await expect(panel.getByText(PERSON, { exact: true }).first()).toBeVisible();
   await page.getByRole("tab", { name: webT.khatmaSettings.link }).click();

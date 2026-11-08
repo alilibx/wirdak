@@ -6,6 +6,7 @@ import { toWesternDigits } from "../../../../convex/lib/digits.js";
 
 // A fixed zone: the function runs in UTC on Vercel, which would shift the day.
 const dateFormat = new Intl.DateTimeFormat("ar", {
+  numberingSystem: "latn",
   day: "numeric",
   month: "long",
   timeZone: "Asia/Dubai",

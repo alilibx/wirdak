@@ -72,6 +72,7 @@ const STAGING_SITE = "https://stg.wirdak.app";
 
 // Same wording and date as `t.khatma.untitled` on the web; change both together.
 const untitledDate = new Intl.DateTimeFormat("ar", {
+  numberingSystem: "latn",
   timeZone: "Asia/Dubai",
   weekday: "long",
   day: "numeric",
