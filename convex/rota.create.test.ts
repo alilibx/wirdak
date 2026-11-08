@@ -404,3 +404,70 @@ test("a new khatma can't start today under the admin's rule", async () => {
   expect(await code(start("2027-01-15"))).toBe("invalid_dates");
   expect(await code(start("2027-01-16"))).toBeUndefined();
 });
+
+test("starting again keeps shared slots", async () => {
+  const t = convexTest(schema, modules);
+  const who = await organizer(t);
+  const { inviteCode } = await create(t, who);
+  await t.run(async (ctx) => {
+    const khatma = await ctx.db
+      .query("khatmas")
+      .withIndex("by_inviteCode", (q) => q.eq("inviteCode", inviteCode))
+      .unique();
+    const khatmaId = khatma!._id;
+    const reader = (name: string, phone: string) =>
+      ctx.db.insert("rotaParticipants", {
+        khatmaId,
+        name,
+        phone,
+        personId: null,
+        addedAt: NOW,
+        removedAt: null,
+      });
+    const first = await reader("الأول", "+971505550001");
+    const second = await reader("الثاني", "+971505550002");
+    await ctx.db.insert("rotaSlots", {
+      khatmaId,
+      slot: 7,
+      participantId: first,
+    });
+    await ctx.db.insert("rotaSlots", {
+      khatmaId,
+      slot: 7,
+      participantId: second,
+      second: true,
+    });
+  });
+  await t.mutation(api.khatmaLifecycle.archive, {
+    sessionToken: who.token,
+    inviteCode,
+  });
+
+  const again = await t.action(api.rota.startAgain, {
+    sessionToken: who.token,
+    inviteCode,
+    firstDate: "2027-01-22",
+  });
+  const slots = await t.run(async (ctx) => {
+    const khatma = await ctx.db
+      .query("khatmas")
+      .withIndex("by_inviteCode", (q) => q.eq("inviteCode", again.inviteCode))
+      .unique();
+    const rows = await ctx.db
+      .query("rotaSlots")
+      .withIndex("by_khatma_slot", (q) => q.eq("khatmaId", khatma!._id))
+      .collect();
+    return Promise.all(
+      rows.map(async (row) => ({
+        slot: row.slot,
+        name: (await ctx.db.get(row.participantId))?.name,
+        second: row.second,
+      })),
+    );
+  });
+  expect(slots).toEqual([
+    { slot: 1, name: "المنظم", second: undefined },
+    { slot: 7, name: "الأول", second: undefined },
+    { slot: 7, name: "الثاني", second: true },
+  ]);
+});

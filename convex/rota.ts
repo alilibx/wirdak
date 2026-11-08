@@ -431,6 +431,7 @@ export const insertAgain = internalMutation({
           khatmaId,
           slot: slot.slot,
           participantId,
+          ...(slot.second === true ? { second: true } : {}),
         });
       }
     }

@@ -1,5 +1,5 @@
 import type { Doc, Id } from "../_generated/dataModel";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { isArchived } from "./khatma";
 import {
   addDays,
@@ -138,21 +138,90 @@ export async function targetDay(
   return { n, number: khatmaNumber(n), date, started: false };
 }
 
-/** Who holds each juz' of khatma `number`: the slot row for that juz', if any. */
-export async function slotRowsByJuz(
+/** The slot rows of khatma `number` by juz': the first readers', or with `second` the second readers'. */
+async function rowsByJuz(
   ctx: QueryCtx,
   khatmaId: Id<"khatmas">,
   number: number,
+  second: boolean,
 ): Promise<Map<number, Doc<"rotaSlots">>> {
   const slots = await ctx.db
     .query("rotaSlots")
     .withIndex("by_khatma_slot", (q) => q.eq("khatmaId", khatmaId))
     .collect();
-  const bySlot = new Map(slots.map((s) => [s.slot, s]));
+  const bySlot = new Map(
+    slots.filter((s) => (s.second === true) === second).map((s) => [s.slot, s]),
+  );
   const out = new Map<number, Doc<"rotaSlots">>();
   for (let juz = 1; juz <= ROTA_SIZE; juz++) {
     const row = bySlot.get(slotFor(juz, number));
     if (row) out.set(juz, row);
   }
   return out;
+}
+
+/** Who holds each juz' of khatma `number`: the slot's first reader, if any. */
+export function slotRowsByJuz(
+  ctx: QueryCtx,
+  khatmaId: Id<"khatmas">,
+  number: number,
+): Promise<Map<number, Doc<"rotaSlots">>> {
+  return rowsByJuz(ctx, khatmaId, number, false);
+}
+
+/** Who shares each juz' of khatma `number`: the slot's second reader, if any. */
+export function partnerRowsByJuz(
+  ctx: QueryCtx,
+  khatmaId: Id<"khatmas">,
+  number: number,
+): Promise<Map<number, Doc<"rotaSlots">>> {
+  return rowsByJuz(ctx, khatmaId, number, true);
+}
+
+/** Whether a slot of khatma `number` may take a second reader: sharing is on and all 30 have a reader. */
+export async function sharingOpen(
+  ctx: QueryCtx,
+  khatmaId: Id<"khatmas">,
+  number: number,
+): Promise<boolean> {
+  if (!(await getSetting(ctx, "rotaSharedSlotsOn"))) return false;
+  return (await slotRowsByJuz(ctx, khatmaId, number)).size === ROTA_SIZE;
+}
+
+/**
+ * Takes a reader off their slot. When the first reader of a shared slot
+ * leaves, the second becomes its only reader, so the juz' never shows empty
+ * while someone holds it.
+ */
+export async function leaveSlot(
+  ctx: MutationCtx,
+  row: Doc<"rotaSlots">,
+): Promise<void> {
+  await ctx.db.delete(row._id);
+  if (row.second === true) return;
+  const partner = (
+    await ctx.db
+      .query("rotaSlots")
+      .withIndex("by_khatma_slot", (q) =>
+        q.eq("khatmaId", row.khatmaId).eq("slot", row.slot),
+      )
+      .collect()
+  ).find((s) => s.second === true);
+  if (partner) await ctx.db.patch(partner._id, { second: undefined });
+}
+
+/**
+ * How many slots a participant holds toward `rotaMaxSlotsPerPerson`: a slot
+ * they share as its second reader counts only while `rotaHalfCountsAsSlot` is on.
+ */
+export async function heldSlotCount(
+  ctx: QueryCtx,
+  participantId: Id<"rotaParticipants">,
+): Promise<number> {
+  const rows = await ctx.db
+    .query("rotaSlots")
+    .withIndex("by_participant", (q) => q.eq("participantId", participantId))
+    .collect();
+  if (await getSetting(ctx, "rotaHalfCountsAsSlot")) return rows.length;
+  return rows.filter((r) => r.second !== true).length;
 }

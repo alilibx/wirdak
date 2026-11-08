@@ -20,6 +20,7 @@ import {
   firstDayFloor,
   lastRotaDay,
   lateTapOf,
+  partnerRowsByJuz,
   slotRowsByJuz,
 } from "./lib/rotaPlace";
 import { getSetting } from "./lib/settings";
@@ -128,6 +129,7 @@ async function startDay(
     juzSentAt: null,
   });
   const byJuz = await slotRowsByJuz(ctx, khatma._id, number);
+  const partners = await partnerRowsByJuz(ctx, khatma._id, number);
   for (let juz = 1; juz <= ROTA_SIZE; juz++) {
     const slot = slotFor(juz, number);
     const holderId = byJuz.get(juz)?.participantId ?? null;
@@ -138,6 +140,7 @@ async function startDay(
       slot,
       holderId,
       readerId: holderId,
+      partnerId: partners.get(juz)?.participantId ?? null,
       doneAt: null,
       doneByOrganizer: false,
       reassignedAt: null,

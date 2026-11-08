@@ -1,6 +1,6 @@
 import { convexTest, type TestConvexForDataModel } from "convex-test";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { sha256Hex } from "./lib/crypto";
 import { slotFor } from "./lib/rota";
@@ -380,6 +380,247 @@ test("removeParticipant frees their ajza' and refuses the organizer", async () =
   expect(await add(t, s, { phone: "+971505550099" })).toMatchObject({
     ok: true,
   });
+});
+
+// ---------------------------------------------------------------------------
+// Shared slots
+
+function khatmaIdOf(t: T, s: Setup) {
+  return t.run(async (ctx) => {
+    const k = await ctx.db
+      .query("khatmas")
+      .withIndex("by_inviteCode", (q) => q.eq("inviteCode", s.inviteCode))
+      .unique();
+    return k!._id;
+  });
+}
+
+/** Adds a second reader to `juz` of khatma 1 straight in the database. */
+async function shareJuz(t: T, s: Setup, juz: number) {
+  const khatmaId = await khatmaIdOf(t, s);
+  phoneSeq += 1;
+  const phone = `+97150555${String(phoneSeq).padStart(4, "0")}`;
+  return t.run(async (ctx) => {
+    const id = await ctx.db.insert("rotaParticipants", {
+      khatmaId,
+      name: `ثانٍ ${phoneSeq}`,
+      phone,
+      personId: null,
+      addedAt: NOW,
+      removedAt: null,
+    });
+    await ctx.db.insert("rotaSlots", {
+      khatmaId,
+      slot: slotFor(juz, 1),
+      participantId: id,
+      second: true,
+    });
+    return id;
+  });
+}
+
+/** The slot rows of `juz` in khatma 1, first reader first. */
+async function slotRowsOf(t: T, s: Setup, juz: number) {
+  const khatmaId = await khatmaIdOf(t, s);
+  const rows = await t.run((ctx) =>
+    ctx.db
+      .query("rotaSlots")
+      .withIndex("by_khatma_slot", (q) =>
+        q.eq("khatmaId", khatmaId).eq("slot", slotFor(juz, 1)),
+      )
+      .collect(),
+  );
+  return rows
+    .sort((a, b) => Number(a.second === true) - Number(b.second === true))
+    .map((r) => ({ participantId: r.participantId, second: r.second }));
+}
+
+test("removing the first reader of a shared slot makes the second whole", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const a = participantId(await add(t, s, { juz: 7 }));
+  const b = await shareJuz(t, s, 7);
+  expect(
+    await t.mutation(api.rota.removeParticipant, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      participantId: a,
+    }),
+  ).toEqual({ ok: true });
+  const view = await people(t, s);
+  expect(view?.rows[6]?.participant?.id).toBe(b);
+  expect(view?.freeJuz).not.toContain(7);
+  expect(await slotRowsOf(t, s, 7)).toEqual([
+    { participantId: b, second: undefined },
+  ]);
+});
+
+test("removing the second reader of a shared slot leaves the first as it was", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const a = participantId(await add(t, s, { juz: 7 }));
+  const b = await shareJuz(t, s, 7);
+  await t.mutation(api.rota.removeParticipant, {
+    sessionToken: s.token,
+    inviteCode: s.inviteCode,
+    participantId: b,
+  });
+  expect((await people(t, s))?.rows[6]?.participant?.id).toBe(a);
+  expect(await slotRowsOf(t, s, 7)).toEqual([
+    { participantId: a, second: undefined },
+  ]);
+});
+
+test("freeing the first reader of a shared slot makes the second whole", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const a = participantId(await add(t, s, { juz: 7 }));
+  const b = await shareJuz(t, s, 7);
+  const free = (participantId: Id<"rotaParticipants">) =>
+    t.mutation(api.rota.freeJuz, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      participantId,
+      juz: 7,
+    });
+  expect(await free(a)).toEqual({ ok: true });
+  expect((await people(t, s))?.rows[6]?.participant?.id).toBe(b);
+  expect(await slotRowsOf(t, s, 7)).toEqual([
+    { participantId: b, second: undefined },
+  ]);
+  expect(await free(a)).toEqual({ error: "not_found" });
+
+  // Freeing a second reader takes only their row.
+  const c = await shareJuz(t, s, 7);
+  expect(await free(c)).toEqual({ ok: true });
+  expect(await slotRowsOf(t, s, 7)).toEqual([
+    { participantId: b, second: undefined },
+  ]);
+});
+
+test("moving the first reader of a shared slot to an empty juz' leaves the second whole", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const a = participantId(await add(t, s, { juz: 7 }));
+  const b = await shareJuz(t, s, 7);
+  const move = (
+    participant: Id<"rotaParticipants">,
+    from: number,
+    to: number,
+  ) =>
+    t.mutation(api.rota.moveJuz, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      participantId: participant,
+      fromJuz: from,
+      toJuz: to,
+    });
+  expect(await move(a, 7, 20)).toEqual({ ok: true });
+  let view = await people(t, s);
+  expect(view?.rows[6]?.participant?.id).toBe(b);
+  expect(view?.rows[19]?.participant?.id).toBe(a);
+  expect(await slotRowsOf(t, s, 7)).toEqual([
+    { participantId: b, second: undefined },
+  ]);
+  expect(await slotRowsOf(t, s, 20)).toEqual([
+    { participantId: a, second: undefined },
+  ]);
+
+  // A second reader moves to an empty juz' as its only reader.
+  const c = participantId(await add(t, s, { juz: 8 }));
+  const d = await shareJuz(t, s, 8);
+  expect(await move(d, 8, 25)).toEqual({ ok: true });
+  view = await people(t, s);
+  expect(view?.rows[7]?.participant?.id).toBe(c);
+  expect(view?.rows[24]?.participant?.id).toBe(d);
+  expect(await slotRowsOf(t, s, 8)).toEqual([
+    { participantId: c, second: undefined },
+  ]);
+
+  // A swap never takes a shared slot, from either side.
+  const e = await shareJuz(t, s, 8);
+  expect(await move(c, 8, 20)).toEqual({ error: "shared" });
+  expect(await move(e, 8, 20)).toEqual({ error: "shared" });
+  expect(await move(a, 20, 8)).toEqual({ error: "shared" });
+  expect(await slotRowsOf(t, s, 8)).toEqual([
+    { participantId: c, second: undefined },
+    { participantId: e, second: true },
+  ]);
+  expect(await slotRowsOf(t, s, 20)).toEqual([
+    { participantId: a, second: undefined },
+  ]);
+});
+
+test("today's read keeps both readers after one leaves", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const a = participantId(await add(t, s, { juz: 7 }));
+  const b = await shareJuz(t, s, 7);
+  const khatmaId = await khatmaIdOf(t, s);
+  await t.run(async (ctx) => {
+    const k = await ctx.db.get(khatmaId);
+    await ctx.db.patch(khatmaId, {
+      rota: { ...k!.rota!, setupDoneAt: NOW - 60_000 },
+    });
+  });
+  await t.mutation(internal.rotaDays.tick, { khatmaId });
+  const readOf7 = () =>
+    t.run(async (ctx) => {
+      const day = await ctx.db
+        .query("rotaDays")
+        .withIndex("by_khatma_n", (q) => q.eq("khatmaId", khatmaId))
+        .unique();
+      return ctx.db
+        .query("rotaReads")
+        .withIndex("by_day_juz", (q) => q.eq("dayId", day!._id).eq("juz", 7))
+        .unique();
+    });
+  expect(await readOf7()).toMatchObject({
+    holderId: a,
+    readerId: a,
+    partnerId: b,
+  });
+  await t.mutation(api.rota.removeParticipant, {
+    sessionToken: s.token,
+    inviteCode: s.inviteCode,
+    participantId: a,
+  });
+  expect(await readOf7()).toMatchObject({
+    holderId: a,
+    readerId: a,
+    partnerId: b,
+  });
+});
+
+test("a shared slot counts toward the cap unless rotaHalfCountsAsSlot is off", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await add(t, s, { juz: 7 });
+  const b = await shareJuz(t, s, 7);
+  await t.run(async (ctx) => {
+    await ctx.db.insert("settings", {
+      key: "rotaMaxSlotsPerPerson",
+      value: 1,
+      updatedAt: 0,
+    });
+  });
+  const give = () =>
+    t.mutation(api.rota.giveJuz, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      participantId: b,
+      juz: 20,
+    });
+  expect(await give()).toEqual({ error: "too_many" });
+  await t.run(async (ctx) => {
+    await ctx.db.insert("settings", {
+      key: "rotaHalfCountsAsSlot",
+      value: false,
+      updatedAt: 0,
+    });
+  });
+  expect(await give()).toEqual({ ok: true });
+  expect((await people(t, s))?.rows[19]?.participant?.id).toBe(b);
 });
 
 test("someone else sees no people and cannot change them", async () => {

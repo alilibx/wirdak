@@ -293,7 +293,9 @@ export async function takeFreeJuzToday(
     .query("rotaSlots")
     .withIndex("by_participant", (q) => q.eq("participantId", participantId))
     .collect();
-  for (const { slot } of slots) {
+  for (const { slot, second } of slots) {
+    // A second reader has a first who holds the juz' already.
+    if (second === true) continue;
     const read = await freeRead(ctx, day, slot);
     if (read) {
       await ctx.db.patch(read._id, {

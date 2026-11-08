@@ -22,7 +22,14 @@ import { allows, roleIn, type OrganizerRole } from "../organizerAuth";
 import { isArchived } from "../khatma";
 import { isOwnerRow } from "../rotaOwner";
 import { khatmaJoinLink } from "../rotaJoin";
-import { slotRowsByJuz, targetDay, type RotaConfig } from "../rotaPlace";
+import {
+  heldSlotCount,
+  leaveSlot,
+  partnerRowsByJuz,
+  slotRowsByJuz,
+  targetDay,
+  type RotaConfig,
+} from "../rotaPlace";
 import { NEW_MEMBER_NAME } from "../rotaTemplates";
 import { getSetting } from "../settings";
 import {
@@ -501,11 +508,10 @@ export async function giveJuz(
   const target = await targetDay(ctx, khatma);
   const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
   if (byJuz.has(args.juz)) return { error: "juz_taken" };
-  const held = await ctx.db
-    .query("rotaSlots")
-    .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
-    .collect();
-  if (held.length >= (await getSetting(ctx, "rotaMaxSlotsPerPerson"))) {
+  if (
+    (await heldSlotCount(ctx, participant._id)) >=
+    (await getSetting(ctx, "rotaMaxSlotsPerPerson"))
+  ) {
     return { error: "too_many" };
   }
   await ctx.db.insert("rotaSlots", {
@@ -549,16 +555,16 @@ export async function spreadFreeJuz(
   const counted = await Promise.all(
     active.map(async (p) => ({
       id: p._id,
-      held: (
-        await ctx.db
+      held: await heldSlotCount(ctx, p._id),
+      holdsAny:
+        (await ctx.db
           .query("rotaSlots")
           .withIndex("by_participant", (q) => q.eq("participantId", p._id))
-          .collect()
-      ).length,
+          .first()) !== null,
     })),
   );
   // Someone holding none stopped reading on purpose (the organizer can), so they get none back.
-  const readers = counted.filter((r) => r.held > 0);
+  const readers = counted.filter((r) => r.holdsAny);
 
   let given = 0;
   for (const juz of free) {
@@ -619,7 +625,9 @@ async function mayTakeSlotsOf(
 /**
  * Moves a participant's juz' of the next day to another one, swapping with its
  * holder if it has one. A co-organizer can't move the owner's or another
- * co-organizer's juz', nor swap one into theirs (`is_organizer`).
+ * co-organizer's juz', nor swap one into theirs (`is_organizer`). Either
+ * reader of a shared slot may move to an empty juz', which leaves the other as
+ * its only reader; a swap never takes a shared slot, from either side (`shared`).
  */
 export async function moveJuz(
   ctx: MutationCtx,
@@ -631,16 +639,15 @@ export async function moveJuz(
     toJuz: number;
   },
   caller: OrganizerRole | "admin",
-): Promise<{ ok: true } | { error: "not_found" | "is_organizer" }> {
+): Promise<{ ok: true } | { error: "not_found" | "is_organizer" | "shared" }> {
   if (!isJuz(args.fromJuz) || !isJuz(args.toJuz)) {
     return { error: "not_found" };
   }
   const target = await targetDay(ctx, khatma);
   const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
-  const from = byJuz.get(args.fromJuz);
-  if (!from || from.participantId !== args.participantId) {
-    return { error: "not_found" };
-  }
+  const partners = await partnerRowsByJuz(ctx, khatma._id, target.number);
+  const from = rowOf(byJuz, partners, args.fromJuz, args.participantId);
+  if (!from) return { error: "not_found" };
   const to = byJuz.get(args.toJuz);
   const moved = to
     ? [from.participantId, to.participantId]
@@ -649,18 +656,40 @@ export async function moveJuz(
     return { error: "is_organizer" };
   }
   if (to) {
+    if (partners.has(args.fromJuz) || partners.has(args.toJuz)) {
+      return { error: "shared" };
+    }
     // Swap holders; the slots stay where they are.
     await ctx.db.patch(from._id, { participantId: to.participantId });
     await ctx.db.patch(to._id, { participantId: from.participantId });
   } else {
-    await ctx.db.patch(from._id, {
+    await leaveSlot(ctx, from);
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: khatma._id,
       slot: slotFor(args.toJuz, target.number),
+      participantId: from.participantId,
     });
   }
   return { ok: true };
 }
 
-/** Frees a juz' of the next day. A co-organizer can't free the owner's or a co-organizer's (`is_organizer`). */
+/** The participant's row on `juz`, as its first or its second reader. */
+function rowOf(
+  byJuz: Map<number, Doc<"rotaSlots">>,
+  partners: Map<number, Doc<"rotaSlots">>,
+  juz: number,
+  participantId: Id<"rotaParticipants">,
+): Doc<"rotaSlots"> | undefined {
+  return [byJuz.get(juz), partners.get(juz)].find(
+    (row) => row?.participantId === participantId,
+  );
+}
+
+/**
+ * Frees a participant's juz' of the next day. Freeing one reader of a shared
+ * slot leaves the other as its only reader. A co-organizer can't free the
+ * owner's or a co-organizer's (`is_organizer`).
+ */
 export async function freeJuz(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
@@ -670,17 +699,18 @@ export async function freeJuz(
 ): Promise<{ ok: true } | { error: "not_found" | "is_organizer" }> {
   if (!isJuz(args.juz)) return { error: "not_found" };
   const target = await targetDay(ctx, khatma);
-  const row = (await slotRowsByJuz(ctx, khatma._id, target.number)).get(
+  const row = rowOf(
+    await slotRowsByJuz(ctx, khatma._id, target.number),
+    await partnerRowsByJuz(ctx, khatma._id, target.number),
     args.juz,
+    args.participantId,
   );
   // The screen may be a day behind: only free the slot the organizer saw.
-  if (!row || row.participantId !== args.participantId) {
-    return { error: "not_found" };
-  }
+  if (!row) return { error: "not_found" };
   if (!(await mayTakeSlotsOf(ctx, khatma, [row.participantId], caller))) {
     return { error: "is_organizer" };
   }
-  await ctx.db.delete(row._id);
+  await leaveSlot(ctx, row);
   return { ok: true };
 }
 
@@ -715,8 +745,9 @@ export async function removeParticipant(
     .query("rotaSlots")
     .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
     .collect();
-  for (const slot of slots) await ctx.db.delete(slot._id);
-  // Today's reads keep their reader: only the slots go.
+  // A shared slot they leave keeps its other reader.
+  for (const slot of slots) await leaveSlot(ctx, slot);
+  // Today's reads keep their readers: only the slots go.
   await ctx.db.patch(participant._id, { removedAt: Date.now() });
   await endCoOrganizer(ctx, khatma._id, participant.phone);
   await refreshPhone(ctx, participant.phone);

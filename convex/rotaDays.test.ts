@@ -228,6 +228,61 @@ test("the next day closes the old one and moves every slot up one juz'", async (
   expect(held[0]?.juz).toBe(2);
 });
 
+test("two readers on one slot rotate together", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, second } = await t.run(async (ctx) => {
+    const reader = (name: string, phone: string) =>
+      ctx.db.insert("rotaParticipants", {
+        khatmaId: s.khatmaId,
+        name,
+        phone,
+        personId: null,
+        addedAt: 0,
+        removedAt: null,
+      });
+    const first = await reader("الأول", "+971500000002");
+    const second = await reader("الثاني", "+971500000003");
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: s.khatmaId,
+      slot: 7,
+      participantId: first,
+    });
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: s.khatmaId,
+      slot: 7,
+      participantId: second,
+      second: true,
+    });
+    return { first, second };
+  });
+  await tickAt(t, s, "2027-01-16T08:00");
+  await tickAt(t, s, "2027-01-17T08:00");
+  const [one, two] = await days(t, s);
+  const firstDay = await reads(t, one!._id);
+  expect(firstDay.find((r) => r.juz === 7)).toMatchObject({
+    holderId: first,
+    readerId: first,
+    partnerId: second,
+  });
+  const rows = await reads(t, two!._id);
+  expect(rows.find((r) => r.juz === 8)).toMatchObject({
+    slot: 7,
+    holderId: first,
+    readerId: first,
+    partnerId: second,
+  });
+  // The organizer's slot 1 has no second reader.
+  expect(rows.find((r) => r.juz === 2)).toMatchObject({
+    holderId: s.participantId,
+    partnerId: null,
+  });
+  expect(rows.find((r) => r.juz === 1)).toMatchObject({
+    holderId: null,
+    partnerId: null,
+  });
+});
+
 test("a pause date starts nothing and the next date is the next day", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t, { pauseDates: ["2027-01-17"] });

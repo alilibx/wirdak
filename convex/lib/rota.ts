@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Doc, Id } from "../_generated/dataModel";
 
 /** Which days a rota khatma is read on. Weekday 0 is Sunday, days are 1 to 31. */
 export type ReadingDays =
@@ -97,6 +98,20 @@ export function juzFor(slot: number, number: number): number {
 /** The slot that reads `juz` in khatma `number` (inverse of `juzFor`). */
 export function slotFor(juz: number, number: number): number {
   return ((((juz - number) % ROTA_SIZE) + ROTA_SIZE) % ROTA_SIZE) + 1;
+}
+
+/**
+ * Whether `participantId` reads this juz' of the day: its reader, or the
+ * slot's second reader while nobody else was given it.
+ */
+export function readsFor(
+  read: Doc<"rotaReads">,
+  participantId: Id<"rotaParticipants">,
+): boolean {
+  return (
+    read.readerId === participantId ||
+    (read.partnerId === participantId && read.reassignedAt === null)
+  );
 }
 
 function dayNumber(date: string): number {
