@@ -14,6 +14,7 @@ The templates for messages Wirdak starts to a rota member or organizer, submitte
 - `wirdak_rota_juz`, `wirdak_rota_assigned` and `wirdak_rota_covered` were moved to MARKETING on review, so their `_v2` templates replace them. Never send the originals.
 - Sample values are the examples Meta asks for.
 - Numbers are Western digits (`5`, `30`), never Eastern Arabic (`٥`, `٣٠`). The approved `wirdak_rota_summary` still has `٣٠` in its fixed text, so it reads «24 من ٣٠» until `wirdak_rota_summary_v2` (the same body with `30`) is approved and the code moves to it.
+- `wirdak_rota_juz_v3` (one juz') and `wirdak_rota_juz_many` (two or more) replace `wirdak_rota_juz_v2` once approved. Their parameter is the juz' numbers only (`4`, `4 و5`), and the khatma number is gone. Until then, `_v2` keeps sending. Inside the 24-hour window the free-form text already uses the new wording.
 
 ## Messages to members
 
@@ -22,6 +23,8 @@ All have header `{{1}}` and quick-reply buttons only.
 | Name | Body | Body samples | Buttons |
 | --- | --- | --- | --- |
 | `wirdak_rota_juz_v2` | `تحديث على قراءتك اليوم في الختمة {{1}}: المسجَّل لك {{2}} من هذه الختمة.` | `3`, `الجزآن 5 و6` | «أتممت», «ليس بعد» |
+| `wirdak_rota_juz_v3` (pending, 2026-11-09) | `السلام عليكم، جزؤكم اليوم هو {{1}}. انقروا «أتممت» بعد القراءة.` | `4` | «أتممت», «ليس بعد» |
+| `wirdak_rota_juz_many` (pending, 2026-11-09) | `السلام عليكم، أجزاؤكم اليوم هي {{1}}. انقروا «أتممت» بعد القراءة.` | `4 و5` | «أتممت», «ليس بعد» |
 | `wirdak_rota_reminder` | `تذكير بقراءتك اليوم: لم تُسجَّل بعد قراءة {{1}} في هذه الختمة.` | `الجزأين 5 و6` | «أتممت», «ليس بعد» |
 | `wirdak_rota_assigned_v2` | `تحديث على قراءتك: سُجِّلت لك قراءة {{1}} في الختمة {{2}} لهذا اليوم.` | `الأجزاء 3، 5 و6`, `7` | «أتممت», «ليس بعد» |
 | `wirdak_rota_covered_v2` | `تحديث على قراءتك: سُجِّلت اليوم قراءة {{1}} باسم قارئ آخر في هذه الختمة.` | `الجزء 26` | none |
@@ -38,6 +41,7 @@ Header `{{1}}` and one URL button, «افتح الختمة», to `https://wirdak
 | --- | --- | --- |
 | `wirdak_rota_unread` | `تحديث على الختمة التي تنظّمها: لم تُسجَّل بعد قراءة {{1}} في ختمة اليوم.` | `الجزأين 5 و6` |
 | `wirdak_rota_summary` | `تحديث على الختمة التي تنظّمها: تمّت قراءة {{1}} من ٣٠ جزءاً اليوم.` | `24` |
+| `wirdak_rota_summary_v2` (pending, 2026-11-09) | `تحديث على الختمة التي تنظّمها: تمّت قراءة {{1}} من 30 جزءاً اليوم.` | `24` |
 | `wirdak_rota_join_request` | `تحديث على الختمة التي تنظّمها: وصل من {{1}} طلب انضمام جديد.` | `أحمد` |
 
 The organizer notes `rotaSilent`, `rotaSilenced` and `rotaStopped`, and `rotaEnabled` (the note that tells someone rotating khatmas are on for them, an announcement Meta would read as marketing), have no template: in-app and push only.
