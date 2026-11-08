@@ -144,6 +144,8 @@ Today's "hand over" (`organizer.handOver`) becomes «انقل ملكية الخ�
 
 ## 5. Two readers on one juz' (rotating khatma)
 
+> Replaced by `2026-11-09-wirdak-rota-shared-juz-design.md`: both readers read the whole juz' (no halves), and sharing opens only once all 30 slots have a reader.
+
 ### 5.1 Halves
 
 - Each of the 30 slots (rotating khatma design 3.2) is **whole** (one reader) or **shared** (two readers). The two readers of a shared slot rotate together: on khatma `k` they both have the same juz'.
