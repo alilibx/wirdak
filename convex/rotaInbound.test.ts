@@ -237,7 +237,7 @@ test("a join text from a listed phone joins and replies with today's juz' button
     {
       to: phoneOf(0),
       body:
-        "*ختمة*\nأهلاً قارئ 1، انضممت إلى ختمة.\nتحديث على قراءتك اليوم في الختمة 1: المسجَّل لك الجزء 1 من هذه الختمة." +
+        "*ختمة*\nأهلاً قارئ 1، انضممت إلى ختمة.\nجزؤكم اليوم هو 1. انقروا «أتممت» بعد القراءة." +
         `\n[أتممت] ${tap("done", day._id, pid)}` +
         `\n[ليس بعد] ${tap("notYet", day._id, pid)}`,
     },
@@ -282,7 +282,7 @@ test("someone added after the day started takes today's free juz' when they join
     {
       to: LATE,
       body:
-        "*ختمة*\nأهلاً جديد، انضممت إلى ختمة.\nتحديث على قراءتك اليوم في الختمة 1: المسجَّل لك الجزء 5 من هذه الختمة." +
+        "*ختمة*\nأهلاً جديد، انضممت إلى ختمة.\nجزؤكم اليوم هو 5. انقروا «أتممت» بعد القراءة." +
         `\n[أتممت] ${tap("done", day._id, pid)}` +
         `\n[ليس بعد] ${tap("notYet", day._id, pid)}`,
     },

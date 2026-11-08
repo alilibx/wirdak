@@ -289,7 +289,7 @@ test("a juz' message inside the window goes as interactive buttons", async () =>
   expect(sent).toEqual([
     {
       to: "971500000002",
-      text: `*ختمة العائلة*\nتحديث على قراءتك اليوم في الختمة 1: المسجَّل لك الجزآن 2 و3 من هذه الختمة.\n[أتممت] ${done}\n[ليس بعد] ${notYet}`,
+      text: `*ختمة العائلة*\nالسلام عليكم، أجزاؤكم اليوم هي 2 و3. انقروا «أتممت» بعد القراءة.\n[أتممت] ${done}\n[ليس بعد] ${notYet}`,
     },
   ]);
   expect((await rows(t))[0]?.sentAt).toBeGreaterThanOrEqual(NOW);
@@ -604,8 +604,8 @@ test("a message names only the ajza' still waiting on the participant, not the o
     });
     await t.finishAllScheduledFunctions(vi.runAllTimers);
     expect(sent).toHaveLength(1);
-    expect(sent[0]?.text).toContain("الجزء 2");
-    expect(sent[0]?.text).not.toMatch(/الجزء 2 و3|الجزآن|الجزأين/);
+    expect(sent[0]?.text).toMatch(/(الجزء|جزؤكم اليوم هو) 2[^\d]/);
+    expect(sent[0]?.text).not.toMatch(/و3|الجزآن|الجزأين|أجزاؤكم/);
   }
 });
 
@@ -667,7 +667,7 @@ test("a welcome inside the window goes free-form with today's juz' and the butto
   expect(sent[0]?.to).toBe(PHONE.slice(1));
   expect(text).toContain("*ختمة العائلة*");
   expect(text).toContain("أهلاً سارة");
-  expect(text).toContain(juzText(1, [2, 3]));
+  expect(text).toContain(juzText([2, 3], false));
   expect(text).toContain(`[${ROTA_BUTTONS.done}]`);
   expect(text).toContain(`[${ROTA_BUTTONS.notYet}]`);
   expect((await rows(t))[0]?.sentAt).not.toBeNull();

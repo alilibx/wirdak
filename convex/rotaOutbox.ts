@@ -349,7 +349,7 @@ export async function welcomeMessage(
       .map((r) => r.juz)
       .sort((a, b) => a - b);
     if (juz.length > 0) {
-      const text = `${welcomeText(participant.name, title, null)}\n${juzText(last.number, juz)}`;
+      const text = `${welcomeText(participant.name, title, null)}\n${juzText(juz, false)}`;
       const payloads = donePayloads(
         { dayId: last._id, participantId: participant._id },
         isStaging(),
@@ -399,7 +399,7 @@ function compose(
       }
       const text =
         row.kind === "juz"
-          ? juzText(number, row.juz)
+          ? juzText(row.juz)
           : row.kind === "reminder"
             ? reminderText(row.juz)
             : assignedText(row.juz, number);

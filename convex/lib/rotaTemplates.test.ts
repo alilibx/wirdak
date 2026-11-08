@@ -120,14 +120,17 @@ test("welcome text names the day and time of the next message, if any", () => {
 });
 
 test("the free texts use Western digits", () => {
-  expect(juzText(3, one)).toBe(
-    "تحديث على قراءتك اليوم في الختمة 3: المسجَّل لك الجزء 26 من هذه الختمة.",
+  expect(juzText(one)).toBe(
+    "السلام عليكم، جزؤكم اليوم هو 26. انقروا «أتممت» بعد القراءة.",
   );
-  expect(juzText(3, two)).toBe(
-    "تحديث على قراءتك اليوم في الختمة 3: المسجَّل لك الجزآن 5 و6 من هذه الختمة.",
+  expect(juzText(two)).toBe(
+    "السلام عليكم، أجزاؤكم اليوم هي 5 و6. انقروا «أتممت» بعد القراءة.",
   );
-  expect(juzText(3, three)).toBe(
-    "تحديث على قراءتك اليوم في الختمة 3: المسجَّل لك الأجزاء 3، 5 و6 من هذه الختمة.",
+  expect(juzText(three)).toBe(
+    "السلام عليكم، أجزاؤكم اليوم هي 3، 5 و6. انقروا «أتممت» بعد القراءة.",
+  );
+  expect(juzText(one, false)).toBe(
+    "جزؤكم اليوم هو 26. انقروا «أتممت» بعد القراءة.",
   );
   expect(reminderText(two)).toBe(
     "تذكير بقراءتك اليوم: لم تُسجَّل بعد قراءة الجزأين 5 و6 في هذه الختمة.",

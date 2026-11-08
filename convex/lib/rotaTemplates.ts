@@ -1,6 +1,6 @@
 import { DUAS } from "./duas";
 import { toWesternDigits } from "./digits";
-import { cheerLead, juzPhrase, juzPhraseGenitive } from "./noteText";
+import { cheerLead, juzList, juzPhrase, juzPhraseGenitive } from "./noteText";
 import { khatmaTitle, type TemplateMessage } from "./whatsappTemplates";
 
 /**
@@ -181,9 +181,17 @@ export function welcomeText(
 /** The name of a member accepted from a join request that came without a profile name. */
 export const NEW_MEMBER_NAME = "مشارك جديد";
 
-/** The juz' message as free-form text; the done and not-yet buttons go with it. */
-export function juzText(number: number, juz: number[]): string {
-  return `تحديث على قراءتك اليوم في الختمة ${toWesternDigits(number)}: المسجَّل لك ${juzPhrase(juz)} من هذه الختمة.`;
+/**
+ * The juz' message as free-form text; the done and not-yet buttons go with it.
+ * `greet` is false after the welcome, which already says hello.
+ */
+export function juzText(juz: number[], greet = true): string {
+  const today =
+    juz.length === 1
+      ? `جزؤكم اليوم هو ${juzList(juz)}`
+      : `أجزاؤكم اليوم هي ${juzList(juz)}`;
+  const text = `${today}. انقروا «${ROTA_BUTTONS.done}» بعد القراءة.`;
+  return greet ? `السلام عليكم، ${text}` : text;
 }
 
 export function thanksText(doneCount: number): string {
