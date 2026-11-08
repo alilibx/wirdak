@@ -582,6 +582,7 @@ export const addParticipant = sessionMutation({
     phone: v.string(),
     juz: v.optional(v.number()),
     readsToday: v.optional(v.boolean()),
+    share: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.addParticipant> => {
     const { person, khatma, rota } = await requireRotaOrganizer(
@@ -709,6 +710,7 @@ export const addSaved = sessionMutation({
     contactId: v.id("rotaContacts"),
     juz: v.optional(v.number()),
     readsToday: v.optional(v.boolean()),
+    share: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.addSaved> => {
     const { person, khatma, rota } = await requireRotaOrganizer(
@@ -720,7 +722,7 @@ export const addSaved = sessionMutation({
   },
 });
 
-/** Several saved people at once, each on the lowest free juz'. */
+/** Several saved people at once, each on the lowest free juz', then sharing one. */
 export const addSavedMany = sessionMutation({
   args: {
     inviteCode: v.string(),
@@ -819,9 +821,11 @@ export const importable = sessionQuery({
 
 /**
  * Adds the active members of one of the organizer's pool khatmas to the free
- * ajza' in the order they joined it. The organizer never sees their numbers:
- * the participants are marked `phoneHidden`, and each has to join on WhatsApp
- * themselves. Stops when the ajza' run out; the rest count as skipped.
+ * ajza' in the order they joined it, then, once every juz' has a reader, as
+ * second readers from the lowest juz' while sharing is open. The organizer
+ * never sees their numbers: the participants are marked `phoneHidden`, and
+ * each has to join on WhatsApp themselves. Stops when the ajza' run out; the
+ * rest count as skipped.
  */
 export const importMembers = sessionMutation({
   args: { inviteCode: v.string(), sourceInviteCode: v.string() },
@@ -869,6 +873,9 @@ export const importMembers = sessionMutation({
           phoneHidden: true,
         },
         undefined,
+        undefined,
+        undefined,
+        "fill",
       );
       if ("error" in placed) {
         skipped += candidates.length - index;
@@ -915,6 +922,7 @@ export const acceptJoinRequest = sessionMutation({
     juz: v.number(),
     name: v.optional(v.string()),
     readsToday: v.optional(v.boolean()),
+    share: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.acceptJoinRequest> => {
     const { person, khatma, rota } = await requireRotaOrganizer(

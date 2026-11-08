@@ -397,6 +397,45 @@ test("a change writes one audit row naming it, and a refused one writes none", a
   expect(await auditRows(t)).toHaveLength(before + 1);
 });
 
+test("an admin can share a juz', audited", async () => {
+  const t = convexTest(schema, modules);
+  const { khatmaId, readerId } = await running(t);
+  for (let juz = 2; juz <= 30; juz++) {
+    if (juz === 8) continue;
+    await t.mutation(api.adminRota.addParticipant, {
+      adminToken,
+      khatmaId,
+      name: `قارئ ${juz}`,
+      phone: `+9715000091${String(juz).padStart(2, "0")}`,
+      juz,
+    });
+  }
+  const before = (await auditRows(t)).length;
+  const shareEight = () =>
+    t.mutation(api.adminRota.addParticipant, {
+      adminToken,
+      khatmaId,
+      name: "الثاني",
+      phone: "+971500009200",
+      juz: 8,
+      share: true,
+    });
+
+  expect(await shareEight()).toMatchObject({ ok: true, juz: 8 });
+  const view = await t.query(api.adminRota.people, { adminToken, khatmaId });
+  expect(view?.rows[7]?.participant?.id).toBe(readerId);
+  expect(view?.rows[7]?.partner?.name).toBe("الثاني");
+  const rows = await auditRows(t);
+  expect(rows).toHaveLength(before + 1);
+  expect(rows.at(-1)).toMatchObject({
+    note: "addParticipant",
+    after: { juz: 8, share: true },
+  });
+
+  expect(await shareEight()).toEqual({ error: "already_added" });
+  expect(await auditRows(t)).toHaveLength(before + 1);
+});
+
 test("spreadFreeJuz gives the free ajza' out and writes one audit row", async () => {
   const t = convexTest(schema, modules);
   const { khatmaId, readerId } = await running(t);

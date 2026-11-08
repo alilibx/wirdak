@@ -262,6 +262,7 @@ export const addParticipant = adminMutation({
     phone: v.string(),
     juz: v.optional(v.number()),
     readsToday: v.optional(v.boolean()),
+    share: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.addParticipant> => {
     const { khatma, rota } = await requireLiveRota(ctx, args.khatmaId);
@@ -389,6 +390,7 @@ export const addSaved = adminMutation({
     contactId: v.id("rotaContacts"),
     juz: v.optional(v.number()),
     readsToday: v.optional(v.boolean()),
+    share: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.addSaved> => {
     const { khatma, rota } = await requireLiveRota(ctx, args.khatmaId);
@@ -442,6 +444,7 @@ export const acceptJoinRequest = adminMutation({
     juz: v.number(),
     name: v.optional(v.string()),
     readsToday: v.optional(v.boolean()),
+    share: v.optional(v.boolean()),
   },
   handler: async (ctx, args): ReturnType<typeof ops.acceptJoinRequest> => {
     const { khatma, rota } = await requireLiveRota(ctx, args.khatmaId);

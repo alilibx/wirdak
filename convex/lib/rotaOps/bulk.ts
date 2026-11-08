@@ -18,7 +18,7 @@ export type AddSavedManyResult =
       added: number;
       /** Already reading in this khatma, or listed twice under one number. */
       alreadyIn: number;
-      /** The free ajza' ran out before them. */
+      /** No juz' was left for them, free or to share. */
       noRoom: number;
       /** Not on the caller's saved list (removed, someone else's, or gone). */
       notFound: number;
@@ -34,10 +34,11 @@ type Who = {
 
 /**
  * Adds several saved contacts at once, in the order given, each on the lowest
- * free juz' of the next day to start, as `addSaved` does for one. Nobody joins
- * here: each still sends the khatma's join message. Late in the day the
- * organizer's answer is asked for once, before anyone is added, and applies
- * to everyone in the batch.
+ * free juz' of the next day to start, as `addSaved` does for one. Once every
+ * juz' has a reader, the rest share ajza' in order, from the lowest juz' with
+ * no second reader, while sharing is open. Nobody joins here: each still sends
+ * the khatma's join message. Late in the day the organizer's answer is asked
+ * for once, before anyone is added, and applies to everyone in the batch.
  */
 export async function addSavedMany(
   ctx: MutationCtx,
@@ -72,11 +73,11 @@ export async function addSavedMany(
   const free = Array.from({ length: ROTA_SIZE }, (_, i) => i + 1).filter(
     (juz) => !byJuz.has(juz),
   );
-  const placing = batch.slice(0, free.length);
 
   // Ask before writing anything, so a question never leaves half a batch in.
+  // Only the people on a free juz' could take today's: a second reader never does.
   if (args.readsToday === undefined && target.date !== null) {
-    for (const [i, who] of placing.entries()) {
+    for (const [i, who] of batch.slice(0, free.length).entries()) {
       const slot = slotFor(free[i]!, target.number);
       if (await lateInTheDay(ctx, khatma, who.phone, slot, false)) {
         return { error: "ask_today" };
@@ -85,18 +86,18 @@ export async function addSavedMany(
   }
 
   let added = 0;
-  for (const [i, who] of placing.entries()) {
+  for (const who of batch) {
     const placed = await placeNewParticipant(
       ctx,
       khatma,
       who,
-      free[i],
       undefined,
-      {
-        readsToday: args.readsToday,
-      },
+      undefined,
+      { readsToday: args.readsToday },
+      "fill",
     );
-    // The question was asked above and every juz' was free, so this can't fail.
+    if ("error" in placed && placed.error === "no_free_juz") break;
+    // The question was asked above, so nothing else can refuse them.
     if ("error" in placed) throw new ConvexError({ code: placed.error });
     added += 1;
   }
@@ -104,7 +105,7 @@ export async function addSavedMany(
     ok: true,
     added,
     alreadyIn,
-    noRoom: batch.length - placing.length,
+    noRoom: batch.length - added,
     notFound,
   };
 }

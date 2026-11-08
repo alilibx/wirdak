@@ -544,6 +544,38 @@ test("accepting a request late in the day asks too, and tomorrow leaves today's 
   expect((await juzFive(t, s.day._id))?.readerId).toBeNull();
 });
 
+test("a second reader added late in the day is never asked, and takes nothing today", async () => {
+  const t = convexTest(schema, modules);
+  const s = await runningKhatma(t);
+  vi.setSystemTime(dubai("2027-01-16T17:00"));
+  // Before 18:00, every juz' of the next day gets a reader, juz' 6 (slot 5) too.
+  for (const juz of (await t.query(api.rota.people, s.auth))!.freeJuz) {
+    await t.mutation(api.rota.addParticipant, {
+      ...s.auth,
+      name: `قارئ ${juz}`,
+      phone: `+9715055570${String(juz).padStart(2, "0")}`,
+      juz,
+    });
+  }
+  vi.setSystemTime(dubai("2027-01-16T19:00"));
+
+  const added = await t.mutation(api.rota.addParticipant, {
+    ...s.auth,
+    name: "جديد",
+    phone: `+${LATE}`,
+    juz: 6,
+    share: true,
+  });
+  expect(added).toMatchObject({ ok: true, juz: 6 });
+  if (!("participantId" in added)) throw new Error(JSON.stringify(added));
+  expect(
+    (await t.run((ctx) => ctx.db.get(added.participantId)))?.readsFrom,
+  ).toBeUndefined();
+
+  await send(t, LATE, joinText("ختمة", "JNC234"));
+  expect((await juzFive(t, s.day._id))?.readerId).toBeNull();
+});
+
 test("a tap after midnight still counts for the day before", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t, [{ slot: 1, phone: `+${LATE}` }]);

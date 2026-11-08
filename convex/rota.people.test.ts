@@ -4,6 +4,7 @@ import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { sha256Hex } from "./lib/crypto";
 import { slotFor } from "./lib/rota";
+import { placeNewParticipant } from "./lib/rotaOps/people";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -78,7 +79,12 @@ let phoneSeq = 0;
 function add(
   t: T,
   s: Setup,
-  over: Partial<{ name: string; phone: string; juz: number }> = {},
+  over: Partial<{
+    name: string;
+    phone: string;
+    juz: number;
+    share: boolean;
+  }> = {},
 ) {
   phoneSeq += 1;
   return t.mutation(api.rota.addParticipant, {
@@ -1495,4 +1501,237 @@ test("people says which participants have signed in, by account or by the number
     false,
   ]);
   expect(view?.rows[1]?.participant?.hasAccount).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Adding a second reader
+
+/** Gives every free juz' of khatma 1 a reader (the organizer holds juz' 1), but `except`. */
+async function fillAll(t: T, s: Setup, except: number[] = []) {
+  const ids = new Map<number, Id<"rotaParticipants">>();
+  for (let juz = 2; juz <= 30; juz++) {
+    if (except.includes(juz)) continue;
+    ids.set(juz, participantId(await add(t, s, { juz })));
+  }
+  return ids;
+}
+
+const share = (
+  t: T,
+  s: Setup,
+  juz: number,
+  over: Partial<{ name: string; phone: string }> = {},
+) => add(t, s, { juz, share: true, ...over });
+
+const setSetting = (t: T, key: string, value: unknown) =>
+  t.run((ctx) => ctx.db.insert("settings", { key, value, updatedAt: 0 }));
+
+test("sharing is refused while any slot is empty", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await fillAll(t, s, [30]);
+  expect(await share(t, s, 1)).toEqual({ error: "not_full" });
+  const view = await people(t, s);
+  expect(view?.participants).toHaveLength(29);
+  expect(view?.sharing).toEqual({
+    on: true,
+    open: false,
+    readers: 29,
+    shared: 0,
+  });
+});
+
+test("sharing works once all 30 have a reader", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await fillAll(t, s);
+  const added = await share(t, s, 1, { name: "الثاني" });
+  expect(added).toMatchObject({ ok: true, juz: 1 });
+
+  const view = await people(t, s);
+  expect(view?.rows[0]?.participant).toMatchObject({
+    name: "المنظم",
+    isMe: true,
+  });
+  expect(view?.rows[0]?.partner).toMatchObject({
+    id: participantId(added),
+    name: "الثاني",
+    isMe: false,
+    slots: 1,
+    joined: false,
+  });
+  expect(view?.rows[1]?.partner).toBeNull();
+  expect(view?.freeJuz).toEqual([]);
+  expect(view?.participants.at(-1)).toMatchObject({
+    name: "الثاني",
+    juz: [1],
+  });
+  expect(view?.sharing).toEqual({
+    on: true,
+    open: true,
+    readers: 31,
+    shared: 1,
+  });
+  expect(await slotRowsOf(t, s, 1)).toEqual([
+    { participantId: view?.rows[0]?.participant?.id, second: undefined },
+    { participantId: participantId(added), second: true },
+  ]);
+});
+
+test("a juz' takes no third reader", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await fillAll(t, s);
+  expect(await share(t, s, 4)).toMatchObject({ ok: true });
+  expect(await share(t, s, 4)).toEqual({ error: "already_shared" });
+  expect((await people(t, s))?.participants).toHaveLength(31);
+});
+
+test("someone already in the khatma can't become a second reader", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await fillAll(t, s, [2]);
+  await add(t, s, { juz: 2, phone: "+971505559001" });
+  expect(await share(t, s, 5, { phone: "+971505559001" })).toEqual({
+    error: "already_added",
+  });
+  expect(await slotRowsOf(t, s, 5)).toHaveLength(1);
+});
+
+test("rotaSharedSlotsOn off refuses sharing, and shared slots carry on", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await fillAll(t, s);
+  const b = participantId(await share(t, s, 3));
+  await setSetting(t, "rotaSharedSlotsOn", false);
+  expect(await share(t, s, 4)).toEqual({ error: "sharing_off" });
+  const view = await people(t, s);
+  expect(view?.rows[2]?.partner?.id).toBe(b);
+  expect(view?.sharing).toEqual({
+    on: false,
+    open: false,
+    readers: 31,
+    shared: 1,
+  });
+});
+
+test("a slot that empties keeps existing shares and blocks new ones", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const ids = await fillAll(t, s);
+  const b = participantId(await share(t, s, 3));
+  expect(
+    await t.mutation(api.rota.freeJuz, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      participantId: ids.get(30)!,
+      juz: 30,
+    }),
+  ).toEqual({ ok: true });
+  const view = await people(t, s);
+  expect(view?.freeJuz).toEqual([30]);
+  expect(view?.rows[2]?.partner?.id).toBe(b);
+  expect(view?.sharing.open).toBe(false);
+  expect(await share(t, s, 4)).toEqual({ error: "not_full" });
+});
+
+test("a khatma holds 60 readers", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await fillAll(t, s);
+  for (let juz = 1; juz <= 30; juz++) {
+    expect(await share(t, s, juz)).toMatchObject({ ok: true, juz });
+  }
+  const view = await people(t, s);
+  expect(view?.participants).toHaveLength(60);
+  expect(view?.sharing).toEqual({
+    on: true,
+    open: true,
+    readers: 60,
+    shared: 30,
+  });
+  expect(view?.rows.every((r) => r.participant && r.partner)).toBe(true);
+
+  const khatmaId = await khatmaIdOf(t, s);
+  const placed = await t.run(async (ctx) =>
+    placeNewParticipant(
+      ctx,
+      (await ctx.db.get(khatmaId))!,
+      { name: "الحادي والستون", phone: "+971505559061", personId: null },
+      undefined,
+      undefined,
+      undefined,
+      "fill",
+    ),
+  );
+  expect(placed).toEqual({ error: "no_free_juz" });
+});
+
+test("a join request can be accepted onto a shared slot", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const ids = await fillAll(t, s, [30]);
+  const id = await request(t, s);
+  const acceptShared = () =>
+    t.mutation(api.rota.acceptJoinRequest, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      requestId: id,
+      juz: 3,
+      share: true,
+    });
+
+  expect(await acceptShared()).toEqual({ error: "not_full" });
+  expect((await people(t, s))?.requests).toHaveLength(1);
+
+  await add(t, s, { juz: 30 });
+  const res = await acceptShared();
+  expect(res).toMatchObject({ ok: true });
+  const view = await people(t, s);
+  expect(view?.requests).toEqual([]);
+  expect(view?.rows[2]?.participant?.id).toBe(ids.get(3));
+  expect(view?.rows[2]?.partner).toMatchObject({
+    name: "خالد",
+    joined: true,
+  });
+});
+
+test("a co-organizer needs People to share", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const co = await person(t);
+  const coPhone = (await t.run((ctx) => ctx.db.get(co.personId)))!.phone;
+  const coP = participantId(await add(t, s, { juz: 2, phone: coPhone }));
+  await fillAll(t, s, [2]);
+  const setPeople = async (people: boolean) => {
+    const list = await t.query(api.coOrganizers.list, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+    });
+    const coOrganizerId =
+      "coOrganizers" in list ? list.coOrganizers[0]?.coOrganizerId : undefined;
+    await t.mutation(api.coOrganizers.set, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      ...(coOrganizerId ? { coOrganizerId } : { candidateId: `p:${coP}` }),
+      readings: true,
+      people,
+      settings: true,
+    });
+  };
+  const coShare = () =>
+    t.mutation(api.rota.addParticipant, {
+      sessionToken: co.token,
+      inviteCode: s.inviteCode,
+      name: "الثاني",
+      phone: "+971505559002",
+      juz: 5,
+      share: true,
+    });
+
+  await setPeople(false);
+  await expect(coShare()).rejects.toThrow(/forbidden/);
+  await setPeople(true);
+  expect(await coShare()).toMatchObject({ ok: true, juz: 5 });
+  expect((await people(t, s))?.rows[4]?.partner?.name).toBe("الثاني");
 });
