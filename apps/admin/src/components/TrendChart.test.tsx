@@ -16,7 +16,7 @@ describe("TrendChart", () => {
         points={points}
         format={String}
         label="أجزاء"
-        period="٧ أيام"
+        period="7 أيام"
       />,
     );
     expect(container.querySelectorAll("[data-bar]")).toHaveLength(2);
@@ -29,7 +29,7 @@ describe("TrendChart", () => {
         points={points}
         format={(v) => `${v} جزء`}
         label="أجزاء"
-        period="٧ أيام"
+        period="7 أيام"
       />,
     );
     expect(screen.getByRole("img")).toHaveAccessibleName(/7 جزء/);
@@ -41,7 +41,7 @@ describe("TrendChart", () => {
         points={points}
         format={(v) => `${v} جزء`}
         label="أجزاء"
-        period="٧ أيام"
+        period="7 أيام"
       />,
     );
     const target = container.querySelectorAll("[data-hit]")[2] as Element;

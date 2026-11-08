@@ -120,7 +120,7 @@ test("notify sends an opted-in member the template, without push", async () => {
   expect(sent).toEqual([
     {
       to: ali.digits,
-      text: `[wirdak_reminder_v2] ختمة رمضان | ١٢ | j/${ali.inviteCode}`,
+      text: `[wirdak_reminder_v2] ختمة رمضان | 12 | j/${ali.inviteCode}`,
     },
   ]);
   const note = await t.run((ctx) => ctx.db.get(noteId));
@@ -251,7 +251,7 @@ test("a grown openForHelp alert is not sent again on WhatsApp", async () => {
   await alert(7);
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   expect(sent.map((s) => s.text)).toEqual([
-    `[wirdak_open_for_help_v3] ختمة رمضان | ٣ | j/${organizer.inviteCode}`,
+    `[wirdak_open_for_help_v3] ختمة رمضان | 3 | j/${organizer.inviteCode}`,
   ]);
 });
 
@@ -280,7 +280,7 @@ test("sendSample sends a template on staging and refuses on production", async (
     many: true,
   });
   expect(sent.map((s) => s.text)).toEqual([
-    `[wirdak_open_for_help_many_v3] ختمة رمضان | ٣، ١٢ و١٥ | j/${ali.inviteCode}`,
+    `[wirdak_open_for_help_many_v3] ختمة رمضان | 3، 12 و15 | j/${ali.inviteCode}`,
   ]);
   vi.stubEnv("WIRDAK_ENV", "prod");
   await expect(

@@ -171,7 +171,7 @@ describe("RotaPeopleSetup: bringing people in", () => {
     const button = screen.getByRole("button", {
       name: new RegExp(t.rota.importTitle("ختمة الجيران")),
     });
-    expect(button).toHaveTextContent("٢٧ عضواً، بالأسماء فقط");
+    expect(button).toHaveTextContent("27 عضواً، بالأسماء فقط");
     expect(screen.getByText(t.rota.importHint)).toBeInTheDocument();
   });
 
@@ -193,7 +193,7 @@ describe("RotaPeopleSetup: bringing people in", () => {
     });
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(t.rota.importResult(25, 2));
-    expect(status).toHaveTextContent("٢٥ شخصاً");
+    expect(status).toHaveTextContent("25 شخصاً");
     expect(status).toHaveTextContent("شخصين");
   });
 

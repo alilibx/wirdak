@@ -79,8 +79,8 @@ describe("PeoplePage", () => {
       "/people/p1",
     );
     expect(screen.getByText("+971 50 ••• 4567")).toBeInTheDocument();
-    expect(screen.getByText("٢")).toBeInTheDocument();
-    expect(screen.getByText("٣")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
   });
 
   it("names a status, and someone who never signed in", () => {

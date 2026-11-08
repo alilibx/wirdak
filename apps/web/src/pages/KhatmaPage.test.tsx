@@ -160,12 +160,12 @@ describe("KhatmaPage", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "ختمة العائلة" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("الختمة ١٢")).toBeInTheDocument();
+    expect(screen.getByText("الختمة 12")).toBeInTheDocument();
     expect(screen.getByText("أسبوعية")).toBeInTheDocument();
     expect(screen.getByText(/^الهدف: /)).toBeInTheDocument();
     expect(screen.getByRole("img")).toHaveAttribute(
       "aria-label",
-      "تمّ ١ من ٣٠ جزءاً",
+      "تمّ 1 من 30 جزءاً",
     );
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
 
@@ -174,7 +174,7 @@ describe("KhatmaPage", () => {
 
     await userEvent.click(screen.getByRole("tab", { name: t.nav.tabs.group }));
     expect(
-      screen.getByText("ختمتم معاً ١١ ختمة، الحمد لله"),
+      screen.getByText("ختمتم معاً 11 ختمة، الحمد لله"),
     ).toBeInTheDocument();
   });
 
@@ -285,7 +285,7 @@ describe("KhatmaPage", () => {
     it("opens the verify sheet from an open tile", async () => {
       useQuery.mockReturnValue(signedOutView());
       renderAt("/j/CODE");
-      await userEvent.click(screen.getByRole("button", { name: /^الجزء ٥،/ }));
+      await userEvent.click(screen.getByRole("button", { name: /^الجزء 5،/ }));
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
 
@@ -362,7 +362,7 @@ describe("KhatmaPage", () => {
       renderAt("/j/CODE");
       await userEvent.click(screen.getByRole("button", { name: "خذ جزءاً" }));
       expect(
-        screen.getByRole("dialog", { name: "الجزء ٣" }),
+        screen.getByRole("dialog", { name: "الجزء 3" }),
       ).toBeInTheDocument();
       expect(
         screen.queryByRole("dialog", { name: "قبل أن تأخذ جزءاً" }),
@@ -437,7 +437,7 @@ describe("KhatmaPage", () => {
           </Routes>
         </MemoryRouter>,
       );
-      expect(screen.queryByText(t.khatma.openCount("٣٠"))).toBeNull();
+      expect(screen.queryByText(t.khatma.openCount("30"))).toBeNull();
       const tile = screen
         .getAllByRole("button")
         .find((b) => b.getAttribute("aria-label")?.includes(t.tile.open))!;
@@ -561,7 +561,7 @@ describe("KhatmaPage", () => {
       expect(
         screen.getByRole("switch", { name: t.khatmaSettings.notifications }),
       ).toBeInTheDocument();
-      expect(screen.getByText(t.khatma.groupTotal("٣"))).toBeInTheDocument();
+      expect(screen.getByText(t.khatma.groupTotal("3"))).toBeInTheDocument();
       expect(grid()).toBeNull();
     });
 

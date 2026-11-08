@@ -123,14 +123,14 @@ describe("HomePage", () => {
     const links = screen.getAllByRole("link", { name: /ختمة/ });
     const first = links.find((l) => l.getAttribute("href") === "/j/AAA")!;
     expect(first).toHaveTextContent("ختمة العائلة");
-    expect(first).toHaveTextContent("١٢ من ٣٠ تمّت");
+    expect(first).toHaveTextContent("12 من 30 تمّت");
     expect(first).toHaveTextContent("أسبوعية");
-    expect(first).toHaveTextContent("جزؤك: الجزء ١٤ «ربما»");
+    expect(first).toHaveTextContent("جزؤك: الجزء 14 «ربما»");
     expect(first).not.toHaveTextContent("·");
     const bar = within(first).getByRole("progressbar");
     expect(bar).toHaveAttribute("aria-valuenow", "12");
     expect(bar).toHaveAttribute("aria-valuemax", "30");
-    expect(bar).toHaveAccessibleName("تمّ ١٢ من ٣٠ جزءاً");
+    expect(bar).toHaveAccessibleName("تمّ 12 من 30 جزءاً");
     const second = links.find((l) => l.getAttribute("href") === "/j/BBB")!;
     expect(second).not.toHaveTextContent("جزؤك");
     expect(second).toHaveTextContent(/^ختمة .*أكتوبر/);
@@ -142,7 +142,7 @@ describe("HomePage", () => {
     const link = screen
       .getAllByRole("link")
       .find((l) => l.getAttribute("href") === "/j/AAA")!;
-    expect(link).toHaveTextContent("ختمة بالتناوب، ٢٦ من ٣٠ اليوم");
+    expect(link).toHaveTextContent("ختمة بالتناوب، 26 من 30 اليوم");
     expect(link).not.toHaveTextContent("تمّت");
     expect(link).not.toHaveTextContent("جزؤك");
     expect(within(link).getByRole("progressbar")).toHaveAttribute(
@@ -165,13 +165,13 @@ describe("HomePage", () => {
         .getAllByRole("link")
         .find((l) => l.getAttribute("href") === `/j/${code}`)!;
     expect(cardOf("AAA")).toHaveTextContent(t.home.peopleCount(3));
-    expect(t.home.peopleCount(3)).toBe("٣ أشخاص");
+    expect(t.home.peopleCount(3)).toBe("3 أشخاص");
     expect(t.home.peopleCount(1)).toBe("شخص واحد");
     expect(t.home.peopleCount(2)).toBe("شخصان");
-    expect(t.home.peopleCount(11)).toBe("١١ شخصاً");
+    expect(t.home.peopleCount(11)).toBe("11 شخصاً");
     expect(cardOf("BBB")).not.toHaveTextContent(/شخص|أشخاص/);
     expect(cardOf("CCC")).toHaveTextContent("شخص واحد");
-    expect(cardOf("EEE")).toHaveTextContent("١١ شخصاً");
+    expect(cardOf("EEE")).toHaveTextContent("11 شخصاً");
   });
 
   it("home shows the new-message label", () => {

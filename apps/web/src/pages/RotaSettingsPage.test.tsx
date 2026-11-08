@@ -156,7 +156,7 @@ describe("RotaSettingsPage", () => {
       const user = userEvent.setup();
       renderPage();
       await user.click(
-        screen.getByRole("button", { name: "احذف الجمعة ٢٧ نوفمبر" }),
+        screen.getByRole("button", { name: "احذف الجمعة 27 نوفمبر" }),
       );
       expect(m.fns.removePauseDate).toHaveBeenCalledWith({
         ...args,
@@ -173,9 +173,9 @@ describe("RotaSettingsPage", () => {
         within(sheet)
           .getAllByRole("button")
           .map((b) => b.textContent),
-      ).toEqual([t.sheet.close, "السبت ٢٨ نوفمبر", "الأحد ٢٩ نوفمبر"]);
+      ).toEqual([t.sheet.close, "السبت 28 نوفمبر", "الأحد 29 نوفمبر"]);
       await user.click(
-        within(sheet).getByRole("button", { name: "السبت ٢٨ نوفمبر" }),
+        within(sheet).getByRole("button", { name: "السبت 28 نوفمبر" }),
       );
       expect(m.fns.addPauseDate).toHaveBeenCalledWith({
         ...args,
@@ -197,7 +197,7 @@ describe("RotaSettingsPage", () => {
       const user = userEvent.setup();
       renderPage();
       await user.click(screen.getByRole("button", { name: t.rota.addDate }));
-      await user.click(screen.getByRole("button", { name: "السبت ٢٨ نوفمبر" }));
+      await user.click(screen.getByRole("button", { name: "السبت 28 نوفمبر" }));
       expect(await screen.findByRole("alert")).toHaveTextContent(
         t.rota.errors.past ?? "",
       );
@@ -223,7 +223,7 @@ describe("RotaSettingsPage", () => {
       ).toEqual(["true", "true", "false"]);
       expect(within(messages).getByText(t.rota.locked)).toBeInTheDocument();
       expect(
-        within(messages).getByText("بتوقيت الختمة، بين ٧:٠٠ ص و٩:٤٥ م."),
+        within(messages).getByText("بتوقيت الختمة، بين 7:00 ص و9:45 م."),
       ).toBeInTheDocument();
     });
 

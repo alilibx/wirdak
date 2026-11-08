@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 
 export type TimeZoneOption = { value: string; label: string };
 
@@ -10,9 +10,9 @@ function zoneName(zone: string, style: "longGeneric" | "shortOffset"): string {
   );
 }
 
-/** A zone as an Arabic reader knows it: «توقيت الخليج (غرينتش+٤)». */
+/** A zone as an Arabic reader knows it: «توقيت الخليج (غرينتش+4)». */
 export function timeZoneLabel(zone: string): string {
-  const offset = toArabicDigits(zoneName(zone, "shortOffset"));
+  const offset = toWesternDigits(zoneName(zone, "shortOffset"));
   return `${zoneName(zone, "longGeneric")} (${offset})`;
 }
 

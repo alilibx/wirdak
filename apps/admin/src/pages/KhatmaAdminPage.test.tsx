@@ -264,9 +264,9 @@ describe("KhatmaAdminPage lifecycle", () => {
 describe("KhatmaAdminPage", () => {
   it("shows the pool as three numbers, with no names next to ajza'", () => {
     renderPage();
-    expect(screen.getByText("٢٠")).toBeInTheDocument();
-    expect(screen.getByText("٤")).toBeInTheDocument();
-    expect(screen.getByText("٦")).toBeInTheDocument();
+    expect(screen.getByText("20")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
+    expect(screen.getByText("6")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "سارة" })).toHaveAttribute(
       "href",
       "/people/p2",
@@ -342,8 +342,8 @@ describe("KhatmaAdminPage", () => {
     renderPage();
     expect(screen.getByText(t.lookup.kindRota)).toBeInTheDocument();
     expect(screen.getByText("كل أسبوع: الاثنين، الخميس")).toBeInTheDocument();
-    expect(screen.getByText("الختمة ١٢ · الدورة ١")).toBeInTheDocument();
-    expect(screen.getByText("٢٧ / ٣٠ اليوم")).toBeInTheDocument();
+    expect(screen.getByText("الختمة 12 · الدورة 1")).toBeInTheDocument();
+    expect(screen.getByText("27 / 30 اليوم")).toBeInTheDocument();
     expect(screen.queryByText(t.lookup.rotaPaused)).not.toBeInTheDocument();
   });
 

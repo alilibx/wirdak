@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import type { PeopleView } from "@convex/lib/rotaOps";
 import { useMutation } from "convex/react";
 import { useId, useState } from "react";
@@ -71,7 +71,7 @@ function JoinRequestCard({
           >
             {freeJuz.map((n) => (
               <option key={n} value={n}>
-                {toArabicDigits(n)}
+                {toWesternDigits(n)}
               </option>
             ))}
           </select>

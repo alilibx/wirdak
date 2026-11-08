@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { JUZ } from "@convex/lib/juz";
 import { t } from "../i18n/ar";
 import { Button } from "./Button";
@@ -25,7 +25,7 @@ export function TakeSheet({
   onClose,
 }: Props) {
   const info = JUZ.find((j) => j.number === juz);
-  const number = toArabicDigits(juz);
+  const number = toWesternDigits(juz);
   return (
     <Sheet title={t.tile.juz(number)} onClose={onClose}>
       <div className="py-2.5 text-center">

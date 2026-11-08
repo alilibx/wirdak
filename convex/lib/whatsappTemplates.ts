@@ -1,4 +1,4 @@
-import { toArabicDigits } from "./digits";
+import { toWesternDigits } from "./digits";
 import {
   behindPhrase,
   juzList,
@@ -84,7 +84,7 @@ export function khatmaTitle(k: {
   createdAt: number;
 }): string {
   const title =
-    k.name ?? `ختمة ${toArabicDigits(untitledDate.format(k.createdAt))}`;
+    k.name ?? `ختمة ${toWesternDigits(untitledDate.format(k.createdAt))}`;
   return cleanParam(title).slice(0, MAX_HEADER).trim();
 }
 
@@ -129,7 +129,7 @@ function noteParams(note: NoteTextInput, now: number): string[] {
     case "rotaUnread":
       return [juzPhraseGenitive(note.juz)];
     case "rotaSummary":
-      return [toArabicDigits(note.count ?? 0)];
+      return [toWesternDigits(note.count ?? 0)];
     case "rotaJoinRequest":
       return [note.name ?? ""];
     // no body values (`cheer`, `rotaSilent`, `rotaSilenced`, `rotaStopped`, `rotaEnabled` and `coOrganizerNow`

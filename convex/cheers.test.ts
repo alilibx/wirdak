@@ -155,7 +155,7 @@ test("a finish cheers those still reading, and only them", async () => {
 
 test("the note names nobody and no juz'", () => {
   const text = noteText({ kind: "cheer", juz: [], count: 12, until: null });
-  expect(text).toContain("١٢ من ٣٠");
+  expect(text).toContain("12 من 30");
   expect(text).not.toMatch(/الجزء \d/);
 });
 
@@ -164,9 +164,9 @@ test("the text says only what the note carries", () => {
   const named = noteText({ ...base, juz: [], name: "سارة" });
   expect(named).toContain("تمّت قراءة جزء على يد سارة");
   const numbered = noteText({ ...base, juz: [5] });
-  expect(numbered).toContain("تمّت قراءة الجزء ٥،");
+  expect(numbered).toContain("تمّت قراءة الجزء 5،");
   const both = noteText({ ...base, juz: [5], name: "سارة" });
-  expect(both).toContain("تمّت قراءة الجزء ٥ على يد سارة");
+  expect(both).toContain("تمّت قراءة الجزء 5 على يد سارة");
 });
 
 test("a reader who asked for more time is cheered again", async () => {

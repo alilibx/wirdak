@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { t } from "../i18n/ar";
 
 const dateFormat = new Intl.DateTimeFormat("ar", {
@@ -7,9 +7,9 @@ const dateFormat = new Intl.DateTimeFormat("ar", {
   month: "long",
 });
 
-/** Some engines resolve "ar" to Latin digits, so the digits are always forced to Eastern Arabic. */
+/** Some engines format "ar" with Eastern Arabic digits, so the digits are always made Western. */
 export function formatDate(ms: number): string {
-  return toArabicDigits(dateFormat.format(ms));
+  return toWesternDigits(dateFormat.format(ms));
 }
 
 // iPadOS 13+ reports itself as a Mac and ChromeOS falls into Linux; neither is distinguishable here.

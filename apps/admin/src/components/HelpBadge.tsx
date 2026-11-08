@@ -1,5 +1,5 @@
 import { api } from "@convex/_generated/api";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { useQuery } from "convex/react";
 import { t } from "../i18n/ar";
 import { useAdminToken } from "../lib/adminSession";
@@ -17,7 +17,7 @@ export function HelpBadge({ className }: { className?: string }) {
         className,
       )}
     >
-      {counts.open >= 100 ? t.help.manyOpen : toArabicDigits(counts.open)}
+      {counts.open >= 100 ? t.help.manyOpen : toWesternDigits(counts.open)}
     </span>
   );
 }

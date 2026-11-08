@@ -1,5 +1,5 @@
 import { api } from "@convex/_generated/api";
-import { normalizeDigits, toArabicDigits } from "@convex/lib/digits";
+import { normalizeDigits, toWesternDigits } from "@convex/lib/digits";
 import { useQuery } from "convex/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -321,7 +321,7 @@ function PinStep({ v }: StepProps) {
                 : "border-line"
             }`}
           >
-            {pin[i] ? toArabicDigits(pin[i]) : ""}
+            {pin[i] ? toWesternDigits(pin[i]) : ""}
           </span>
         ))}
         <input

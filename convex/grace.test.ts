@@ -267,7 +267,7 @@ test("almost-up note fires at a quarter left, and no push falls in quiet hours",
   });
   if (!notes[0]) throw new Error("no note");
   expect(noteText(notes[0])).toBe(
-    "مهلة الجزء ١٢ أوشكت على الانتهاء. هل تحتاج وقتاً أطول؟",
+    "مهلة الجزء 12 أوشكت على الانتهاء. هل تحتاج وقتاً أطول؟",
   );
   expect((await rowOf(t, khatma._id, 12)).noticeSentAt).not.toBeNull();
   const pushes = await scheduled(t, "pushNode");
@@ -432,7 +432,7 @@ test("organizer alert on timeout and on release are identical", async () => {
   if (!timedOut || !released) throw new Error("missing alert");
   expect(shape(timedOut)).toEqual(shape(released));
   expect(noteText(timedOut)).toBe(
-    "الجزء ٣ متاح لمن يساعد. هل تأخذه أو ترسل الدعوة؟",
+    "الجزء 3 متاح لمن يساعد. هل تأخذه أو ترسل الدعوة؟",
   );
   // the reader isn't told their juz' opened; the releaser gets nothing either
   expect(uncleared(await notesOf(t, ali))).toHaveLength(0);
@@ -482,7 +482,7 @@ test("two ajza opening within an hour make one alert listing both", async () => 
   expect(alerts[0]?.juz).toEqual([12, 15]);
   if (!alerts[0]) throw new Error("no alert");
   expect(noteText(alerts[0])).toBe(
-    "الأجزاء ١٢ و١٥ متاحة لمن يساعد. هل تأخذ أحدها أو ترسل الدعوة؟",
+    "الأجزاء 12 و15 متاحة لمن يساعد. هل تأخذ أحدها أو ترسل الدعوة؟",
   );
 
   // two hours after the first alert: a new one
@@ -604,7 +604,7 @@ test("someone else takes it: old row released by system, one thanks note, reader
   expect(thanks[0]).toMatchObject({ juz: [9], clearedAt: null });
   if (!thanks[0]) throw new Error("no thanks");
   expect(noteText(thanks[0])).toBe(
-    "أحدهم يُكمل الجزء ٩ الآن. جزاكما الله خيراً.",
+    "أحدهم يُكمل الجزء 9 الآن. جزاكما الله خيراً.",
   );
   // the thanks is all that's left for the reader; the alert is gone too
   expect(uncleared(await notesOf(t, ali)).map((n) => n.kind)).toEqual([

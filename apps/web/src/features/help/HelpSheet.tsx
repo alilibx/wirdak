@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/Button";
@@ -32,7 +32,7 @@ function useObjectUrl(blob: Blob | null): string | null {
 
 function seconds(s: number): string {
   const m = Math.floor(s / 60);
-  return toArabicDigits(`${m}:${String(s % 60).padStart(2, "0")}`);
+  return toWesternDigits(`${m}:${String(s % 60).padStart(2, "0")}`);
 }
 
 /** The help sheet (spec 3.2 to 3.4): the person's requests, a composer, and conversations. */

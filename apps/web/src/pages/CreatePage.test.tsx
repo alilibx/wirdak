@@ -298,7 +298,7 @@ describe("CreatePage", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: /يومية/ }));
     expect(
-      screen.getByRole("button", { name: "مهلة كل جزء: ٦ ساعات · تغيير" }),
+      screen.getByRole("button", { name: "مهلة كل جزء: 6 ساعات · تغيير" }),
     ).toBeInTheDocument();
   });
 

@@ -516,7 +516,7 @@ test("sendWhatsAppTemplate posts a template with header, body and url button", a
     await sendWhatsAppTemplate("+971501234567", {
       name: "wirdak_reminder_v2",
       header: "ختمة رمضان",
-      body: ["١٢"],
+      body: ["12"],
       buttonParam: "j/AB12CD",
     }),
   ).toBe(true);
@@ -533,7 +533,7 @@ test("sendWhatsAppTemplate posts a template with header, body and url button", a
             type: "header",
             parameters: [{ type: "text", text: "ختمة رمضان" }],
           },
-          { type: "body", parameters: [{ type: "text", text: "١٢" }] },
+          { type: "body", parameters: [{ type: "text", text: "12" }] },
           {
             type: "button",
             sub_type: "url",
@@ -550,7 +550,7 @@ test("sendWhatsAppTemplate adds a payload for each quick-reply button", async ()
   await sendWhatsAppTemplate("+971501234567", {
     name: "wirdak_rota_day",
     header: "ختمة رمضان",
-    body: ["١٢"],
+    body: ["12"],
     quickReplies: ["r1|p|done|d1|p1", "r1|p|notYet|d1|p1"],
   });
   const template = payloads[0]!.template as { components: unknown[] };

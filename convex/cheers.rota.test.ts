@@ -186,7 +186,7 @@ test("a khatma can show the reader's name and every juz' of the tap", async () =
   // Nothing is sent to the reader of the two; the one already done hears of both.
   const [message] = sent.filter((m) => m.to === DONE.slice(1));
   expect(message?.text).toContain(cheerText(3, "قارئ 0", [1, 2]));
-  expect(message?.text).toContain("تمّت قراءة الجزأين ١ و٢ على يد قارئ 0");
+  expect(message?.text).toContain("تمّت قراءة الجزأين 1 و2 على يد قارئ 0");
 });
 
 test("the everyone setting reaches those already done, and never the reader", async () => {

@@ -1,5 +1,5 @@
 import { counted } from "@convex/lib/arabicCount";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { formatCount, formatDecimal } from "../lib/formatNumber";
 import type { AuditAction } from "@convex/lib/audit";
 import type { SettingGroup } from "@convex/lib/settingSpecs";
@@ -14,8 +14,8 @@ const labels: Record<SettingKey, string> = {
   verificationTtlMs: "صلاحية رمز التحقق",
   pinMaxAttempts: "محاولات الرمز المسموحة",
   signInAlertOn: "تنبيه الأعضاء عند تسجيل الدخول",
-  verifyStartPerClientPer10Min: "بدء التحقق لكل جهاز / ١٠ دقائق",
-  verifyStartPerIpPer10Min: "بدء التحقق لكل عنوان IP / ١٠ دقائق",
+  verifyStartPerClientPer10Min: "بدء التحقق لكل جهاز / 10 دقائق",
+  verifyStartPerIpPer10Min: "بدء التحقق لكل عنوان IP / 10 دقائق",
   verifyPerPhonePerHour: "رسائل التحقق لكل رقم / ساعة",
   verifyGlobalPerMinute: "بدء التحقق للجميع / دقيقة",
   poolActionsPerPersonPerMinute: "أخذ وإنهاء الأجزاء لكل شخص / دقيقة",
@@ -190,7 +190,7 @@ export const ar = {
     start: "الدخول عبر واتساب",
     waiting: "بانتظار رسالتك…",
     openAgain: "افتح واتساب مرة أخرى",
-    pinLabel: "الرمز المكوّن من ٦ أرقام",
+    pinLabel: "الرمز المكوّن من 6 أرقام",
     pinPaste: "الصق الرمز",
     pinPasteEmpty:
       "لم نجد رمزاً من ستة أرقام. اضغط «نسخ الرمز» في رسالة واتساب، ثم عُد إلى هنا.",
@@ -241,13 +241,13 @@ export const ar = {
     empty: "—",
     am: "ص",
     pm: "م",
-    seconds: (n: number) => `${toArabicDigits(n)} ثانية`,
+    seconds: (n: number) => `${toWesternDigits(n)} ثانية`,
     errors: {
       wrong_type: "القيمة ليست من النوع الصحيح.",
       out_of_range: "القيمة خارج المسموح.",
-      too_long: "النص أطول من ٢٠٠ حرف.",
+      too_long: "النص أطول من 200 حرف.",
       bad_version: "اكتب الإصدار هكذا: 0.3.0",
-      bad_grace: "كل مهلة بين ٣٠ دقيقة و٣٠ يومًا.",
+      bad_grace: "كل مهلة بين 30 دقيقة و30 يومًا.",
       pace_order: "يجب أن تكون: أقل وتيرة ≤ الافتراضية ≤ أعلى وتيرة.",
       quiet_hours_equal: "بداية ساعات الهدوء ونهايتها لا تتساويان.",
       unknown_key: "إعداد غير معروف.",
@@ -320,10 +320,10 @@ export const ar = {
     cancel: "إلغاء",
     homeCard: "طلبات مساعدة مفتوحة",
     oldest: (since: string) => `أقدمها منذ ${since}`,
-    manyOpen: "+٩٩",
+    manyOpen: "+99",
     errors: {
       empty: "اكتب الرد أولاً.",
-      too_long: "الرد أطول من ١٠٠٠ حرف.",
+      too_long: "الرد أطول من 1000 حرف.",
       not_found: "هذا الطلب لم يعد موجوداً.",
       generic: "تعذّر الإرسال. حاول مرة أخرى.",
     },
@@ -352,12 +352,12 @@ export const ar = {
     daysPerRound: "مدة الختمة (الوسيط)",
     changeWeek: (n: string) => `${n} عن الأسبوع الماضي`,
     newThisWeek: (n: string) => `+${n} هذا الأسبوع`,
-    avg7: (n: string) => `معدل ٧ أيام: ${n}`,
-    stalledHint: "١٤ يوماً بلا جزء مقروء",
+    avg7: (n: string) => `معدل 7 أيام: ${n}`,
+    stalledHint: "14 يوماً بلا جزء مقروء",
     capped: (n: string) => `${n}+`,
-    medianHint: "آخر ٣٠ يوماً",
+    medianHint: "آخر 30 يوماً",
     signIn: "نجاح التحقق عبر واتساب",
-    signInHint: "من بدأ التحقق في آخر ٧ أيام وأكمله",
+    signInHint: "من بدأ التحقق في آخر 7 أيام وأكمله",
     none: "—",
     days: (n: number) =>
       counted(
@@ -366,7 +366,7 @@ export const ar = {
         formatDecimal(n),
       ),
     percent: (n: string) => `${n}٪`,
-    periods: { 7: "٧ أيام", 30: "٣٠ يوماً", 365: "سنة" },
+    periods: { 7: "7 أيام", 30: "30 يوماً", 365: "سنة" },
     period: "المدة",
     metric: "المقياس",
     metrics: {
@@ -497,7 +497,7 @@ export const ar = {
       self: "هذا العضو هو المنظّم الآن.",
       archived: "هذه الختمة مؤرشفة.",
       rota: "لهذه الختمة أدواتها الخاصة في صفحة المساعدة.",
-      invalid_grace: "الوقت يجب أن يكون بين ٣٠ دقيقة و٣٠ يومًا.",
+      invalid_grace: "الوقت يجب أن يكون بين 30 دقيقة و30 يومًا.",
       not_archived: "أرشف الختمة أولاً.",
       invalid_name: "اكتب اسمًا فيه حروف أو أرقام.",
       no_account:
