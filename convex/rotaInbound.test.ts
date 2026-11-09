@@ -1025,6 +1025,43 @@ test("typed «تم» from the partner after the juz' is done doesn't mark anothe
   ).toHaveLength(1);
 });
 
+test("no thanks reply for a shared juz' reassigned to someone else and finished by them", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }, { slot: 2 }]);
+  const partner = await shareSlot(t, s, 1);
+  const day = await startDay(t, s);
+  const [holder, third] = s.participants as [
+    Id<"rotaParticipants">,
+    Id<"rotaParticipants">,
+  ];
+  // The organizer gave the juz' to a third reader, who finished it.
+  const shared = await juzRead(t, day._id, 1);
+  await t.run((ctx) =>
+    ctx.db.patch(shared._id, {
+      readerId: third,
+      reassignedAt: Date.now(),
+      doneAt: Date.now(),
+      doneById: third,
+      doneByOrganizer: false,
+    }),
+  );
+  sent = [];
+
+  await send(t, phoneOf(0), "أتممت", { payload: tap("done", day._id, holder) });
+  await send(t, PARTNER, "أتممت", { payload: tap("done", day._id, partner) });
+
+  expect(sent.map((m) => m.body)).toEqual([
+    `*ختمة*\n${alreadyText}`,
+    `*ختمة*\n${alreadyText}`,
+  ]);
+  expect((await juzRead(t, day._id, 1)).thankedIds ?? []).toEqual([]);
+
+  // Typed «تم» isn't drawn to that day either: it has nothing for them.
+  await send(t, PARTNER, "تم");
+  expect(sent.at(-1)?.body).toBe(alreadyText);
+  expect((await juzRead(t, day._id, 1)).thankedIds ?? []).toEqual([]);
+});
+
 test("the same in the late window", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t, [{ slot: 1 }]);

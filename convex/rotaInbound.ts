@@ -164,7 +164,8 @@ async function readsOf(ctx: MutationCtx, participant: Participant, day: Day) {
 
 /**
  * Whether a done shared juz' still owes this reader the thanks reply: the
- * other reader or the organizer finished it, and they haven't had it yet.
+ * other reader or the organizer finished it, and they haven't had it yet. Not
+ * one reassigned to a third person: both readers were told it was read for them.
  */
 function thanksDue(
   read: Doc<"rotaReads">,
@@ -173,6 +174,7 @@ function thanksDue(
   return (
     read.doneAt !== null &&
     read.partnerId != null &&
+    read.reassignedAt === null &&
     read.doneById !== participantId &&
     !(read.thankedIds ?? []).includes(participantId)
   );

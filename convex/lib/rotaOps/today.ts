@@ -5,6 +5,7 @@ import { celebrateIfComplete, completeIfDone } from "../../rotaDays";
 import { enqueue } from "../../rotaOutbox";
 import { changeCompletedDays } from "../directory";
 import { isArchived } from "../khatma";
+import { readsFor } from "../rota";
 import { lastRotaDay, targetDay, type RotaConfig } from "../rotaPlace";
 import { localDate } from "../wakingTime";
 import { activeParticipant, isActor, type Actor } from "./people";
@@ -38,6 +39,17 @@ export type TodayView = {
     readerId: Id<"rotaParticipants"> | null;
     /** What the reader answered to an unread juz': «ليس بعد», or nothing yet; null once done. */
     answer: "notYet" | "none" | null;
+    /** The day's second reader of a shared juz', fixed at the day's start. */
+    partnerId: Id<"rotaParticipants"> | null;
+    partnerName: string | null;
+    /** What the partner answered, like `answer`; null once done or when unshared. */
+    partnerAnswer: "notYet" | "none" | null;
+    /**
+     * Who finished a shared juz' by their own «أتممت». Null for an organizer's
+     * mark and for juz' that aren't shared. The view is for Readings
+     * organizers (and admins) only, so it is no wider than who sees the tile.
+     */
+    doneByName: string | null;
   }[];
   participants: {
     id: Id<"rotaParticipants">;
@@ -66,9 +78,10 @@ async function currentDay(
 function answerOf(
   read: Doc<"rotaReads">,
   reader: Doc<"rotaParticipants"> | null | undefined,
+  notYetAt: number | null | undefined = read.notYetAt,
 ): "notYet" | "none" | null {
   if (read.doneAt !== null) return null;
-  if (read.notYetAt != null) return "notYet";
+  if (notYetAt != null) return "notYet";
   return reader &&
     reader.removedAt === null &&
     reader.joinedAt != null &&
@@ -114,12 +127,20 @@ export async function today(
     readerName: nameOf(r.readerId),
     readerId: r.readerId,
     answer: answerOf(r, r.readerId && byId.get(r.readerId)),
+    partnerId: r.partnerId ?? null,
+    partnerName: nameOf(r.partnerId ?? null),
+    // A partner of a reassigned juz' has been told it is read for them.
+    partnerAnswer:
+      r.partnerId != null && r.reassignedAt === null
+        ? answerOf(r, byId.get(r.partnerId), r.partnerNotYetAt)
+        : null,
+    doneByName: nameOf(r.doneById ?? null),
   }));
   const participants = everyone
     .filter((p) => p.removedAt === null)
     .sort((a, b) => a.addedAt - b.addedAt || a._creationTime - b._creationTime)
     .map((p) => {
-      const mine = reads.filter((r) => r.readerId === p._id);
+      const mine = reads.filter((r) => readsFor(r, p._id));
       return {
         id: p._id,
         name: p.name,
@@ -182,8 +203,9 @@ export async function reassign(
   await ctx.db.patch(found.read._id, {
     readerId: participant._id,
     reassignedAt: Date.now(),
-    // The new reader hasn't answered.
+    // The new reader hasn't answered, and the partner's answer was to the old arrangement.
     notYetAt: null,
+    partnerNotYetAt: null,
   });
   const row = {
     khatmaId: khatma._id,
@@ -206,6 +228,16 @@ export async function reassign(
       kind: "covered",
     });
   }
+  // A shared juz's second reader is covered too, unless it went to them.
+  const partnerId = found.read.partnerId;
+  if (
+    partnerId != null &&
+    partnerId !== previousId &&
+    partnerId !== participant._id &&
+    told
+  ) {
+    await enqueue(ctx, { ...row, participantId: partnerId, kind: "covered" });
+  }
   return { ok: true };
 }
 
@@ -226,6 +258,7 @@ export async function markDone(
     await ctx.db.patch(found.read._id, {
       doneAt: now,
       doneByOrganizer: true,
+      doneById: null,
     });
     await scheduleRotaCheer(ctx, found.read._id, now, null);
   }
@@ -257,6 +290,8 @@ export async function markNotDone(
   await ctx.db.patch(found.read._id, {
     doneAt: null,
     doneByOrganizer: false,
+    doneById: null,
+    thankedIds: [],
   });
   if (found.day.completedAt !== null) {
     await ctx.db.patch(found.day._id, { completedAt: null });

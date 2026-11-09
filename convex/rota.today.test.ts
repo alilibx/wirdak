@@ -682,3 +682,209 @@ test("a reader whose juz' moved before the day's message hears nothing of it", a
   expect(await covered()).toEqual([first]);
   expect(await covered()).not.toContain(holder);
 });
+
+// ---------------------------------------------------------------------------
+// A shared juz'
+
+/** A second reader on slot `slot`, joined, who shares its juz' from the next day start. */
+async function shareWith(t: T, s: Setup, slot: number, name = "شريك") {
+  return await t.run(async (ctx) => {
+    const participantId = await ctx.db.insert("rotaParticipants", {
+      khatmaId: s.khatmaId,
+      name,
+      phone: `+97150777${String(slot).padStart(4, "0")}`,
+      personId: null,
+      addedAt: 0,
+      removedAt: null,
+      joinedAt: NOW - 3_600_000,
+    });
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: s.khatmaId,
+      slot,
+      participantId,
+      second: true,
+    });
+    return participantId;
+  });
+}
+
+/** A shared juz' 8: its first reader, its second reader, and the day started. */
+async function sharedEight(t: T, s: Setup) {
+  const first = await add(t, s, 8);
+  await join(t, first);
+  const partner = await shareWith(t, s, 8);
+  const third = await add(t, s, 9);
+  await join(t, third);
+  await startDay(t, s);
+  return { first, partner, third, eight: await tile(t, s, 8) };
+}
+
+test("today shows both readers and their answers", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, partner, eight } = await sharedEight(t, s);
+  expect(eight).toMatchObject({
+    readerId: first,
+    partnerId: partner,
+    partnerName: "شريك",
+    partnerAnswer: "none",
+    doneByName: null,
+  });
+  expect((await tile(t, s, 9)).partnerName).toBeNull();
+  expect((await tile(t, s, 9)).partnerAnswer).toBeNull();
+
+  await t.run((ctx) => ctx.db.patch(eight.readId, { partnerNotYetAt: NOW }));
+  expect((await tile(t, s, 8)).partnerAnswer).toBe("notYet");
+  expect((await tile(t, s, 8)).answer).toBe("none");
+
+  await act(t, s, "markDone", { readId: eight.readId });
+  expect((await tile(t, s, 8)).partnerAnswer).toBeNull();
+});
+
+test("today shows who marked a shared juz' to those with Readings", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { partner, eight } = await sharedEight(t, s);
+  await t.run((ctx) =>
+    ctx.db.patch(eight.readId, {
+      doneAt: NOW,
+      doneById: partner,
+      doneByOrganizer: false,
+    }),
+  );
+  expect((await tile(t, s, 8)).doneByName).toBe("شريك");
+
+  // Someone with no Readings switch doesn't get the view at all.
+  const other = await person(t, "منظم مساعد");
+  const phone = await t.run(
+    async (ctx) => (await ctx.db.get(other.personId))!.phone,
+  );
+  await t.run(async (ctx) => {
+    await ctx.db.insert("rotaParticipants", {
+      khatmaId: s.khatmaId,
+      name: "منظم مساعد",
+      phone,
+      personId: other.personId,
+      addedAt: 0,
+      removedAt: null,
+      joinedAt: 0,
+    });
+    await ctx.db.insert("coOrganizers", {
+      khatmaId: s.khatmaId,
+      phone,
+      readings: false,
+      people: true,
+      settings: false,
+      addedAt: 0,
+    });
+  });
+  expect(await today(t, s, other.token)).toBeNull();
+  await t.run(async (ctx) => {
+    const row = await ctx.db.query("coOrganizers").first();
+    await ctx.db.patch(row!._id, { readings: true });
+  });
+  const view = await today(t, s, other.token);
+  expect(view?.tiles.find((x) => x.juz === 8)?.doneByName).toBe("شريك");
+});
+
+test("reassigning a shared juz' covers both readers", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, partner, third, eight } = await sharedEight(t, s);
+  await t.run((ctx) => ctx.db.patch(eight.readId, { partnerNotYetAt: NOW }));
+
+  await act(t, s, "reassign", { readId: eight.readId, participantId: third });
+
+  expect(await queued(t, "assigned")).toEqual([
+    { participantId: third, juz: [8] },
+  ]);
+  const covered = await queued(t, "covered");
+  expect(covered).toHaveLength(2);
+  expect(covered).toEqual(
+    expect.arrayContaining([
+      { participantId: first, juz: [8] },
+      { participantId: partner, juz: [8] },
+    ]),
+  );
+  // The partner's «ليس بعد» belonged to the old arrangement.
+  const view = await tile(t, s, 8);
+  expect(view.state).toBe("reassigned");
+  expect(view.partnerAnswer).toBeNull();
+  const read = await t.run((ctx) => ctx.db.get(eight.readId));
+  expect(read?.partnerNotYetAt ?? null).toBeNull();
+});
+
+test("reassigning a shared juz' to its partner covers only the first reader", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, partner, eight } = await sharedEight(t, s);
+
+  await act(t, s, "reassign", { readId: eight.readId, participantId: partner });
+
+  expect(await queued(t, "assigned")).toEqual([
+    { participantId: partner, juz: [8] },
+  ]);
+  expect(await queued(t, "covered")).toEqual([
+    { participantId: first, juz: [8] },
+  ]);
+});
+
+test("after reassigning, the partner gets no reminder, and their late «أتممت» still counts", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { partner, third, eight } = await sharedEight(t, s);
+  await act(t, s, "reassign", { readId: eight.readId, participantId: third });
+
+  // The day's reminder time: only the new reader hears from us about juz' 8.
+  vi.setSystemTime(Date.UTC(2027, 0, 15, 12, 30, 0));
+  await t.mutation(internal.rotaDays.tick, { khatmaId: s.khatmaId });
+  const reminders = await t.run(async (ctx) =>
+    (await ctx.db.query("rotaOutbox").collect()).filter(
+      (r) => r.kind === "reminder",
+    ),
+  );
+  expect(reminders.map((r) => r.participantId)).not.toContain(partner);
+
+  // They aren't reading it, but their «أتممت» for it counts, as a holder's does.
+  const phone = await t.run(async (ctx) => (await ctx.db.get(partner))!.phone);
+  await t.mutation(internal.rotaInbound.handle, {
+    phone,
+    text: "تم",
+    mayBeSignIn: false,
+    now: Date.now(),
+  });
+  const read = await t.run((ctx) => ctx.db.get(eight.readId));
+  expect(read).toMatchObject({ doneAt: Date.now(), doneById: partner });
+});
+
+test("an organizer's mark records no reader, and undo clears it", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { partner, eight } = await sharedEight(t, s);
+
+  await act(t, s, "markDone", { readId: eight.readId });
+  let read = await t.run((ctx) => ctx.db.get(eight.readId));
+  expect(read).toMatchObject({ doneByOrganizer: true, doneById: null });
+  expect((await tile(t, s, 8)).doneByName).toBeNull();
+
+  await t.run((ctx) =>
+    ctx.db.patch(eight.readId, { doneById: partner, thankedIds: [partner] }),
+  );
+  await act(t, s, "markNotDone", { readId: eight.readId });
+  read = await t.run((ctx) => ctx.db.get(eight.readId));
+  expect(read?.doneAt).toBeNull();
+  expect(read?.doneById ?? null).toBeNull();
+  expect(read?.thankedIds ?? []).toEqual([]);
+});
+
+test("a shared juz' counts as done for both readers' doneToday", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, partner, eight } = await sharedEight(t, s);
+  await act(t, s, "markDone", { readId: eight.readId });
+  const view = await today(t, s);
+  const done = (id: Id<"rotaParticipants">) =>
+    view?.participants.find((p) => p.id === id)?.doneToday;
+  expect(done(first)).toBe(true);
+  expect(done(partner)).toBe(true);
+});
