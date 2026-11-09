@@ -888,3 +888,30 @@ test("a shared juz' counts as done for both readers' doneToday", async () => {
   expect(done(first)).toBe(true);
   expect(done(partner)).toBe(true);
 });
+
+test("a shared juz' reassigned twice tells its partner once", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, partner, third, eight } = await sharedEight(t, s);
+  await act(t, s, "reassign", { readId: eight.readId, participantId: third });
+  await act(t, s, "reassign", { readId: eight.readId, participantId: first });
+  const covered = await queued(t, "covered");
+  expect(covered.filter((r) => r.participantId === partner)).toHaveLength(1);
+});
+
+test("a shared juz' reassigned first to its partner covers the partner once, as the previous reader", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, partner, third, eight } = await sharedEight(t, s);
+  await act(t, s, "reassign", { readId: eight.readId, participantId: partner });
+  // Their «assigned» went out, so moving it on is worth telling them.
+  await t.run(async (ctx) => {
+    for (const row of await ctx.db.query("rotaOutbox").collect()) {
+      await ctx.db.patch(row._id, { sentAt: 1 });
+    }
+  });
+  await act(t, s, "reassign", { readId: eight.readId, participantId: third });
+  const covered = await queued(t, "covered");
+  expect(covered.filter((r) => r.participantId === partner)).toHaveLength(1);
+  expect(covered.filter((r) => r.participantId === first)).toHaveLength(1);
+});

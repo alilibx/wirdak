@@ -228,13 +228,16 @@ export async function reassign(
       kind: "covered",
     });
   }
-  // A shared juz's second reader is covered too, unless it went to them.
+  // A shared juz's second reader is covered too, once: on its first
+  // reassignment. If that went to them they are covered later, as the previous
+  // reader.
   const partnerId = found.read.partnerId;
   if (
     partnerId != null &&
+    found.read.reassignedAt === null &&
+    found.day.juzSentAt !== null &&
     partnerId !== previousId &&
-    partnerId !== participant._id &&
-    told
+    partnerId !== participant._id
   ) {
     await enqueue(ctx, { ...row, participantId: partnerId, kind: "covered" });
   }
