@@ -108,3 +108,32 @@ test("both phrases are empty, with no stray space, for no ajza'", () => {
   expect(juzPhrase([])).toBe("");
   expect(juzPhraseGenitive([])).toBe("");
 });
+
+test("juzPhrase names a partner after its own juz'", () => {
+  expect(juzPhrase([26], new Map([[26, "سارة"]]))).toBe(
+    "الجزء ٢٦ (مشترك مع سارة)",
+  );
+  expect(juzPhrase([5, 6], new Map([[5, "سارة"]]))).toBe(
+    "الجزآن ٥ (مشترك مع سارة) و٦",
+  );
+  expect(
+    juzPhrase(
+      [3, 5, 6],
+      new Map([
+        [3, "هدى"],
+        [6, "سارة"],
+      ]),
+    ),
+  ).toBe("الأجزاء ٣ (مشترك مع هدى)، ٥ و٦ (مشترك مع سارة)");
+  expect(juzPhraseGenitive([5, 6], new Map([[6, "سارة"]]))).toBe(
+    "الجزأين ٥ و٦ (مشترك مع سارة)",
+  );
+});
+
+test("juzPhrase without partners is unchanged", () => {
+  for (const juz of [[26], [5, 6], [3, 5, 6]]) {
+    expect(juzPhrase(juz, new Map())).toBe(juzPhrase(juz));
+    expect(juzPhraseGenitive(juz, new Map())).toBe(juzPhraseGenitive(juz));
+  }
+  expect(juzPhrase([5, 6], new Map([[7, "سارة"]]))).toBe("الجزآن ٥ و٦");
+});

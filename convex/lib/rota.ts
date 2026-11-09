@@ -114,6 +114,26 @@ export function readsFor(
   );
 }
 
+/**
+ * Who shares this juz' with `participantId` that day, by name: the partner for
+ * its reader, the reader for its partner. Null when the juz' isn't shared,
+ * was reassigned, or the other reader isn't in `names`.
+ */
+export function partnersOf(
+  read: Doc<"rotaReads">,
+  participantId: Id<"rotaParticipants">,
+  names: ReadonlyMap<Id<"rotaParticipants">, string>,
+): string | null {
+  if (read.reassignedAt !== null || read.partnerId == null) return null;
+  const other =
+    read.readerId === participantId
+      ? read.partnerId
+      : read.partnerId === participantId
+        ? read.readerId
+        : null;
+  return other === null ? null : (names.get(other) ?? null);
+}
+
 function dayNumber(date: string): number {
   const [y = 0, m = 1, d = 1] = date.split("-").map(Number);
   return Math.floor(Date.UTC(y, m - 1, d) / DAY_MS);

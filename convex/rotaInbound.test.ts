@@ -14,9 +14,12 @@ import {
   duaText,
   endedText,
   helpText,
+  lateThanksText,
   manyKhatmasText,
   notOnListText,
+  notYetText,
   stopText,
+  thanksText,
   unknownJoinText,
   whichKhatmaText,
 } from "./lib/rotaTemplates";
@@ -853,6 +856,204 @@ test("a holder's typed «تم» counts for the juz' reassigned away", async () =
   expect(sent.map((m) => m.body)).toEqual([
     "*ختمة*\nتقبّل الله منك. ١ من ٣٠ جزءاً تمّت اليوم.",
   ]);
+});
+
+// ---------------------------------------------------------------------------
+// A shared juz'
+
+const PARTNER = "971500000150";
+
+/** «شريك» on `PARTNER` as the second reader of `slot`, joined long ago. Before the day starts. */
+function shareSlot(t: T, s: Setup, slot: number) {
+  return t.run(async (ctx) => {
+    const participantId = await ctx.db.insert("rotaParticipants", {
+      khatmaId: s.khatmaId,
+      name: "شريك",
+      phone: `+${PARTNER}`,
+      personId: null,
+      addedAt: 0,
+      removedAt: null,
+      joinedAt: 0,
+    });
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: s.khatmaId,
+      slot,
+      participantId,
+      second: true,
+    });
+    return participantId;
+  });
+}
+
+const juzRead = async (t: T, dayId: Id<"rotaDays">, juz: number) =>
+  (await readsOf(t, dayId)).find((r) => r.juz === juz)!;
+
+test("either reader's «أتممت» marks the juz' done once", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }, { slot: 2 }]);
+  const partner = await shareSlot(t, s, 1);
+  const day = await startDay(t, s);
+  expect((await juzRead(t, day._id, 1)).partnerId).toBe(partner);
+
+  await send(t, PARTNER, "أتممت", { payload: tap("done", day._id, partner) });
+
+  const reads = await readsOf(t, day._id);
+  expect(reads.filter((r) => r.doneAt !== null)).toHaveLength(1);
+  expect(await juzRead(t, day._id, 1)).toMatchObject({
+    doneAt: Date.now(),
+    doneById: partner,
+    doneByOrganizer: false,
+  });
+  expect(sent.map((m) => m.body)).toEqual([`*ختمة*\n${thanksText(1)}`]);
+
+  // At the reminder time, only the reader of juz' 2 hears from us.
+  vi.setSystemTime(dubai("2027-01-16T16:00"));
+  await t.mutation(internal.rotaDays.tick, { khatmaId: s.khatmaId });
+  const reminders = await t.run(async (ctx) =>
+    (await ctx.db.query("rotaOutbox").collect()).filter(
+      (r) => r.kind === "reminder",
+    ),
+  );
+  expect(reminders.map((r) => r.participantId)).toEqual([s.participants[1]]);
+});
+
+test("the partner's later «أتممت» gets the thanks reply and changes nothing", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }, { slot: 2 }]);
+  const partner = await shareSlot(t, s, 1);
+  const day = await startDay(t, s);
+  const [reader] = s.participants as [Id<"rotaParticipants">];
+  await send(t, phoneOf(0), "أتممت", { payload: tap("done", day._id, reader) });
+  const done = await juzRead(t, day._id, 1);
+  vi.setSystemTime(dubai("2027-01-16T10:00"));
+
+  await send(t, PARTNER, "أتممت", { payload: tap("done", day._id, partner) });
+  await send(t, PARTNER, "أتممت", { payload: tap("done", day._id, partner) });
+
+  const after = await juzRead(t, day._id, 1);
+  expect(after).toMatchObject({
+    doneAt: done.doneAt,
+    doneById: reader,
+    thankedIds: [partner],
+  });
+  expect(
+    (await readsOf(t, day._id)).filter((r) => r.doneAt !== null),
+  ).toHaveLength(1);
+  expect(sent.map((m) => m.body)).toEqual([
+    `*ختمة*\n${thanksText(1)}`,
+    `*ختمة*\n${thanksText(1)}`,
+    `*ختمة*\n${alreadyText}`,
+  ]);
+});
+
+test("«ليس بعد» from the partner sets partnerNotYetAt", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const partner = await shareSlot(t, s, 1);
+  const day = await startDay(t, s);
+
+  await send(t, PARTNER, "ليس بعد", {
+    payload: tap("notYet", day._id, partner),
+  });
+
+  const read = await juzRead(t, day._id, 1);
+  expect(read.partnerNotYetAt).toBe(Date.now());
+  expect(read.notYetAt ?? null).toBeNull();
+  expect(read.doneAt).toBeNull();
+  expect(sent.map((m) => m.body)).toEqual([`*ختمة*\n${notYetText("٤ عصراً")}`]);
+});
+
+test("«ليس بعد» from the partner after the juz' is done gets the thanks reply", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const partner = await shareSlot(t, s, 1);
+  const day = await startDay(t, s);
+  await send(t, phoneOf(0), "تم");
+
+  await send(t, PARTNER, "ليس بعد", {
+    payload: tap("notYet", day._id, partner),
+  });
+
+  const read = await juzRead(t, day._id, 1);
+  expect(read.partnerNotYetAt ?? null).toBeNull();
+  expect(read.thankedIds).toEqual([partner]);
+  expect(sent.map((m) => m.body)).toEqual([
+    `*ختمة*\n${thanksText(1)}`,
+    `*ختمة*\n${thanksText(1)}`,
+  ]);
+});
+
+test("typed «تم» from the partner after the juz' is done doesn't mark another khatma's juz'", async () => {
+  const t = convexTest(schema, modules);
+  const one = await setup(t, [{ slot: 1 }]);
+  const partner = await shareSlot(t, one, 1);
+  const two = await setup(t, [{ slot: 3, phone: `+${PARTNER}` }], {
+    name: "ختمة الجيران",
+    joinCode: "JNC567",
+    organizerId: one.personId,
+  });
+  const dayOne = await startDay(t, one);
+  const dayTwo = await startDay(t, two);
+  await send(t, phoneOf(0), "تم");
+  sent = [];
+
+  // The shared juz' is still open for the partner, so «تم» asks which khatma.
+  await send(t, PARTNER, "تم");
+  expect(sent.map((m) => m.body)).toEqual([
+    whichKhatmaText +
+      `\n[ختمة] ${tap("done", dayOne._id, partner)}` +
+      `\n[ختمة الجيران] ${tap("done", dayTwo._id, two.participants[0]!)}`,
+  ]);
+  expect((await readsOf(t, dayTwo._id)).every((r) => r.doneAt === null)).toBe(
+    true,
+  );
+
+  // Its button gets the thanks, and the other khatma's juz' stays unread.
+  await send(t, PARTNER, "ختمة", {
+    payload: tap("done", dayOne._id, partner),
+  });
+  expect(sent.at(-1)?.body).toBe(`*ختمة*\n${thanksText(1)}`);
+  expect((await readsOf(t, dayTwo._id)).every((r) => r.doneAt === null)).toBe(
+    true,
+  );
+
+  // Thanked once, the shared juz' is closed for them: «تم» is for the other khatma.
+  await send(t, PARTNER, "تم");
+  expect(sent.at(-1)?.body).toBe(`*ختمة الجيران*\n${thanksText(1)}`);
+  expect(
+    (await readsOf(t, dayTwo._id)).filter((r) => r.doneAt !== null),
+  ).toHaveLength(1);
+});
+
+test("the same in the late window", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const partner = await shareSlot(t, s, 1);
+  const dayOne = await startDay(t, s);
+  await send(t, phoneOf(0), "تم");
+  // Day two starts after midnight: the partner's juz' 2 is unread.
+  vi.setSystemTime(dubai("2027-01-17T00:10"));
+  await t.mutation(internal.rotaDays.tick, { khatmaId: s.khatmaId });
+  const dayTwo = await t.run((ctx) =>
+    ctx.db
+      .query("rotaDays")
+      .withIndex("by_khatma_n", (q) => q.eq("khatmaId", s.khatmaId).eq("n", 2))
+      .unique(),
+  );
+  vi.setSystemTime(dubai("2027-01-17T00:30"));
+
+  await send(t, PARTNER, "تم");
+
+  expect((await juzRead(t, dayOne._id, 1)).thankedIds).toEqual([partner]);
+  expect((await juzRead(t, dayTwo!._id, 2)).doneAt).toBeNull();
+  expect(sent.at(-1)?.body).toBe(`*ختمة*\n${lateThanksText(1)}`);
+
+  // The next «تم» is for today's juz'.
+  await send(t, PARTNER, "تم");
+  expect(await juzRead(t, dayTwo!._id, 2)).toMatchObject({
+    doneAt: Date.now(),
+    doneById: partner,
+  });
 });
 
 test("B's phone with A's payload changes nothing", async () => {

@@ -754,3 +754,136 @@ test("sendSample sends every rota template, only on dev or staging", async () =>
     t.action(internal.rotaOutbox.sendSample, { phone: PHONE }),
   ).rejects.toThrow();
 });
+
+const PARTNER_PHONE = "+971500000003";
+
+/** «هدى», joined, shares both of the day's reads with «سارة»; her window is open. */
+async function addPartner(t: T, ids: Ids) {
+  return await t.run(async (ctx) => {
+    const partnerId = await ctx.db.insert("rotaParticipants", {
+      khatmaId: ids.khatmaId,
+      name: "هدى",
+      phone: PARTNER_PHONE,
+      personId: null,
+      addedAt: 0,
+      removedAt: null,
+      joinedAt: NOW - HOUR,
+    });
+    await ctx.db.insert("waContacts", {
+      phone: PARTNER_PHONE,
+      lastInboundAt: NOW - HOUR,
+    });
+    for (const read of await ctx.db.query("rotaReads").collect()) {
+      await ctx.db.patch(read._id, { partnerId });
+    }
+    return partnerId;
+  });
+}
+
+const queuePartner = (
+  t: T,
+  ids: Ids,
+  partnerId: Id<"rotaParticipants">,
+  kind: "juz" | "reminder" | "welcome" = "juz",
+) =>
+  t.run((ctx) =>
+    enqueue(ctx, {
+      khatmaId: ids.khatmaId,
+      participantId: partnerId,
+      dayId: kind === "welcome" ? null : ids.dayId,
+      kind,
+      juz: [2, 3],
+      number: 1,
+      partners: [
+        { juz: 2, name: "سارة" },
+        { juz: 3, name: "سارة" },
+      ],
+    }),
+  );
+
+const markRead = (t: T, ids: Ids, juz: number) =>
+  t.run(async (ctx) => {
+    const read = await ctx.db
+      .query("rotaReads")
+      .withIndex("by_day_juz", (q) => q.eq("dayId", ids.dayId).eq("juz", juz))
+      .unique();
+    await ctx.db.patch(read!._id, {
+      doneAt: NOW,
+      doneById: ids.participantId,
+    });
+  });
+
+test("a partner's juz' message names the reader, for the ajza' still waiting", async () => {
+  const t = convexTest(schema, modules);
+  const ids = await setup(t);
+  const partnerId = await addPartner(t, ids);
+  await queuePartner(t, ids, partnerId);
+  expect((await rows(t))[0]?.partners).toEqual([
+    { juz: 2, name: "سارة" },
+    { juz: 3, name: "سارة" },
+  ]);
+  await markRead(t, ids, 2);
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(sent).toHaveLength(1);
+  expect(sent[0]?.to).toBe(PARTNER_PHONE.slice(1));
+  expect(sent[0]?.text).toContain(juzText(1, [3], new Map([[3, "سارة"]])));
+});
+
+test("a queued juz' message to the partner drops once the juz' is done", async () => {
+  const t = convexTest(schema, modules);
+  const ids = await setup(t);
+  const partnerId = await addPartner(t, ids);
+  await queuePartner(t, ids, partnerId);
+  await queuePartner(t, ids, partnerId, "reminder");
+  await markRead(t, ids, 2);
+  await markRead(t, ids, 3);
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(sent).toEqual([]);
+  expect((await rows(t)).every((r) => r.skippedAt !== null)).toBe(true);
+});
+
+test("a juz' reassigned away from a shared slot no longer reaches its partner", async () => {
+  const t = convexTest(schema, modules);
+  const ids = await setup(t);
+  const partnerId = await addPartner(t, ids);
+  await queuePartner(t, ids, partnerId);
+  await t.run(async (ctx) => {
+    for (const read of await ctx.db.query("rotaReads").collect()) {
+      await ctx.db.patch(read._id, { reassignedAt: NOW });
+    }
+  });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(sent).toEqual([]);
+});
+
+test("a partner's welcome has today's shared juz', naming the reader", async () => {
+  const t = convexTest(schema, modules);
+  const ids = await setup(t);
+  const partnerId = await addPartner(t, ids);
+  await markRead(t, ids, 2);
+  await queuePartner(t, ids, partnerId, "welcome");
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(sent).toHaveLength(1);
+  const text = sent[0]?.text ?? "";
+  expect(text).toContain("أهلاً هدى");
+  expect(text).toContain(juzText(1, [3], new Map([[3, "سارة"]])));
+  expect(text).toContain(`[${ROTA_BUTTONS.done}]`);
+});
+
+test("the reader's welcome names the partner too", async () => {
+  const t = convexTest(schema, modules);
+  const ids = await setup(t, { windowOpen: true });
+  await addPartner(t, ids);
+  await queue(t, ids, "welcome");
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(sent[0]?.text).toContain(
+    juzText(
+      1,
+      [2, 3],
+      new Map([
+        [2, "هدى"],
+        [3, "هدى"],
+      ]),
+    ),
+  );
+});

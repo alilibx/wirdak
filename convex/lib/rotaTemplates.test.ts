@@ -100,6 +100,45 @@ test("the cycle template has a header and no parameters or buttons", () => {
   });
 });
 
+test("the juz', reminder and assigned messages name each juz' partner", () => {
+  const partners = new Map([[5, "سارة"]]);
+  expect(juzTemplate(khatma, two, 12, payloads, partners).body).toEqual([
+    "١٢",
+    "الجزآن ٥ (مشترك مع سارة) و٦",
+  ]);
+  expect(reminderTemplate(khatma, two, payloads, partners).body).toEqual([
+    "الجزأين ٥ (مشترك مع سارة) و٦",
+  ]);
+  expect(assignedTemplate(khatma, two, 7, payloads, partners).body).toEqual([
+    "الجزأين ٥ (مشترك مع سارة) و٦",
+    "٧",
+  ]);
+  expect(juzText(3, one, new Map([[26, "سارة"]]))).toBe(
+    "تحديث على قراءتك اليوم في الختمة ٣: المسجَّل لك الجزء ٢٦ (مشترك مع سارة) من هذه الختمة.",
+  );
+  expect(reminderText(one, new Map([[26, "سارة"]]))).toBe(
+    "تذكير بقراءتك اليوم: لم تُسجَّل بعد قراءة الجزء ٢٦ (مشترك مع سارة) في هذه الختمة.",
+  );
+  expect(assignedText(two, 7, partners)).toBe(
+    "تحديث على قراءتك: سُجِّلت لك قراءة الجزأين ٥ (مشترك مع سارة) و٦ في الختمة ٧ لهذا اليوم.",
+  );
+});
+
+test("the longest juz' phrase with partners fits a template parameter", () => {
+  const name = "ن".repeat(60);
+  const partners = new Map(three.map((j) => [j, name]));
+  const params = [
+    ...juzTemplate(khatma, three, 30, payloads, partners).body!,
+    ...reminderTemplate(khatma, three, payloads, partners).body!,
+    ...assignedTemplate(khatma, three, 30, payloads, partners).body!,
+  ];
+  for (const param of params) {
+    expect(param.length).toBeLessThan(1024);
+    expect(param).not.toMatch(/\n/);
+  }
+  expect(params[1]).toContain(name);
+});
+
 test("an unnamed khatma gets the untitled-date header", () => {
   expect(cycleTemplate({ name: null, createdAt: 0 }).header).toMatch(/^ختمة /);
 });

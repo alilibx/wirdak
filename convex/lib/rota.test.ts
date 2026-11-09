@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import type { Doc, Id } from "../_generated/dataModel";
 import {
   cycleOf,
   DAY_START,
@@ -8,6 +9,7 @@ import {
   khatmaNumber,
   messageTimesError,
   nextReadingDates,
+  partnersOf,
   slotFor,
   type ReadingDays,
 } from "./rota";
@@ -177,4 +179,24 @@ test("the juz' message may go at the day's start, and nothing else may", () => {
       7,
     ),
   ).not.toBeNull();
+});
+
+test("partnersOf names the other reader of a shared juz', until it's reassigned", () => {
+  const reader = "reader" as Id<"rotaParticipants">;
+  const partner = "partner" as Id<"rotaParticipants">;
+  const names = new Map([
+    [reader, "هدى"],
+    [partner, "سارة"],
+  ]);
+  const read = {
+    readerId: reader,
+    partnerId: partner,
+    reassignedAt: null,
+  } as Doc<"rotaReads">;
+  expect(partnersOf(read, reader, names)).toBe("سارة");
+  expect(partnersOf(read, partner, names)).toBe("هدى");
+  expect(partnersOf({ ...read, partnerId: null }, reader, names)).toBeNull();
+  expect(partnersOf({ ...read, reassignedAt: 1 }, reader, names)).toBeNull();
+  expect(partnersOf({ ...read, reassignedAt: 1 }, partner, names)).toBeNull();
+  expect(partnersOf(read, "other" as Id<"rotaParticipants">, names)).toBeNull();
 });
