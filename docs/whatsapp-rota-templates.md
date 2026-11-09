@@ -29,6 +29,8 @@ All have header `{{1}}` and quick-reply buttons only.
 
 The juz' text is `الجزء ٢٦` for one juz', `الجزآن ٥ و٦` for two and `الأجزاء ٣، ٥ و٦` for three or more. It is the subject of `wirdak_rota_juz_v2` only. Everywhere else it follows the noun «قراءة» (the singular feminine subject, so the verb never has to agree with a plural), so it is genitive: the same except `الجزأين ٥ و٦` for two. This applies to `wirdak_rota_unread` too.
 
+For a juz' two readers share, the juz' phrase may carry a partner note, such as «الجزء ٢٦ (مشترك مع فلان)»; it is still one parameter, so no template changes.
+
 ## Messages to the organizer
 
 Header `{{1}}` and one URL button, «افتح الختمة», to `https://wirdak.app/{{1}}` (button sample: `j/AB12CD`; staging sends `stg/j/<code>`).
