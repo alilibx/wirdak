@@ -38,6 +38,14 @@ function forPeople(n: number): string {
   return n <= 2 ? `ل${said}` : `لـ${said}`;
 }
 
+/**
+ * Where a reader of `juz` in khatma `number` goes next: each khatma moves them up one juz', and
+ * after 30 both go back to 1.
+ */
+function nextOnWalk(juz: number, number: number) {
+  return { juz: (juz % 30) + 1, number: (number % 30) + 1 };
+}
+
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
@@ -819,9 +827,8 @@ export const ar = {
     shareAction: "أضف قارئاً يشاركه الجزء",
     /** What follows a share: both read the juz' and move on together, and one «أتممت» is enough. */
     shareExplain: (a: string, b: string, juz: number, number: number) => {
-      const nextJuz = (juz % 30) + 1;
-      const nextNumber = (number % 30) + 1;
-      return `يقرأ \u200E${a}\u200E و\u200E${b}\u200E الجزء ${toWesternDigits(juz)} في الختمة ${toWesternDigits(number)}، ثم الجزء ${toWesternDigits(nextJuz)} في الختمة ${toWesternDigits(nextNumber)}. أيّهما سجّل أنه أتمّه يُحسب الجزء مقروءاً`;
+      const next = nextOnWalk(juz, number);
+      return `يقرأ \u200E${a}\u200E و\u200E${b}\u200E الجزء ${toWesternDigits(juz)} في الختمة ${toWesternDigits(number)}، ثم الجزء ${toWesternDigits(next.juz)} في الختمة ${toWesternDigits(next.number)}. أيّهما سجّل أنه أتمّه يُحسب الجزء مقروءاً`;
     },
     /** Said before one reader of a shared juz' leaves it. */
     leavesAlone: (name: string) => `سيقرأ ${name} الجزء وحده`,
@@ -846,10 +853,8 @@ export const ar = {
     noReader: "بلا قارئ",
     readerTitle: (juz: number) => `قارئ الجزء ${toWesternDigits(juz)}`,
     walk: (juz: number, number: number) => {
-      // Each khatma moves a reader up one juz', and after 30 it goes back to 1.
-      const nextJuz = (juz % 30) + 1;
-      const nextNumber = (number % 30) + 1;
-      return `يقرأ الجزء ${toWesternDigits(juz)} في الختمة ${toWesternDigits(number)}، ثم ${toWesternDigits(nextJuz)} في الختمة ${toWesternDigits(nextNumber)}، وهكذا.`;
+      const next = nextOnWalk(juz, number);
+      return `يقرأ الجزء ${toWesternDigits(juz)} في الختمة ${toWesternDigits(number)}، ثم ${toWesternDigits(next.juz)} في الختمة ${toWesternDigits(next.number)}، وهكذا.`;
     },
     moveLabel: "انقله إلى الجزء",
     moveOption: (juz: number, other: string | null) =>
