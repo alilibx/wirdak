@@ -801,6 +801,8 @@ async function mayTakeSlotsOf(
  * co-organizer's juz', nor swap one into theirs (`is_organizer`). Either
  * reader of a shared slot may move to an empty juz', which leaves the other as
  * its only reader; a swap never takes a shared slot, from either side (`shared`).
+ * A second reader moved to an empty juz' reads it alone, so it counts toward
+ * `rotaMaxSlotsPerPerson` even when their shared slot didn't (`too_many`).
  */
 export async function moveJuz(
   ctx: MutationCtx,
@@ -812,7 +814,9 @@ export async function moveJuz(
     toJuz: number;
   },
   caller: OrganizerRole | "admin",
-): Promise<{ ok: true } | { error: "not_found" | "is_organizer" | "shared" }> {
+): Promise<
+  { ok: true } | { error: "not_found" | "is_organizer" | "shared" | "too_many" }
+> {
   if (!isJuz(args.fromJuz) || !isJuz(args.toJuz)) {
     return { error: "not_found" };
   }
@@ -836,6 +840,14 @@ export async function moveJuz(
     await ctx.db.patch(from._id, { participantId: to.participantId });
     await ctx.db.patch(to._id, { participantId: from.participantId });
   } else {
+    if (
+      from.second === true &&
+      !(await getSetting(ctx, "rotaHalfCountsAsSlot")) &&
+      (await heldSlotCount(ctx, from.participantId)) + 1 >
+        (await getSetting(ctx, "rotaMaxSlotsPerPerson"))
+    ) {
+      return { error: "too_many" };
+    }
     await leaveSlot(ctx, from);
     await ctx.db.insert("rotaSlots", {
       khatmaId: khatma._id,

@@ -887,6 +887,25 @@ describe("PeoplePanel", () => {
       ).toBeInTheDocument();
     });
 
+    it("says why moving a second reader to a juz' of their own was refused", async () => {
+      // Off the shared juz', it counts toward the cap. Juz' 30 lost its reader.
+      const view = sharedView();
+      view.rows[29] = slot(30, null);
+      view.freeJuz = [30];
+      m.view = view;
+      m.fns.moveJuz = vi.fn().mockResolvedValue({ error: "too_many" });
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /ليلى/ }));
+      const sheet = screen.getByRole("dialog", { name: "ليلى" });
+      await user.click(
+        within(sheet).getByRole("button", { name: t.rota.move }),
+      );
+      expect(
+        await within(sheet).findByText(t.rota.peopleErrors.too_many!),
+      ).toBeInTheDocument();
+    });
+
     /** Saad owns the khatma and Muna, who is looking, helps run it. */
     function coRunView(): PeopleView {
       const view = fullView();

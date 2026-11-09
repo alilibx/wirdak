@@ -629,6 +629,69 @@ test("a shared slot counts toward the cap unless rotaHalfCountsAsSlot is off", a
   expect((await people(t, s))?.rows[19]?.participant?.id).toBe(b);
 });
 
+test("moving a second reader to an empty juz' keeps to the cap when their shared slot didn't count", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await add(t, s, { juz: 7 });
+  const b = await shareJuz(t, s, 7);
+  const setSetting = (key: string, value: unknown) =>
+    t.run((ctx) => ctx.db.insert("settings", { key, value, updatedAt: 0 }));
+  await setSetting("rotaMaxSlotsPerPerson", 1);
+  await setSetting("rotaHalfCountsAsSlot", false);
+  // Their shared juz' 7 doesn't count, so they could take juz' 20 too.
+  expect(
+    await t.mutation(api.rota.giveJuz, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      participantId: b,
+      juz: 20,
+    }),
+  ).toEqual({ ok: true });
+  const move = (fromJuz: number) =>
+    t.mutation(api.rota.moveJuz, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      participantId: b,
+      fromJuz,
+      toJuz: 25,
+    });
+
+  // On a juz' of their own, juz' 7 would count: one more than the cap.
+  expect(await move(7)).toEqual({ error: "too_many" });
+  let view = await people(t, s);
+  expect(view?.rows[6]?.partner?.id).toBe(b);
+  expect(view?.rows[24]?.participant).toBeNull();
+
+  // A juz' they read alone moves as before.
+  expect(await move(20)).toEqual({ ok: true });
+  view = await people(t, s);
+  expect(view?.rows[24]?.participant?.id).toBe(b);
+});
+
+test("moving a second reader to an empty juz' is fine when their shared slot counted already", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  await add(t, s, { juz: 7 });
+  const b = await shareJuz(t, s, 7);
+  await t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaMaxSlotsPerPerson",
+      value: 1,
+      updatedAt: 0,
+    }),
+  );
+  expect(
+    await t.mutation(api.rota.moveJuz, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      participantId: b,
+      fromJuz: 7,
+      toJuz: 25,
+    }),
+  ).toEqual({ ok: true });
+  expect((await people(t, s))?.rows[24]?.participant?.id).toBe(b);
+});
+
 test("people counts each one's ajza' toward the cap the way giveJuz does, and names the shared ones", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t);
