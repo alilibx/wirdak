@@ -436,6 +436,50 @@ test("an admin can share a juz', audited", async () => {
   expect(await auditRows(t)).toHaveLength(before + 1);
 });
 
+test("an admin can't share a juz' while another has no reader", async () => {
+  const t = convexTest(schema, modules);
+  const { khatmaId } = await running(t);
+  const requestId = await t.run((ctx) =>
+    ctx.db.insert("rotaJoinRequests", {
+      khatmaId,
+      phone: "+971500009300",
+      profileName: "خالد",
+      createdAt: NOW,
+      resolvedAt: null,
+      outcome: null,
+    }),
+  );
+  const before = (await auditRows(t)).length;
+
+  expect(
+    await t.mutation(api.adminRota.addParticipant, {
+      adminToken,
+      khatmaId,
+      name: "الثاني",
+      phone: "+971500009200",
+      juz: 8,
+      share: true,
+    }),
+  ).toEqual({ error: "not_full" });
+  expect(
+    await t.mutation(api.adminRota.acceptJoinRequest, {
+      adminToken,
+      khatmaId,
+      requestId,
+      juz: 8,
+      share: true,
+    }),
+  ).toEqual({ error: "not_full" });
+
+  const view = await t.query(api.adminRota.people, { adminToken, khatmaId });
+  expect(view?.rows[7]?.partner).toBeNull();
+  expect(view?.requests).toHaveLength(1);
+  expect(await t.run((ctx) => ctx.db.get(requestId))).toMatchObject({
+    resolvedAt: null,
+  });
+  expect(await auditRows(t)).toHaveLength(before);
+});
+
 test("spreadFreeJuz gives the free ajza' out and writes one audit row", async () => {
   const t = convexTest(schema, modules);
   const { khatmaId, readerId } = await running(t);

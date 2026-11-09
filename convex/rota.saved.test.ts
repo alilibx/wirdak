@@ -1271,3 +1271,43 @@ test("saved marks people who read in the organizer's other live khatmas and list
     ["هالة", false],
   ]);
 });
+
+test("addSaved shares a juz' only once all 30 have a reader, with no third reader, and never someone already in", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const shareSaved = (contactId: Id<"rotaContacts">, juz: number) =>
+    t.mutation(api.rota.addSaved, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      contactId,
+      juz,
+      share: true,
+    });
+  const first = await contact(t, s.personId, {
+    name: "أ",
+    phone: "+971505556001",
+  });
+  const second = await contact(t, s.personId, {
+    name: "ب",
+    phone: "+971505556002",
+  });
+  for (let juz = 2; juz <= 29; juz++) await add(t, s, { juz });
+
+  // Juz' 30 has no reader yet.
+  expect(await shareSaved(first, 4)).toEqual({ error: "not_full" });
+  expect((await peopleView(t, s))?.rows[3]?.partner).toBeNull();
+
+  const inKhatma = await contact(t, s.personId, {
+    name: "ج",
+    phone: "+971505556003",
+  });
+  await add(t, s, { juz: 30, name: "ج", phone: "+971505556003" });
+  expect(await shareSaved(first, 4)).toMatchObject({ ok: true, juz: 4 });
+  expect(await shareSaved(second, 4)).toEqual({ error: "already_shared" });
+  expect(await shareSaved(inKhatma, 5)).toEqual({ error: "already_added" });
+
+  const view = await peopleView(t, s);
+  expect(view?.rows[3]?.partner?.name).toBe("أ");
+  expect(view?.rows[4]?.partner).toBeNull();
+  expect(view?.sharing).toMatchObject({ readers: 31, shared: 1 });
+});
