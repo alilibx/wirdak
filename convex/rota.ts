@@ -882,13 +882,7 @@ export const importMembers = sessionMutation({
         break;
       }
       added += 1;
-      const slot = await ctx.db
-        .query("rotaSlots")
-        .withIndex("by_participant", (q) =>
-          q.eq("participantId", placed.participantId),
-        )
-        .first();
-      if (slot?.second === true) shared += 1;
+      if (placed.second) shared += 1;
       personIds.add(them._id);
       phones.add(them.phone);
       await ops.saveContact(ctx, person, {

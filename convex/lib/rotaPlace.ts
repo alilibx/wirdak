@@ -138,54 +138,50 @@ export async function targetDay(
   return { n, number: khatmaNumber(n), date, started: false };
 }
 
-/** The slot rows of khatma `number` by juz': the first readers', or with `second` the second readers'. */
-async function rowsByJuz(
+/** The slot rows of one khatma number by juz': its first readers' and its second readers'. */
+export type SlotRows = {
+  first: Map<number, Doc<"rotaSlots">>;
+  second: Map<number, Doc<"rotaSlots">>;
+};
+
+/** Who reads each juz' of khatma `number`, from one read of the khatma's slots. */
+export async function slotRows(
   ctx: QueryCtx,
   khatmaId: Id<"khatmas">,
   number: number,
-  second: boolean,
-): Promise<Map<number, Doc<"rotaSlots">>> {
+): Promise<SlotRows> {
   const slots = await ctx.db
     .query("rotaSlots")
     .withIndex("by_khatma_slot", (q) => q.eq("khatmaId", khatmaId))
     .collect();
-  const bySlot = new Map(
-    slots.filter((s) => (s.second === true) === second).map((s) => [s.slot, s]),
-  );
-  const out = new Map<number, Doc<"rotaSlots">>();
-  for (let juz = 1; juz <= ROTA_SIZE; juz++) {
-    const row = bySlot.get(slotFor(juz, number));
-    if (row) out.set(juz, row);
+  const firstBySlot = new Map<number, Doc<"rotaSlots">>();
+  const secondBySlot = new Map<number, Doc<"rotaSlots">>();
+  for (const s of slots) {
+    (s.second === true ? secondBySlot : firstBySlot).set(s.slot, s);
   }
-  return out;
+  const rows: SlotRows = { first: new Map(), second: new Map() };
+  for (let juz = 1; juz <= ROTA_SIZE; juz++) {
+    const slot = slotFor(juz, number);
+    const first = firstBySlot.get(slot);
+    const second = secondBySlot.get(slot);
+    if (first) rows.first.set(juz, first);
+    if (second) rows.second.set(juz, second);
+  }
+  return rows;
 }
 
 /** Who holds each juz' of khatma `number`: the slot's first reader, if any. */
-export function slotRowsByJuz(
+export async function slotRowsByJuz(
   ctx: QueryCtx,
   khatmaId: Id<"khatmas">,
   number: number,
 ): Promise<Map<number, Doc<"rotaSlots">>> {
-  return rowsByJuz(ctx, khatmaId, number, false);
+  return (await slotRows(ctx, khatmaId, number)).first;
 }
 
-/** Who shares each juz' of khatma `number`: the slot's second reader, if any. */
-export function partnerRowsByJuz(
-  ctx: QueryCtx,
-  khatmaId: Id<"khatmas">,
-  number: number,
-): Promise<Map<number, Doc<"rotaSlots">>> {
-  return rowsByJuz(ctx, khatmaId, number, true);
-}
-
-/** Whether a slot of khatma `number` may take a second reader: sharing is on and all 30 have a reader. */
-export async function sharingOpen(
-  ctx: QueryCtx,
-  khatmaId: Id<"khatmas">,
-  number: number,
-): Promise<boolean> {
-  if (!(await getSetting(ctx, "rotaSharedSlotsOn"))) return false;
-  return (await slotRowsByJuz(ctx, khatmaId, number)).size === ROTA_SIZE;
+/** Whether a slot may take a second reader: sharing is on (`sharingOn`) and all 30 have a reader. */
+export function sharingOpen(sharingOn: boolean, rows: SlotRows): boolean {
+  return sharingOn && rows.first.size === ROTA_SIZE;
 }
 
 /**
@@ -211,17 +207,37 @@ export async function leaveSlot(
 }
 
 /**
- * How many slots a participant holds toward `rotaMaxSlotsPerPerson`: a slot
- * they share as its second reader counts only while `rotaHalfCountsAsSlot` is on.
+ * How many of a participant's slot rows count toward `rotaMaxSlotsPerPerson`:
+ * a slot they share as its second reader counts only while
+ * `rotaHalfCountsAsSlot` is on (`countsSecond`).
  */
+export function countHeld(
+  rows: Doc<"rotaSlots">[],
+  countsSecond: boolean,
+): number {
+  return countsSecond
+    ? rows.length
+    : rows.filter((r) => r.second !== true).length;
+}
+
+/** The slot rows a participant holds, in every khatma number. */
+export function slotsOf(
+  ctx: QueryCtx,
+  participantId: Id<"rotaParticipants">,
+): Promise<Doc<"rotaSlots">[]> {
+  return ctx.db
+    .query("rotaSlots")
+    .withIndex("by_participant", (q) => q.eq("participantId", participantId))
+    .collect();
+}
+
+/** How many slots a participant holds toward `rotaMaxSlotsPerPerson`, as `countHeld` counts them. */
 export async function heldSlotCount(
   ctx: QueryCtx,
   participantId: Id<"rotaParticipants">,
 ): Promise<number> {
-  const rows = await ctx.db
-    .query("rotaSlots")
-    .withIndex("by_participant", (q) => q.eq("participantId", participantId))
-    .collect();
-  if (await getSetting(ctx, "rotaHalfCountsAsSlot")) return rows.length;
-  return rows.filter((r) => r.second !== true).length;
+  return countHeld(
+    await slotsOf(ctx, participantId),
+    await getSetting(ctx, "rotaHalfCountsAsSlot"),
+  );
 }

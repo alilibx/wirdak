@@ -23,13 +23,16 @@ import { isArchived } from "../khatma";
 import { isOwnerRow } from "../rotaOwner";
 import { khatmaJoinLink } from "../rotaJoin";
 import {
+  countHeld,
   heldSlotCount,
   leaveSlot,
-  partnerRowsByJuz,
   sharingOpen,
+  slotRows,
   slotRowsByJuz,
+  slotsOf,
   targetDay,
   type RotaConfig,
+  type SlotRows,
 } from "../rotaPlace";
 import { NEW_MEMBER_NAME } from "../rotaTemplates";
 import { getSetting } from "../settings";
@@ -284,8 +287,10 @@ export async function people(
   actor: Actor,
 ): Promise<PeopleView> {
   const target = await targetDay(ctx, khatma);
-  const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
-  const partners = await partnerRowsByJuz(ctx, khatma._id, target.number);
+  const slots = await slotRows(ctx, khatma._id, target.number);
+  const { first: byJuz, second: partners } = slots;
+  const sharingOn = await getSetting(ctx, "rotaSharedSlotsOn");
+  const open = sharingOpen(sharingOn, slots);
   const participants = (
     await ctx.db
       .query("rotaParticipants")
@@ -379,8 +384,8 @@ export async function people(
     phoneExample: localPhoneExample(homeCountry(organizer)),
     leftoverBox: await getSetting(ctx, "rotaLeftoverBoxOn"),
     sharing: {
-      on: await getSetting(ctx, "rotaSharedSlotsOn"),
-      open: await sharingOpen(ctx, khatma._id, target.number),
+      on: sharingOn,
+      open,
       readers: heldBy.size,
       shared: partners.size,
     },
@@ -456,15 +461,12 @@ async function coOrganizerPhonesOf(
 /** Why `juz` can't take a second reader now, or null when it can. */
 async function shareRefusal(
   ctx: QueryCtx,
-  khatmaId: Id<"khatmas">,
-  number: number,
-  byJuz: Map<number, Doc<"rotaSlots">>,
+  rows: SlotRows,
   juz: number,
 ): Promise<"not_full" | "sharing_off" | "already_shared" | null> {
   if (!(await getSetting(ctx, "rotaSharedSlotsOn"))) return "sharing_off";
-  if (byJuz.size < ROTA_SIZE) return "not_full";
-  const partners = await partnerRowsByJuz(ctx, khatmaId, number);
-  return partners.has(juz) ? "already_shared" : null;
+  if (rows.first.size < ROTA_SIZE) return "not_full";
+  return rows.second.has(juz) ? "already_shared" : null;
 }
 
 /**
@@ -473,16 +475,14 @@ async function shareRefusal(
  */
 async function lowestUnshared(
   ctx: QueryCtx,
-  khatmaId: Id<"khatmas">,
-  number: number,
-  byJuz: Map<number, Doc<"rotaSlots">>,
+  rows: SlotRows,
   blocked: ReadonlySet<Id<"rotaParticipants">>,
 ): Promise<number | undefined> {
-  if (!(await sharingOpen(ctx, khatmaId, number))) return undefined;
-  const partners = await partnerRowsByJuz(ctx, khatmaId, number);
+  const on = await getSetting(ctx, "rotaSharedSlotsOn");
+  if (!sharingOpen(on, rows)) return undefined;
   return Array.from({ length: ROTA_SIZE }, (_, i) => i + 1).find((j) => {
-    const first = byJuz.get(j);
-    return !partners.has(j) && !(first && blocked.has(first.participantId));
+    const first = rows.first.get(j);
+    return !rows.second.has(j) && !(first && blocked.has(first.participantId));
   });
 }
 
@@ -524,19 +524,14 @@ export async function placeNewParticipant(
 > {
   const { joinedAt, late, mode = "empty", actor = { personId: null } } = opts;
   const target = await targetDay(ctx, khatma);
-  const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
+  const rows = await slotRows(ctx, khatma._id, target.number);
+  const byJuz = rows.first;
   let second = false;
   if (mode === "share") {
     if (juz === undefined || !isJuz(juz)) {
       throw new ConvexError({ code: "invalid_juz" });
     }
-    const refused = await shareRefusal(
-      ctx,
-      khatma._id,
-      target.number,
-      byJuz,
-      juz,
-    );
+    const refused = await shareRefusal(ctx, rows, juz);
     if (refused !== null) return { error: refused };
     const first = byJuz.get(juz);
     if (
@@ -551,9 +546,7 @@ export async function placeNewParticipant(
     if (juz === undefined && mode === "fill") {
       juz = await lowestUnshared(
         ctx,
-        khatma._id,
-        target.number,
-        byJuz,
+        rows,
         await unshareableFor(ctx, khatma, actor),
       );
       second = juz !== undefined;
@@ -725,16 +718,16 @@ export async function spreadFreeJuz(
     )
     .sort((a, b) => a.addedAt - b.addedAt || a._creationTime - b._creationTime);
   // Held counts the way `giveJuz` checks the cap.
+  const countsSecond = await getSetting(ctx, "rotaHalfCountsAsSlot");
   const counted = await Promise.all(
-    active.map(async (p) => ({
-      id: p._id,
-      held: await heldSlotCount(ctx, p._id),
-      holdsAny:
-        (await ctx.db
-          .query("rotaSlots")
-          .withIndex("by_participant", (q) => q.eq("participantId", p._id))
-          .first()) !== null,
-    })),
+    active.map(async (p) => {
+      const slots = await slotsOf(ctx, p._id);
+      return {
+        id: p._id,
+        held: countHeld(slots, countsSecond),
+        holdsAny: slots.length > 0,
+      };
+    }),
   );
   // Someone holding none stopped reading on purpose (the organizer can), so they get none back.
   const readers = counted.filter((r) => r.holdsAny);
@@ -821,8 +814,11 @@ export async function moveJuz(
     return { error: "not_found" };
   }
   const target = await targetDay(ctx, khatma);
-  const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
-  const partners = await partnerRowsByJuz(ctx, khatma._id, target.number);
+  const { first: byJuz, second: partners } = await slotRows(
+    ctx,
+    khatma._id,
+    target.number,
+  );
   const from = rowOf(byJuz, partners, args.fromJuz, args.participantId);
   if (!from) return { error: "not_found" };
   const to = byJuz.get(args.toJuz);
@@ -884,12 +880,8 @@ export async function freeJuz(
 ): Promise<{ ok: true } | { error: "not_found" | "is_organizer" }> {
   if (!isJuz(args.juz)) return { error: "not_found" };
   const target = await targetDay(ctx, khatma);
-  const row = rowOf(
-    await slotRowsByJuz(ctx, khatma._id, target.number),
-    await partnerRowsByJuz(ctx, khatma._id, target.number),
-    args.juz,
-    args.participantId,
-  );
+  const { first, second } = await slotRows(ctx, khatma._id, target.number);
+  const row = rowOf(first, second, args.juz, args.participantId);
   // The screen may be a day behind: only free the slot the organizer saw.
   if (!row) return { error: "not_found" };
   if (!(await mayTakeSlotsOf(ctx, khatma, [row.participantId], caller))) {
