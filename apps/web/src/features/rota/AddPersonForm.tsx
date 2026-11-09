@@ -11,18 +11,25 @@ const addErrors: Record<string, string> = t.rota.addErrors;
 
 /**
  * A name and a number, added as a participant. With `juz` the person takes that juz' of the next
- * khatma; without it, the first one nobody reads.
+ * khatma; without it, the first one nobody reads. With `share` they become the second reader of
+ * `juz`, and `explain` says what follows for the name typed, above the add button.
  */
 export function AddPersonForm({
   inviteCode,
   juz,
   phoneExample,
   variant = "ghost",
+  share = false,
+  explain,
   onStart,
   onAdded,
 }: {
   inviteCode: string;
   juz?: number;
+  /** As the second reader of `juz`. */
+  share?: boolean;
+  /** What adding this person means, shown once a name is typed. */
+  explain?: (name: string) => string;
   /** A local number from the organizer's country, shown in the hint. */
   phoneExample: string | null;
   variant?: "ghost" | "primary";
@@ -49,6 +56,7 @@ export function AddPersonForm({
           name: name.trim(),
           phone: phone.trim(),
           ...(juz === undefined ? {} : { juz }),
+          ...(share ? { share } : {}),
           ...today,
         }),
       () => {
@@ -93,6 +101,9 @@ export function AddPersonForm({
       <p id={`${ids}-hint`} className="mt-1 text-base text-ink-soft">
         {t.rota.phoneHint(phoneExample)}
       </p>
+      {explain && name.trim() !== "" && (
+        <p className="mt-4 leading-relaxed">{explain(name.trim())}</p>
+      )}
       <ErrorLine error={error} />
       {question ?? (
         <div className="mt-4">

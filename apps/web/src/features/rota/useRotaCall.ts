@@ -1,14 +1,13 @@
 import { useRef, useState } from "react";
-import { t } from "../../i18n/ar";
-import { thrownMessage } from "./errors";
+import { refusalMessage, thrownMessage } from "./errors";
 
 /** What a rota call answers: `{ ok }`, a refusal as `{ error }`, or nothing. */
 export type Outcome = { ok: true } | { error: string } | void;
 
 /**
  * Runs one call at a time for a screen of the rota page. A refusal (`{ error }`, mapped through
- * `errors`) or a thrown failure becomes `error`; a success runs `onDone`. A second `run` while
- * one is in flight does nothing.
+ * `errors`, then the words every rota screen shares) or a thrown failure becomes `error`; a
+ * success runs `onDone`. A second `run` while one is in flight does nothing.
  */
 export function useRotaCall(errors: Record<string, string>) {
   const [busy, setBusy] = useState(false);
@@ -26,7 +25,7 @@ export function useRotaCall(errors: Record<string, string>) {
     try {
       const result = await call();
       if (result && "error" in result) {
-        setError(errors[result.error] ?? t.errors.generic);
+        setError(refusalMessage(result.error, errors));
       } else {
         onDone?.();
       }

@@ -643,6 +643,10 @@ export const ar = {
       past: "هذا اليوم مضى.",
       archived: "هذه الختمة مؤرشفة، فلا يمكن تغييرها.",
       not_archived: "أرشِف الختمة أولاً، ثم ابدأ منها من جديد أو احذفها.",
+      // A second reader on a juz': refused by any of the add screens.
+      not_full: "لا تُشارَك الأجزاء إلا بعد أن يكون لكل جزء قارئ",
+      sharing_off: "مشاركة الجزء غير متاحة الآن",
+      already_shared: "لهذا الجزء قارئان",
     } as Record<string, string>,
     setupTitle: "من سيقرأ معك؟",
     personName: "الاسم",
@@ -723,6 +727,10 @@ export const ar = {
       name ? `${name} · ${phone}` : phone,
     requestJuz: "جزؤه",
     acceptRequest: "أضفه واختر جزأه",
+    /** Every juz' has a reader: the request joins one as its second reader. */
+    shareRequest: "شارِك جزءاً",
+    shareJuzOption: (juz: number, name: string) =>
+      `${toArabicDigits(juz)} · مع ${name}`,
     declineRequest: "لا",
     joinRequestErrors: {
       not_found: "لم نجد هذا الطلب. أعد تحميل الصفحة.",
@@ -774,6 +782,11 @@ export const ar = {
     holder: (name: string) => `صاحبه اليوم: ${name}`,
     readerNow: (name: string) => `يقرؤه الآن: ${name}`,
     readBy: (name: string) => `قرأه: ${name}`,
+    /** A shared juz': both readers, and what each answered. */
+    holders: (a: string, b: string) => `صاحباه اليوم: ${a} و${b}`,
+    answerOf: (name: string, answer: string) => `${name}: ${answer}`,
+    /** Who of a shared juz''s readers said they finished it first. */
+    doneBy: (name: string) => `أتمّه: ${name}`,
     assign: "أسنده إلى مشارك",
     readMyself: "سأقرؤه أنا",
     markDone: "سجّله تامّاً",
@@ -795,6 +808,29 @@ export const ar = {
       `الختمة ${toArabicDigits(number)}${date ? ` يوم ${date}` : ""}. هذا جزء كل مشارك فيها، ويتقدّم كلٌّ منهم جزءاً في كل ختمة.`,
     addReader: (juz: number) => `+ أضف قارئاً للجزء ${toArabicDigits(juz)}`,
     secondJuz: "جزء ثانٍ",
+    // A second reader on a juz'
+    shareAction: "أضف قارئاً يشاركه الجزء",
+    /** What follows a share: both read the juz' and move on together, and one «أتممت» is enough. */
+    shareExplain: (a: string, b: string, juz: number, number: number) => {
+      const nextJuz = (juz % 30) + 1;
+      const nextNumber = (number % 30) + 1;
+      return `يقرأ \u200E${a}\u200E و\u200E${b}\u200E الجزء ${toArabicDigits(juz)} في الختمة ${toArabicDigits(number)}، ثم الجزء ${toArabicDigits(nextJuz)} في الختمة ${toArabicDigits(nextNumber)}. أيّهما سجّل أنه أتمّه يُحسب الجزء مقروءاً`;
+    },
+    /** Said before one reader of a shared juz' leaves it. */
+    leavesAlone: (name: string) => `سيقرأ ${name} الجزء وحده`,
+    /** Above the list once a juz' is shared: «٤٢ قارئاً، ١٢ جزءاً مشتركاً». */
+    sharedCount: (readers: number, shared: number) =>
+      `${counted(readers, {
+        one: "قارئ واحد",
+        two: "قارئان",
+        few: "قرّاء",
+        many: "قارئاً",
+      })}، ${counted(shared, {
+        one: "جزء واحد مشترك",
+        two: "جزءان مشتركان",
+        few: "أجزاء مشتركة",
+        many: "جزءاً مشتركاً",
+      })}`,
     noReader: "بلا قارئ",
     readerTitle: (juz: number) => `قارئ الجزء ${toArabicDigits(juz)}`,
     walk: (juz: number, number: number) => {
@@ -834,6 +870,7 @@ export const ar = {
       juz_taken: "هذا الجزء له قارئ الآن.",
       too_many: "لا يمكنه أن يقرأ أكثر من هذا.",
       bad_name: "اكتب اسم الشخص.",
+      shared: "انقل القارئ إلى جزء بلا قارئ",
     } as Record<string, string>,
     // Saved participants and pool members
     savedFrom: "من ختمات سابقة",

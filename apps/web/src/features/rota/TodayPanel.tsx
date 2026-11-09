@@ -68,7 +68,15 @@ export function GridTile({
   );
 }
 
-/** What the organizer can do with one juz' of today: who reads it, give it away, or record it. */
+/** «ليس بعد» or nothing yet, as the sheet says it. */
+function answerWord(answer: "notYet" | "none"): string {
+  return answer === "notYet" ? t.rota.answerNotYet : t.rota.answerNone;
+}
+
+/**
+ * What the organizer can do with one juz' of today: who reads it, give it away, or record it. A
+ * shared juz' names both readers, with each one's answer, and once done, who finished it first.
+ */
 export function TileSheet({
   inviteCode,
   view,
@@ -98,8 +106,29 @@ export function TileSheet({
   if (tile.state === "done") {
     return (
       <Sheet title={t.rota.doneTitle(tile.juz)} onClose={onClose}>
-        {tile.readerName && (
-          <p className="text-ink-soft">{t.rota.readBy(tile.readerName)}</p>
+        {tile.partnerName !== null ? (
+          <>
+            <p className="text-ink-soft">
+              {t.rota.holders(tile.holderName ?? "", tile.partnerName)}
+            </p>
+            {tile.doneByName !== null ? (
+              <p className="mt-1 text-ink-soft">
+                {t.rota.doneBy(tile.doneByName)}
+              </p>
+            ) : (
+              // Handed to someone else for the day, who read it alone.
+              tile.readerName !== null &&
+              tile.readerName !== tile.holderName && (
+                <p className="mt-1 text-ink-soft">
+                  {t.rota.readBy(tile.readerName)}
+                </p>
+              )
+            )}
+          </>
+        ) : (
+          tile.readerName && (
+            <p className="text-ink-soft">{t.rota.readBy(tile.readerName)}</p>
+          )
         )}
         <div className="mt-4">
           <Button
@@ -158,18 +187,40 @@ export function TileSheet({
 
   return (
     <Sheet title={t.rota.unreadTitle(tile.juz)} onClose={onClose}>
-      {tile.holderName && (
-        <p className="text-ink-soft">{t.rota.holder(tile.holderName)}</p>
+      {tile.partnerName !== null ? (
+        <p className="text-ink-soft">
+          {t.rota.holders(tile.holderName ?? "", tile.partnerName)}
+        </p>
+      ) : (
+        tile.holderName && (
+          <p className="text-ink-soft">{t.rota.holder(tile.holderName)}</p>
+        )
       )}
       {tile.state === "reassigned" && tile.readerName && (
         <p className="mt-1 text-ink-soft">
           {t.rota.readerNow(tile.readerName)}
         </p>
       )}
-      {tile.answer !== null && (
-        <p className="mt-1 text-ink-soft">
-          {tile.answer === "notYet" ? t.rota.answerNotYet : t.rota.answerNone}
-        </p>
+      {tile.partnerName !== null ? (
+        <>
+          {tile.answer !== null && tile.readerName && (
+            <p className="mt-1 text-ink-soft">
+              {t.rota.answerOf(tile.readerName, answerWord(tile.answer))}
+            </p>
+          )}
+          {tile.partnerAnswer !== null && (
+            <p className="mt-1 text-ink-soft">
+              {t.rota.answerOf(
+                tile.partnerName,
+                answerWord(tile.partnerAnswer),
+              )}
+            </p>
+          )}
+        </>
+      ) : (
+        tile.answer !== null && (
+          <p className="mt-1 text-ink-soft">{answerWord(tile.answer)}</p>
+        )
       )}
       <div className="mt-4 grid gap-3">
         <Button disabled={busy} onClick={() => setPicking(true)}>
