@@ -280,6 +280,18 @@ export async function markDone(
         silentDays: 0,
         silencedAt: null,
       });
+      // Their mark answers a juz' they share, so a later «تم» isn't drawn back
+      // to this day for its thanks. The other reader is still owed theirs.
+      const thanked = found.read.thankedIds ?? [];
+      if (
+        partnerId != null &&
+        readsFor(found.read, own._id) &&
+        !thanked.includes(own._id)
+      ) {
+        await ctx.db.patch(found.read._id, {
+          thankedIds: [...thanked, own._id],
+        });
+      }
     }
   }
   const completed = await completeIfDone(ctx, found.day._id);

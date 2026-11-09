@@ -909,6 +909,48 @@ test("the organizer marking a juz' they share as its second reader counts as the
   });
 });
 
+test("an organizer who reads a shared juz' and marks it is owed no thanks for it", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, eight } = await sharedEight(t, s);
+  const me = (await today(t, s))!.participants.find((p) => p.isMe)!;
+  // The organizer is the day's second reader of juz' 8.
+  await t.run((ctx) => ctx.db.patch(eight.readId, { partnerId: me.id }));
+
+  await act(t, s, "markDone", { readId: eight.readId });
+
+  const read = await t.run((ctx) => ctx.db.get(eight.readId));
+  expect(read).toMatchObject({ doneByOrganizer: true, doneById: null });
+  expect(read?.thankedIds).toEqual([me.id]);
+  // The first reader, who didn't mark it, is still owed theirs.
+  expect(read?.thankedIds).not.toContain(first);
+});
+
+test("an organizer who is a shared juz's first reader is thanked by their own mark too", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { partner, eight } = await sharedEight(t, s);
+  const me = (await today(t, s))!.participants.find((p) => p.isMe)!;
+  await t.run((ctx) => ctx.db.patch(eight.readId, { readerId: me.id }));
+
+  await act(t, s, "markDone", { readId: eight.readId });
+
+  const read = await t.run((ctx) => ctx.db.get(eight.readId));
+  expect(read?.thankedIds).toEqual([me.id]);
+  expect(read?.thankedIds).not.toContain(partner);
+});
+
+test("an organizer's mark of a shared juz' they don't read thanks nobody", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { eight } = await sharedEight(t, s);
+
+  await act(t, s, "markDone", { readId: eight.readId });
+
+  const read = await t.run((ctx) => ctx.db.get(eight.readId));
+  expect(read?.thankedIds ?? []).toEqual([]);
+});
+
 test("a second reader whose shared juz' was reassigned away doesn't reply by the organizer's mark", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t);
