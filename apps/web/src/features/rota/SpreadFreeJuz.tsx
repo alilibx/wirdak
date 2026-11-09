@@ -11,7 +11,7 @@ const spreadErrors: Record<string, string> = t.rota.spreadErrors;
 /** Who `spreadFreeJuz` can give one more juz' to. */
 function canTakeMore(p: View["participants"][number], maxSlots: number) {
   return (
-    !p.stopped && !p.silenced && p.juz.length > 0 && p.juz.length < maxSlots
+    !p.stopped && !p.silenced && p.juz.length > 0 && p.heldSlots < maxSlots
   );
 }
 

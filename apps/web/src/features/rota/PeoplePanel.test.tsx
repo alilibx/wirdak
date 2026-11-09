@@ -58,6 +58,13 @@ const shown = {
   ...state,
 };
 
+/** A participant's ajza', each counting toward the cap, none of them shared. */
+const held = (juz: number[]) => ({
+  juz,
+  heldSlots: juz.length,
+  shared: [] as number[],
+});
+
 /** One of the 30 rows: its first reader, and a second one when it is shared. */
 function slot(
   juz: number,
@@ -86,8 +93,8 @@ function makeView(): PeopleView {
       ),
     ),
     participants: [
-      { ...hidden, juz: [1] },
-      { ...shown, juz: [2] },
+      { ...hidden, ...held([1]) },
+      { ...shown, ...held([2]) },
     ],
     freeJuz: Array.from({ length: 28 }, (_, i) => i + 3),
     phoneExample: null,
@@ -157,11 +164,11 @@ describe("PeoplePanel", () => {
     m.view = {
       ...view,
       participants: [
-        { ...hidden, juz: [1, 3] },
-        { ...shown, juz: [2], stopped: true },
-        { ...shown, id: pid("p3"), juz: [4], silenced: true },
+        { ...hidden, ...held([1, 3]) },
+        { ...shown, ...held([2]), stopped: true },
+        { ...shown, id: pid("p3"), ...held([4]), silenced: true },
         // Stopped reading on purpose: holds none, and the spread gives none back.
-        { ...shown, id: pid("p4"), juz: [] },
+        { ...shown, id: pid("p4"), ...held([]) },
       ],
     };
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
@@ -184,6 +191,37 @@ describe("PeoplePanel", () => {
     expect(screen.getByRole("button", { name: /سعد/ })).not.toHaveTextContent(
       "+",
     );
+  });
+
+  it("offers one more juz' by the count the server checks, not by how many ajza' are listed", async () => {
+    const view = makeView();
+    // Saad reads juz' 1 alone and shares juz' 3, which doesn't count toward the cap.
+    view.rows[2] = slot(3, { ...shown, slots: 1 }, { ...hidden, slots: 1 });
+    view.participants[0] = {
+      ...hidden,
+      juz: [1, 3],
+      heldSlots: 1,
+      shared: [3],
+    };
+    view.freeJuz = view.freeJuz.filter((j) => j !== 3);
+    m.view = view;
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+    await user.click(screen.getAllByRole("button", { name: /سعد/ })[0]!);
+    const sheet = screen.getByRole("dialog");
+    expect(within(sheet).getByText(t.rota.giveMore)).toBeInTheDocument();
+  });
+
+  it("offers no more once the server's count reaches the cap", async () => {
+    const view = makeView();
+    view.participants[0] = { ...hidden, juz: [1], heldSlots: 2, shared: [] };
+    m.view = view;
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+    await user.click(screen.getByRole("button", { name: /سعد/ }));
+    expect(
+      within(screen.getByRole("dialog")).queryByText(t.rota.giveMore),
+    ).toBeNull();
   });
 
   it("an empty juz' also offers the saved people, and adds the one picked to that juz'", async () => {
@@ -402,7 +440,7 @@ describe("PeoplePanel", () => {
     const view = makeView();
     // An admin's view: the organizer's row isn't "me".
     view.rows[0] = slot(1, { ...hidden, isOrganizer: true, slots: 1 });
-    view.participants[0] = { ...hidden, isOrganizer: true, juz: [1] };
+    view.participants[0] = { ...hidden, isOrganizer: true, ...held([1]) };
     m.view = view;
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
 
@@ -428,7 +466,7 @@ describe("PeoplePanel", () => {
       const view = makeView();
       view.rows[4] = slot(5, { ...shown, slots: 2 });
       view.rows[1] = slot(2, { ...shown, slots: 2 });
-      view.participants[1] = { ...shown, juz: [2, 5] };
+      view.participants[1] = { ...shown, ...held([2, 5]) };
       view.freeJuz = view.freeJuz.filter((j) => j !== 5);
       return view;
     }
@@ -469,7 +507,7 @@ describe("PeoplePanel", () => {
       const organizer = { ...hidden, isOrganizer: true };
       view.rows[0] = slot(1, { ...organizer, slots: 2 });
       view.rows[2] = slot(3, { ...organizer, slots: 2 });
-      view.participants[0] = { ...organizer, juz: [1, 3] };
+      view.participants[0] = { ...organizer, ...held([1, 3]) };
       view.freeJuz = view.freeJuz.filter((j) => j !== 3);
       m.view = view;
       const user = userEvent.setup();
@@ -493,7 +531,7 @@ describe("PeoplePanel", () => {
     it("an admin frees the organizer's only juz' too, since the organizer can't be taken out", async () => {
       const view = makeView();
       view.rows[0] = slot(1, { ...hidden, isOrganizer: true, slots: 1 });
-      view.participants[0] = { ...hidden, isOrganizer: true, juz: [1] };
+      view.participants[0] = { ...hidden, isOrganizer: true, ...held([1]) };
       m.view = view;
       const user = userEvent.setup();
       render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
@@ -509,7 +547,7 @@ describe("PeoplePanel", () => {
       const me = { ...hidden, isOrganizer: true, isMe: true };
       view.rows[0] = slot(1, { ...me, slots: 2 });
       view.rows[2] = slot(3, { ...me, slots: 2 });
-      view.participants[0] = { ...me, juz: [1, 3] };
+      view.participants[0] = { ...me, ...held([1, 3]) };
       view.freeJuz = view.freeJuz.filter((j) => j !== 3);
       m.view = view;
       const user = userEvent.setup();
@@ -558,7 +596,9 @@ describe("PeoplePanel", () => {
         const other = others[i - 2];
         return other ? slot(row.juz, { ...other, slots: 1 }) : row;
       });
-      view.participants.push(...others.map((p, i) => ({ ...p, juz: [i + 3] })));
+      view.participants.push(
+        ...others.map((p, i) => ({ ...p, ...held([i + 3]) })),
+      );
       view.freeJuz = [];
       view.sharing = { on: true, open: true, readers: 30, shared: 0 };
       return view;
@@ -576,7 +616,7 @@ describe("PeoplePanel", () => {
     function sharedView(): PeopleView {
       const view = fullView();
       view.rows[0] = slot(1, { ...hidden, slots: 1 }, { ...layla, slots: 1 });
-      view.participants.push({ ...layla, juz: [1] });
+      view.participants.push({ ...layla, ...held([1]) });
       view.sharing = { on: true, open: true, readers: 31, shared: 1 };
       return view;
     }
@@ -707,7 +747,7 @@ describe("PeoplePanel", () => {
       view.rows[2] = slot(3, { ...layla, slots: 2 });
       view.participants[view.participants.length - 1] = {
         ...layla,
-        juz: [1, 3],
+        ...held([1, 3]),
       };
       m.view = view;
       const user = userEvent.setup();
@@ -788,7 +828,7 @@ describe("PeoplePanel", () => {
       const view = sharedView();
       // Saad reads juz' 3 too, so his juz' 1 can be freed.
       view.rows[2] = slot(3, { ...hidden, slots: 2 });
-      view.participants[0] = { ...hidden, juz: [1, 3] };
+      view.participants[0] = { ...hidden, ...held([1, 3]) };
       m.view = view;
       const user = userEvent.setup();
       render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
@@ -859,9 +899,9 @@ describe("PeoplePanel", () => {
       view.rows[1] = slot(2, { ...co, slots: 1 });
       view.rows[2] = slot(3, { ...huda, slots: 1 });
       view.participants = [
-        { ...owner, juz: [1] },
-        { ...co, juz: [2] },
-        { ...huda, juz: [3] },
+        { ...owner, ...held([1]) },
+        { ...co, ...held([2]) },
+        { ...huda, ...held([3]) },
       ];
       view.freeJuz = view.freeJuz.filter((j) => j !== 3);
       return view;
@@ -945,7 +985,7 @@ describe("PeoplePanel", () => {
         ...shown,
         isCoOrganizer: true,
         isMe: true,
-        juz: [2],
+        ...held([2]),
       };
       m.view = view;
       const user = userEvent.setup();
@@ -1007,7 +1047,7 @@ describe("PeoplePanel", () => {
         ...shown,
         isCoOrganizer: true,
         isMe: true,
-        juz: [2],
+        ...held([2]),
       };
       const other = {
         ...shown,
@@ -1016,7 +1056,7 @@ describe("PeoplePanel", () => {
         isCoOrganizer: true,
       };
       view.rows[3] = slot(4, { ...other, slots: 1 });
-      view.participants.push({ ...other, juz: [4] });
+      view.participants.push({ ...other, ...held([4]) });
       view.freeJuz = view.freeJuz.filter((j) => j !== 4);
       m.view = view;
       const user = userEvent.setup();

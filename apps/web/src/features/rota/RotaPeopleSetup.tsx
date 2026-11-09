@@ -60,7 +60,7 @@ function GiveJuzSheet({
           <li key={person.id}>
             <button
               type="button"
-              disabled={busy || person.juz.length >= view.maxSlots}
+              disabled={busy || person.heldSlots >= view.maxSlots}
               onClick={() => void choose(person.id)}
               className="flex min-h-14 w-full items-center justify-between gap-3 rounded-ui border-2 border-line bg-card px-4 text-start disabled:opacity-50"
             >
@@ -188,7 +188,9 @@ function BringPoolMembersIn({
     onResult(null);
     return run(async () => {
       const done = await bring({ ...backend.authArgs(), sourceInviteCode });
-      if ("ok" in done) onResult(t.rota.importResult(done.added, done.skipped));
+      if ("ok" in done) {
+        onResult(t.rota.importResult(done.added, done.skipped, done.shared));
+      }
       return done;
     });
   };
@@ -329,7 +331,7 @@ export function RotaPeopleSetupContent({
             </span>
             {person.juz.length > 0 && (
               <span className="ms-auto text-base text-ink-soft">
-                {t.rota.juzOf(person.juz)}
+                {t.rota.juzOf(person.juz, person.shared)}
               </span>
             )}
             <span className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 ps-10">

@@ -189,6 +189,8 @@ const withState = (p: Person) => ({
   joined: true,
   stopped: false,
   silenced: false,
+  heldSlots: p.juz.length,
+  shared: [] as number[],
   ...p,
 });
 

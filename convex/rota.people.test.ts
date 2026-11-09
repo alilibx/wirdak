@@ -629,6 +629,38 @@ test("a shared slot counts toward the cap unless rotaHalfCountsAsSlot is off", a
   expect((await people(t, s))?.rows[19]?.participant?.id).toBe(b);
 });
 
+test("people counts each one's ajza' toward the cap the way giveJuz does, and names the shared ones", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const a = participantId(await add(t, s, { juz: 7 }));
+  const b = await shareJuz(t, s, 7);
+  const counts = async () => {
+    const view = await people(t, s);
+    const of = (id: Id<"rotaParticipants">) =>
+      view?.participants.find((p) => p.id === id);
+    return {
+      a: of(a)?.heldSlots,
+      b: of(b)?.heldSlots,
+      rowA: view?.rows[6]?.participant?.slots,
+      rowB: view?.rows[6]?.partner?.slots,
+    };
+  };
+  expect(await counts()).toEqual({ a: 1, b: 1, rowA: 1, rowB: 1 });
+  const view = await people(t, s);
+  expect(view?.participants.find((p) => p.id === a)?.shared).toEqual([7]);
+  expect(view?.participants.find((p) => p.id === b)?.shared).toEqual([7]);
+  expect(view?.participants.find((p) => p.isMe)?.shared).toEqual([]);
+
+  await t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaHalfCountsAsSlot",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
+  expect(await counts()).toEqual({ a: 1, b: 0, rowA: 1, rowB: 0 });
+});
+
 test("someone else sees no people and cannot change them", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t);

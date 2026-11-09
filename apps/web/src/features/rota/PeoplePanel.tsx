@@ -96,7 +96,7 @@ function PersonSheet({
   const { busy, error, run } = useRotaCall(peopleErrors);
   const args = backend.authArgs();
   const nextFree = view.freeJuz[0];
-  const canGive = nextFree !== undefined && person.juz.length < view.maxSlots;
+  const canGive = nextFree !== undefined && person.heldSlots < view.maxSlots;
   const swapWith = holderOf(target);
 
   const name = person.isMe ? t.rota.me : person.name;
@@ -447,7 +447,7 @@ function EmptyRowSheet({
               <li key={person.id}>
                 <button
                   type="button"
-                  disabled={busy || person.juz.length >= view.maxSlots}
+                  disabled={busy || person.heldSlots >= view.maxSlots}
                   onClick={() =>
                     void run(
                       () =>

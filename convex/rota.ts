@@ -825,7 +825,7 @@ export const importable = sessionQuery({
  * second readers from the lowest juz' while sharing is open. The organizer
  * never sees their numbers: the participants are marked `phoneHidden`, and
  * each has to join on WhatsApp themselves. Stops when the ajza' run out; the
- * rest count as skipped.
+ * rest count as skipped. `shared` counts the ones added as second readers.
  */
 export const importMembers = sessionMutation({
   args: { inviteCode: v.string(), sourceInviteCode: v.string() },
@@ -833,7 +833,8 @@ export const importMembers = sessionMutation({
     ctx,
     args,
   ): Promise<
-    { ok: true; added: number; skipped: number } | { error: "not_found" }
+    | { ok: true; added: number; skipped: number; shared: number }
+    | { error: "not_found" }
   > => {
     const { person, khatma } = await requireRotaOrganizer(
       ctx,
@@ -857,6 +858,7 @@ export const importMembers = sessionMutation({
     );
     let added = 0;
     let skipped = 0;
+    let shared = 0;
     for (const [index, member] of candidates.entries()) {
       const them = await ctx.db.get(member.personId);
       if (!them || personIds.has(them._id) || phones.has(them.phone)) {
@@ -882,6 +884,13 @@ export const importMembers = sessionMutation({
         break;
       }
       added += 1;
+      const slot = await ctx.db
+        .query("rotaSlots")
+        .withIndex("by_participant", (q) =>
+          q.eq("participantId", placed.participantId),
+        )
+        .first();
+      if (slot?.second === true) shared += 1;
       personIds.add(them._id);
       phones.add(them.phone);
       await ops.saveContact(ctx, person, {
@@ -891,7 +900,7 @@ export const importMembers = sessionMutation({
         personId: them._id,
       });
     }
-    return { ok: true, added, skipped };
+    return { ok: true, added, skipped, shared };
   },
 });
 

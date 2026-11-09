@@ -425,7 +425,7 @@ test("importMembers adds the pool's members in join order and never shows their 
     inviteCode: s.inviteCode,
     sourceInviteCode: source,
   });
-  expect(result).toEqual({ ok: true, added: 3, skipped: 0 });
+  expect(result).toEqual({ ok: true, added: 3, skipped: 0, shared: 0 });
 
   const view = await peopleView(t, s);
   expect(view?.participants.map((p) => p.name)).toEqual([
@@ -486,8 +486,8 @@ test("importing again skips the people already in", async () => {
       inviteCode: s.inviteCode,
       sourceInviteCode: source,
     });
-  expect(await call()).toEqual({ ok: true, added: 2, skipped: 0 });
-  expect(await call()).toEqual({ ok: true, added: 0, skipped: 2 });
+  expect(await call()).toEqual({ ok: true, added: 2, skipped: 0, shared: 0 });
+  expect(await call()).toEqual({ ok: true, added: 0, skipped: 2, shared: 0 });
   expect(await participantRows(t, s.inviteCode)).toHaveLength(3);
   expect(await contactRows(t)).toHaveLength(2);
 });
@@ -504,7 +504,7 @@ test("a member already typed in by phone is skipped too", async () => {
       inviteCode: s.inviteCode,
       sourceInviteCode: source,
     }),
-  ).toEqual({ ok: true, added: 1, skipped: 1 });
+  ).toEqual({ ok: true, added: 1, skipped: 1, shared: 0 });
 });
 
 const sharingOff = (t: T) =>
@@ -529,7 +529,7 @@ test("the import stops when the ajza' run out and reports the rest as skipped", 
     sourceInviteCode: source,
   });
   // The organizer holds juz' 1: 29 are free.
-  expect(result).toEqual({ ok: true, added: 29, skipped: 4 });
+  expect(result).toEqual({ ok: true, added: 29, skipped: 4, shared: 0 });
   const view = await peopleView(t, s);
   expect(view?.freeJuz).toEqual([]);
   expect(view?.participants.at(-1)?.name).toBe("عضو 29");
@@ -546,7 +546,7 @@ test("once every juz' has a reader, the import shares them in order", async () =
       inviteCode: s.inviteCode,
       sourceInviteCode: source,
     }),
-  ).toEqual({ ok: true, added: 31, skipped: 0 });
+  ).toEqual({ ok: true, added: 31, skipped: 0, shared: 2 });
   const view = await peopleView(t, s);
   expect(view?.freeJuz).toEqual([]);
   expect(view?.rows[0]?.partner?.name).toBe("عضو 30");

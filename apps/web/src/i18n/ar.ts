@@ -672,10 +672,14 @@ export const ar = {
       juz_taken: "هذا الجزء له قارئ. حاول مرة أخرى.",
       already_added: "هذا الرقم مضاف في الختمة.",
     } as Record<string, string>,
-    juzOf: (juz: number[]) =>
-      juz.length === 1
-        ? `الجزء ${toArabicDigits(juz[0] ?? 0)}`
-        : `الأجزاء ${juz.map((j) => toArabicDigits(j)).join(" و")}`,
+    /** «الجزء ٤», «الأجزاء ١ و٤»; each of `shared` reads «٤ (مشترك)». */
+    juzOf: (juz: number[], shared: number[] = []) => {
+      const one = (j: number) =>
+        `${toArabicDigits(j)}${shared.includes(j) ? " (مشترك)" : ""}`;
+      return juz.length === 1
+        ? `الجزء ${one(juz[0] ?? 0)}`
+        : `الأجزاء ${juz.map(one).join(" و")}`;
+    },
     /** The banner when ajza' have no reader; the numbers are named only while they are few. */
     leftover: (juz: number[]) => {
       const n = juz.length;
@@ -876,7 +880,7 @@ export const ar = {
       juz_taken: "هذا الجزء له قارئ الآن.",
       too_many: "لا يمكنه أن يقرأ أكثر من هذا.",
       bad_name: "اكتب اسم الشخص.",
-      shared: "انقل القارئ إلى جزء بلا قارئ",
+      shared: "انقل القارئ إلى جزء بلا قارئ.",
     } as Record<string, string>,
     // Saved participants and pool members
     savedFrom: "من ختمات سابقة",
@@ -938,7 +942,8 @@ export const ar = {
     importCount: (n: number) =>
       `${counted(n, { one: "عضو واحد", two: "عضوان", few: "أعضاء", many: "عضواً" })}، بالأسماء فقط`,
     importHint: "لا ترى أرقامهم، وكلٌّ منهم ينضمّ بنفسه من رابط الانضمام.",
-    importResult: (added: number, skipped: number) => {
+    /** `shared`: how many of those added share a juz', once every juz' had a reader. */
+    importResult: (added: number, skipped: number, shared = 0) => {
       const people = (n: number) =>
         counted(n, {
           one: "شخصاً واحداً",
@@ -946,10 +951,22 @@ export const ar = {
           few: "أشخاص",
           many: "شخصاً",
         });
-      const first = added > 0 ? `أضفنا ${people(added)}.` : "لم نضف أحداً.";
-      return skipped > 0
-        ? `${first} تركنا ${people(skipped)}، لأنهم في الختمة أو لأن الأجزاء اكتملت.`
-        : first;
+      const parts = [added > 0 ? `أضفنا ${people(added)}.` : "لم نضف أحداً."];
+      if (shared > 0) {
+        const who = counted(shared, {
+          one: "شخص واحد",
+          two: "شخصان",
+          few: "أشخاص",
+          many: "شخصاً",
+        });
+        parts.push(`يشترك ${who} منهم في جزء مع قارئ آخر، لأن لكل جزء قارئاً.`);
+      }
+      if (skipped > 0) {
+        parts.push(
+          `تركنا ${people(skipped)}، لأنهم في الختمة أو لأن الأجزاء اكتملت.`,
+        );
+      }
+      return parts.join(" ");
     },
     importErrors: {
       not_found: "لم نجد تلك الختمة. أعد تحميل الصفحة.",

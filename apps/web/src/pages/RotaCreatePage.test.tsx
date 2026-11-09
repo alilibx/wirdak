@@ -78,6 +78,8 @@ function peopleView(people: Person[]) {
     joined: false,
     stopped: false,
     silenced: false,
+    heldSlots: p.juz.length,
+    shared: [] as number[],
     ...p,
   }));
   const holder = new Map<number, Person>();

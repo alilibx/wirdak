@@ -161,6 +161,10 @@ export type PeopleView = {
     name: string;
     isMe: boolean;
     juz: number[];
+    /** How many of their ajza' count toward `maxSlots`, as `heldSlotCount` counts them. */
+    heldSlots: number;
+    /** Their ajza' that have two readers. */
+    shared: number[];
   } & PersonState)[];
   freeJuz: number[];
   maxSlots: number;
@@ -185,7 +189,7 @@ type SlotReader = {
   id: Id<"rotaParticipants">;
   name: string;
   isMe: boolean;
-  /** How many ajza' they hold, shared ones too. */
+  /** How many of their ajza' count toward `maxSlots`, as `heldSlotCount` counts them. */
   slots: number;
 } & PersonState;
 
@@ -291,13 +295,28 @@ export async function people(
     .filter((p) => p.removedAt === null)
     .sort((a, b) => a.addedAt - b.addedAt || a._creationTime - b._creationTime);
   const heldBy = new Map<Id<"rotaParticipants">, number[]>();
+  const sharedBy = new Map<Id<"rotaParticipants">, number[]>();
+  // Counted toward the cap the way `heldSlotCount` counts them.
+  const countsSecond = await getSetting(ctx, "rotaHalfCountsAsSlot");
+  const counted = new Map<Id<"rotaParticipants">, number>();
+  const push = (
+    map: Map<Id<"rotaParticipants">, number[]>,
+    id: Id<"rotaParticipants">,
+    juz: number,
+  ) => map.set(id, [...(map.get(id) ?? []), juz]);
   for (let juz = 1; juz <= ROTA_SIZE; juz++) {
-    for (const row of [byJuz.get(juz), partners.get(juz)]) {
+    const first = byJuz.get(juz);
+    const second = partners.get(juz);
+    for (const row of [first, second]) {
       if (!row) continue;
-      heldBy.set(row.participantId, [
-        ...(heldBy.get(row.participantId) ?? []),
-        juz,
-      ]);
+      push(heldBy, row.participantId, juz);
+      if (first && second) push(sharedBy, row.participantId, juz);
+      if (row === first || countsSecond) {
+        counted.set(
+          row.participantId,
+          (counted.get(row.participantId) ?? 0) + 1,
+        );
+      }
     }
   }
   const byId = new Map(participants.map((p) => [p._id, p]));
@@ -328,7 +347,7 @@ export async function people(
       id: p._id,
       name: p.name,
       isMe: isActor(p, actor),
-      slots: heldBy.get(p._id)?.length ?? 0,
+      slots: counted.get(p._id) ?? 0,
       ...personState(p, khatma, owner, coOrganizerPhones, hidden, withAccount),
     };
   };
@@ -358,6 +377,8 @@ export async function people(
       name: p.name,
       isMe: isActor(p, actor),
       juz: heldBy.get(p._id) ?? [],
+      heldSlots: counted.get(p._id) ?? 0,
+      shared: sharedBy.get(p._id) ?? [],
       ...personState(p, khatma, owner, coOrganizerPhones, hidden, withAccount),
     })),
     freeJuz: freeJuzOf(byJuz),

@@ -64,6 +64,8 @@ const organizer = {
   isMe: false,
   phone: "+971500009000",
   juz: [1],
+  heldSlots: 1,
+  shared: [],
   joined: false,
   stopped: false,
   silenced: false,

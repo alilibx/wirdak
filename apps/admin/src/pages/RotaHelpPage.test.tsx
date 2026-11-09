@@ -119,7 +119,7 @@ const people = {
     participant: i === 0 ? { ...organizer, slots: 1 } : null,
     partner: null,
   })),
-  participants: [{ ...organizer, juz: [1] }],
+  participants: [{ ...organizer, juz: [1], heldSlots: 1, shared: [] }],
   freeJuz: Array.from({ length: 29 }, (_, i) => i + 2),
   maxSlots: 3,
   leftoverBox: true,
