@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.0](https://github.com/alilibx/wirdak/compare/v0.12.0...v0.13.0) (2026-11-09)
+
+
+### Features
+
+* **rota:** two readers share one juz' once all 30 have one ([#75](https://github.com/alilibx/wirdak/issues/75)) ([5143c8b](https://github.com/alilibx/wirdak/commit/5143c8b059ec5d8aa8b0196f89af5fa2289dcade))
+
+
+### Bug Fixes
+
+* show Western digits (123) instead of Eastern Arabic digits everywhere ([#73](https://github.com/alilibx/wirdak/issues/73)) ([ef5828e](https://github.com/alilibx/wirdak/commit/ef5828e25a173a7be9bd593a93e423542e419685))
+
 ## [0.12.0](https://github.com/alilibx/wirdak/compare/v0.11.0...v0.12.0) (2026-11-07)
 
 
