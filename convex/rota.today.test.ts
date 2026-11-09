@@ -889,6 +889,48 @@ test("a shared juz' counts as done for both readers' doneToday", async () => {
   expect(done(partner)).toBe(true);
 });
 
+test("the organizer marking a juz' they share as its second reader counts as their reply", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { eight } = await sharedEight(t, s);
+  const me = (await today(t, s))!.participants.find((p) => p.isMe)!;
+  // The organizer is the day's second reader of juz' 8.
+  await t.run(async (ctx) => {
+    await ctx.db.patch(eight.readId, { partnerId: me.id });
+    await ctx.db.patch(me.id, { silentDays: 5, lastReplyAt: 1, silencedAt: 1 });
+  });
+
+  await act(t, s, "markDone", { readId: eight.readId });
+
+  expect(await t.run((ctx) => ctx.db.get(me.id))).toMatchObject({
+    lastReplyAt: expect.toSatisfy((at: number) => at >= NOW),
+    silentDays: 0,
+    silencedAt: null,
+  });
+});
+
+test("a second reader whose shared juz' was reassigned away doesn't reply by the organizer's mark", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { third, eight } = await sharedEight(t, s);
+  const me = (await today(t, s))!.participants.find((p) => p.isMe)!;
+  await t.run(async (ctx) => {
+    await ctx.db.patch(eight.readId, {
+      partnerId: me.id,
+      readerId: third,
+      reassignedAt: NOW,
+    });
+    await ctx.db.patch(me.id, { silentDays: 5, lastReplyAt: 1, silencedAt: 1 });
+  });
+
+  await act(t, s, "markDone", { readId: eight.readId });
+
+  expect(await t.run((ctx) => ctx.db.get(me.id))).toMatchObject({
+    lastReplyAt: 1,
+    silentDays: 5,
+  });
+});
+
 test("a shared juz' reassigned twice tells its partner once", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t);

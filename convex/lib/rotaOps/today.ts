@@ -45,8 +45,8 @@ export type TodayView = {
     /** What the partner answered, like `answer`; null once done or when unshared. */
     partnerAnswer: "notYet" | "none" | null;
     /**
-     * Who finished a shared juz' by their own «أتممت». Null for an organizer's
-     * mark and for juz' that aren't shared. The view is for Readings
+     * Who finished the juz' by their own «أتممت» or typed «تم», shared or not.
+     * Null for an organizer's mark and while unread. The view is for Readings
      * organizers (and admins) only, so it is no wider than who sees the tile.
      */
     doneByName: string | null;
@@ -266,7 +266,13 @@ export async function markDone(
     await scheduleRotaCheer(ctx, found.read._id, now, null);
   }
   // The organizer marking their own juz' is their reply: they never go silent.
-  for (const id of new Set([found.read.readerId, found.read.holderId])) {
+  // That includes one they share as its second reader, while they still read it.
+  const { partnerId } = found.read;
+  const mine = [found.read.readerId, found.read.holderId];
+  if (partnerId != null && readsFor(found.read, partnerId)) {
+    mine.push(partnerId);
+  }
+  for (const id of new Set(mine)) {
     const own = id ? await ctx.db.get(id) : null;
     if (own && isActor(own, actor)) {
       await ctx.db.patch(own._id, {

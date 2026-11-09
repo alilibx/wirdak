@@ -454,6 +454,51 @@ test("a partner whose juz' was reassigned isn't reading it any more", async () =
   expect(sent.map((m) => m.to)).toEqual([READING.slice(1)]);
 });
 
+test("neither reader of a shared juz' is cheered about it, whoever tapped", async () => {
+  const everyone = {
+    on: true,
+    everyone: true,
+    gapMs: 0,
+    showName: false,
+    showJuz: false,
+  };
+  for (const tapper of ["reader", "partner"] as const) {
+    sent = [];
+    const t = convexTest(schema, modules);
+    const { khatmaId, readId } = await setup(t, everyone);
+    // The partner shares juz' 1 with the finisher.
+    const partnerId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("rotaParticipants", {
+        khatmaId,
+        name: "شريك",
+        phone: PARTNER,
+        personId: null,
+        addedAt: 0,
+        removedAt: null,
+        joinedAt: NOW - DAY,
+      });
+      await ctx.db.insert("waContacts", {
+        phone: PARTNER,
+        lastInboundAt: NOW - HOUR,
+      });
+      await ctx.db.patch(readId, { partnerId: id });
+      return id;
+    });
+    await t.run(async (ctx) => {
+      const read = (await ctx.db.get(readId))!;
+      const actorId = tapper === "reader" ? read.readerId : partnerId;
+      await ctx.db.patch(readId, { doneAt: NOW, doneById: actorId });
+      await scheduleRotaCheer(ctx, readId, NOW, actorId);
+    });
+
+    await advance(t, AFTER_UNDO);
+
+    expect(sent.map((m) => m.to).sort()).toEqual(
+      [READING.slice(1), DONE.slice(1)].sort(),
+    );
+  }
+});
+
 test("a window that closes before delivery skips the row", async () => {
   const t = convexTest(schema, modules);
   const { khatmaId } = await setup(t);
