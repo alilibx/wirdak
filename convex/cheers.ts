@@ -201,11 +201,11 @@ export const afterRead = internalMutation({
     // One tap can finish several ajza': they share its moment.
     const juz = reads.filter((r) => r.doneAt === args.doneAt).map((r) => r.juz);
     // Neither reader of the finished juz' hears about it, whoever tapped: a
-    // cheer would tell one that the other replied.
-    const finishers = new Set([finished.readerId, finished.partnerId]);
+    // cheer would tell one that the other replied. A partner it was taken
+    // from doesn't read it any more, so to them it's anyone's juz'.
     for (const participant of participants) {
       if (
-        finishers.has(participant._id) ||
+        readsFor(finished, participant._id) ||
         participant._id === args.actorId ||
         !reachable(participant) ||
         heldBack.has(participant._id) ||

@@ -499,6 +499,44 @@ test("neither reader of a shared juz' is cheered about it, whoever tapped", asyn
   }
 });
 
+test("the partner of a shared juz' reassigned to someone else hears that it was finished", async () => {
+  const t = convexTest(schema, modules);
+  const { khatmaId, readId } = await setup(t, {
+    on: true,
+    everyone: true,
+    gapMs: 0,
+    showName: false,
+    showJuz: false,
+  });
+  // Juz' 1 was shared with the partner, then given to the finisher alone.
+  await t.run(async (ctx) => {
+    const partnerId = await ctx.db.insert("rotaParticipants", {
+      khatmaId,
+      name: "شريك",
+      phone: PARTNER,
+      personId: null,
+      addedAt: 0,
+      removedAt: null,
+      joinedAt: NOW - DAY,
+    });
+    await ctx.db.insert("waContacts", {
+      phone: PARTNER,
+      lastInboundAt: NOW - HOUR,
+    });
+    await ctx.db.patch(readId, { partnerId, reassignedAt: NOW - HOUR });
+    const read = (await ctx.db.get(readId))!;
+    await ctx.db.patch(readId, { doneAt: NOW, doneById: read.readerId });
+    await scheduleRotaCheer(ctx, readId, NOW, read.readerId);
+  });
+
+  await advance(t, AFTER_UNDO);
+
+  // They don't read it any more, so it's someone else's juz' to them.
+  expect(sent.map((m) => m.to).sort()).toEqual(
+    [READING.slice(1), DONE.slice(1), PARTNER.slice(1)].sort(),
+  );
+});
+
 test("a window that closes before delivery skips the row", async () => {
   const t = convexTest(schema, modules);
   const { khatmaId } = await setup(t);
