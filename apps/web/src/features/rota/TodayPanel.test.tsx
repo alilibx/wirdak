@@ -88,12 +88,8 @@ describe("TodayPanel", () => {
     expect(
       within(sheet).getByText(t.rota.holders("سعد", "ليلى")),
     ).toBeVisible();
-    expect(
-      within(sheet).getByText(t.rota.answerOf("سعد", t.rota.answerNone)),
-    ).toBeVisible();
-    expect(
-      within(sheet).getByText(t.rota.answerOf("ليلى", t.rota.answerNotYet)),
-    ).toBeVisible();
+    expect(within(sheet).getByText("سعد: لم يردّ")).toBeVisible();
+    expect(within(sheet).getByText("ليلى: ليس بعد")).toBeVisible();
   });
 
   it("a done shared tile says who finished it", async () => {

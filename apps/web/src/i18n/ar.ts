@@ -644,9 +644,9 @@ export const ar = {
       archived: "هذه الختمة مؤرشفة، فلا يمكن تغييرها.",
       not_archived: "أرشِف الختمة أولاً، ثم ابدأ منها من جديد أو احذفها.",
       // A second reader on a juz': refused by any of the add screens.
-      not_full: "لا تُشارَك الأجزاء إلا بعد أن يكون لكل جزء قارئ",
-      sharing_off: "مشاركة الجزء غير متاحة الآن",
-      already_shared: "لهذا الجزء قارئان",
+      not_full: "لا تُشارَك الأجزاء إلا بعد أن يكون لكل جزء قارئ.",
+      sharing_off: "مشاركة الجزء غير متاحة الآن.",
+      already_shared: "لهذا الجزء قارئان.",
     } as Record<string, string>,
     setupTitle: "من سيقرأ معك؟",
     personName: "الاسم",
@@ -784,7 +784,8 @@ export const ar = {
     readBy: (name: string) => `قرأه: ${name}`,
     /** A shared juz': both readers, and what each answered. */
     holders: (a: string, b: string) => `صاحباه اليوم: ${a} و${b}`,
-    answerOf: (name: string, answer: string) => `${name}: ${answer}`,
+    answerOf: (name: string, answer: "notYet" | "none") =>
+      `${name}: ${answer === "notYet" ? "ليس بعد" : "لم يردّ"}`,
     /** Who of a shared juz''s readers said they finished it first. */
     doneBy: (name: string) => `أتمّه: ${name}`,
     assign: "أسنده إلى مشارك",
@@ -818,6 +819,11 @@ export const ar = {
     },
     /** Said before one reader of a shared juz' leaves it. */
     leavesAlone: (name: string) => `سيقرأ ${name} الجزء وحده`,
+    /** After `leavesAlone`, what else a change to one reader of a shared juz' does. */
+    freeThisStaysShared: "يبقى في الختمة.",
+    freeThisStaysSharedMe: "تبقى في الختمة.",
+    removeBodyShared: "تبقى قراءته اليوم كما هي.",
+    stopReadingHintShared: "تبقى منظّم الختمة.",
     /** Above the list once a juz' is shared: «٤٢ قارئاً، ١٢ جزءاً مشتركاً». */
     sharedCount: (readers: number, shared: number) =>
       `${counted(readers, {
@@ -884,6 +890,9 @@ export const ar = {
       not_found: "لم نجد هذا الشخص. أعد تحميل الصفحة.",
     } as Record<string, string>,
     savedManyHint: "حدّد من تريد إضافتهم، ويأخذ كلٌّ منهم أول جزء بلا قارئ.",
+    /** Every juz' has a reader and sharing is open: the ones added share ajza'. */
+    savedShareHint:
+      "لكل جزء قارئ الآن. حدّد من تريد إضافتهم، ويشارك كلٌّ منهم قارئاً جزأه، بدءاً من الجزء الأصغر رقماً.",
     savedActive: "يقرأ معك الآن",
     savedPickActive: "حدّد من يقرأ معك الآن",
     /** How many more can be ticked: the ajza' with no reader left. */

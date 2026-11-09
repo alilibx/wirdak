@@ -1,3 +1,5 @@
+import type { Id } from "@convex/_generated/dataModel";
+import type { PeopleView } from "@convex/lib/rotaOps";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -43,10 +45,49 @@ const contacts = [
   },
 ];
 
-/** The People view's free ajza', which bound how many can be ticked. */
-const freeJuz = (n: number) => ({
-  freeJuz: Array.from({ length: n }, (_, i) => i + 2),
+const reader = (n: number) => ({
+  id: `p${n}` as Id<"rotaParticipants">,
+  name: `قارئ ${n}`,
+  isMe: false,
+  slots: 1,
+  phone: null,
+  joined: true,
+  stopped: false,
+  silenced: false,
+  isOrganizer: false,
+  isCoOrganizer: false,
+  hasAccount: false,
 });
+
+/**
+ * The People view, whose free ajza' (2 to n + 1) bound how many can be ticked. With every juz'
+ * read, `shared` of them have a second reader, and sharing is `open` or not.
+ */
+function freeJuz(
+  n: number,
+  { open = false, shared = 0 }: { open?: boolean; shared?: number } = {},
+): PeopleView {
+  const free = Array.from({ length: n }, (_, i) => i + 2);
+  return {
+    title: "ختمة العائلة",
+    archived: false,
+    daysKind: "daily",
+    joinLink: null,
+    requests: [],
+    target: { number: 2, date: "2026-10-31", isFirst: false },
+    rows: Array.from({ length: 30 }, (_, i) => ({
+      juz: i + 1,
+      participant: free.includes(i + 1) ? null : reader(i + 1),
+      partner: i < shared ? reader(31 + i) : null,
+    })),
+    participants: [],
+    freeJuz: free,
+    maxSlots: 2,
+    phoneExample: null,
+    leftoverBox: true,
+    sharing: { on: true, open, readers: 30 - n + shared, shared },
+  };
+}
 
 const sheet = () => screen.getByRole("dialog", { name: t.rota.savedTitle });
 
@@ -122,6 +163,24 @@ describe("SavedPicker", () => {
     // Unticking frees the room again.
     await user.click(screen.getByRole("checkbox", { name: /أم خالد/ }));
     expect(screen.getByRole("checkbox", { name: /سعد/ })).not.toBeDisabled();
+  });
+
+  it("once every juz' has a reader and sharing is open, the room is the ajza' with one reader", () => {
+    m.people = freeJuz(0, { open: true, shared: 2 });
+    render(<SavedPicker inviteCode="CODE" onClose={() => {}} />);
+    expect(screen.getByText(t.rota.savedRoom(28))).toBeInTheDocument();
+    expect(screen.getByText(t.rota.savedShareHint)).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: /أم خالد/ }),
+    ).not.toBeDisabled();
+  });
+
+  it("with every juz' read and sharing closed, there is no room and no word of sharing", () => {
+    m.people = freeJuz(0, { open: false, shared: 2 });
+    render(<SavedPicker inviteCode="CODE" onClose={() => {}} />);
+    expect(screen.getByText(t.rota.savedRoom(0))).toBeInTheDocument();
+    expect(screen.queryByText(t.rota.savedShareHint)).toBeNull();
+    expect(screen.getByRole("checkbox", { name: /أم خالد/ })).toBeDisabled();
   });
 
   it("ticks the people who read with the organizer now, up to the room", async () => {

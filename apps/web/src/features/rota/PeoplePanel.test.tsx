@@ -702,6 +702,46 @@ describe("PeoplePanel", () => {
       ).toBeTruthy();
     });
 
+    it("removing a reader who also reads a juz' alone says that juz' is left empty", async () => {
+      const view = sharedView();
+      view.rows[2] = slot(3, { ...layla, slots: 2 });
+      view.participants[view.participants.length - 1] = {
+        ...layla,
+        juz: [1, 3],
+      };
+      m.view = view;
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getAllByRole("button", { name: /ليلى/ })[0]!);
+      await user.click(screen.getByRole("button", { name: t.rota.remove }));
+      const confirm = screen.getByRole("dialog", {
+        name: t.rota.removeTitle("ليلى"),
+      });
+      expect(
+        within(confirm).getByText(t.rota.leavesAlone("سعد")),
+      ).toBeVisible();
+      expect(within(confirm).getByText(t.rota.removeBody)).toBeVisible();
+    });
+
+    it("offers the saved list once every juz' has a reader and sharing is open", () => {
+      m.view = fullView();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      expect(
+        screen.getByRole("button", { name: t.rota.savedFrom }),
+      ).toBeInTheDocument();
+    });
+
+    it("offers no saved list once every juz' has a reader but sharing is closed", () => {
+      m.view = {
+        ...fullView(),
+        sharing: { on: true, open: false, readers: 30, shared: 0 },
+      };
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      expect(
+        screen.queryByRole("button", { name: t.rota.savedFrom }),
+      ).toBeNull();
+    });
+
     it("no count of readers while nothing is shared", () => {
       m.view = fullView();
       render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
@@ -729,6 +769,11 @@ describe("PeoplePanel", () => {
       expect(
         within(confirm).getByText(t.rota.leavesAlone("سعد")),
       ).toBeInTheDocument();
+      // Her reading today stays; she reads no juz' alone, so none is left empty.
+      expect(
+        within(confirm).getByText(t.rota.removeBodyShared),
+      ).toBeInTheDocument();
+      expect(within(confirm).queryByText(t.rota.removeBody)).toBeNull();
       await user.click(
         within(confirm).getByRole("button", { name: t.rota.removeConfirm }),
       );
@@ -752,6 +797,7 @@ describe("PeoplePanel", () => {
         name: new RegExp(t.rota.freeThis(1)),
       });
       expect(free).toHaveTextContent(t.rota.leavesAlone("ليلى"));
+      expect(free).toHaveTextContent(t.rota.freeThisStaysShared);
     });
 
     it("a reader of a shared juz' moves only to an empty one, and is told the other stays", async () => {

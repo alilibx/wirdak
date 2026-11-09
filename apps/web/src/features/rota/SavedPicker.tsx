@@ -18,7 +18,8 @@ const savedErrors: Record<string, string> = t.rota.savedErrors;
  * With `juz` (an empty row) pressing one adds them there and closes. With `share` too, they join
  * `juz` as its second reader once the organizer confirms `explain`. Without `juz` the list is a
  * checklist: the organizer ticks up to as many as there are free ajza' and adds them all in one
- * call, each on the lowest free juz'. `onAddedMany` gets the line saying what it did.
+ * call, each on the lowest free juz', or once every juz' has a reader and sharing is open, as the
+ * second reader of the lowest juz' that has none. `onAddedMany` gets the line saying what it did.
  */
 export function SavedPicker({
   inviteCode,
@@ -214,8 +215,17 @@ function Checklist({
     () => new Set(),
   );
 
+  // Once every juz' has a reader and sharing is open, each one added shares a juz' one person
+  // reads, lowest first. Nothing says so while a juz' is empty.
+  const sharing =
+    people != null && people.freeJuz.length === 0 && people.sharing.open;
+  const unshared = sharing
+    ? people.rows.filter(
+        (row) => row.participant !== null && row.partner === null,
+      ).length
+    : 0;
   // Until the free ajza' load, the server's own count is the limit (it reports who didn't fit).
-  const free = people ? people.freeJuz.length : Infinity;
+  const free = people ? people.freeJuz.length + unshared : Infinity;
   const room = Math.max(0, free - ticked.size);
   const locked = busy || question !== null;
   const canTick = (c: SavedContact) =>
@@ -268,7 +278,9 @@ function Checklist({
 
   return (
     <>
-      <p className="text-ink-soft">{t.rota.savedManyHint}</p>
+      <p className="text-ink-soft">
+        {sharing ? t.rota.savedShareHint : t.rota.savedManyHint}
+      </p>
       {people !== undefined && people !== null && (
         <p role="status" className="mt-2 font-medium">
           {t.rota.savedRoom(room)}

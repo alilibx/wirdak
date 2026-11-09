@@ -36,7 +36,7 @@ function JoinRequestCard({
   const [chosen, setChosen] = useState<number | null>(null);
   const share = view.freeJuz.length === 0 && view.sharing.open;
   // The ajza' to pick from, each with who reads it when it is shared onto.
-  const choices = share
+  const choices: { juz: number; with: string | null }[] = share
     ? view.rows.flatMap((row) =>
         row.participant !== null && row.partner === null
           ? [{ juz: row.juz, with: row.participant.name }]
@@ -44,7 +44,8 @@ function JoinRequestCard({
       )
     : view.freeJuz.map((n) => ({ juz: n, with: null }));
   // The juz' may be taken while the card is open: fall back to the first one left.
-  const juz = (choices.find((c) => c.juz === chosen) ?? choices[0])?.juz;
+  const choice = choices.find((c) => c.juz === chosen) ?? choices[0];
+  const juz = choice?.juz;
   const args = backend.authArgs();
   // Left as it came, the server cleans WhatsApp's name itself, or gives its usual one.
   const nameArg =
@@ -89,6 +90,17 @@ function JoinRequestCard({
               </option>
             ))}
           </select>
+          {/* Shared onto a juz': what follows, once there is a name to say it with. */}
+          {choice?.with != null && name.trim() !== "" && (
+            <p className="mt-3 leading-relaxed">
+              {t.rota.shareExplain(
+                choice.with,
+                name.trim(),
+                choice.juz,
+                view.target.number,
+              )}
+            </p>
+          )}
         </>
       )}
       {question ?? (

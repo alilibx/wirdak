@@ -162,6 +162,15 @@ describe("JoinRequests", () => {
       }),
     ).toBeInTheDocument();
     await user.selectOptions(picker, "5");
+    // What follows, before the organizer confirms.
+    const explain = screen.getByText(
+      t.rota.shareExplain("قارئ 5", "خالد", 5, 2),
+    );
+    expect(
+      explain.compareDocumentPosition(
+        screen.getByRole("button", { name: t.rota.shareRequest }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     await user.click(screen.getByRole("button", { name: t.rota.shareRequest }));
     expect(m.fns.acceptJoinRequest).toHaveBeenCalledWith({
       sessionToken: "tok",

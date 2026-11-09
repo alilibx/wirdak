@@ -205,15 +205,12 @@ export function TileSheet({
         <>
           {tile.answer !== null && tile.readerName && (
             <p className="mt-1 text-ink-soft">
-              {t.rota.answerOf(tile.readerName, answerWord(tile.answer))}
+              {t.rota.answerOf(tile.readerName, tile.answer)}
             </p>
           )}
           {tile.partnerAnswer !== null && (
             <p className="mt-1 text-ink-soft">
-              {t.rota.answerOf(
-                tile.partnerName,
-                answerWord(tile.partnerAnswer),
-              )}
+              {t.rota.answerOf(tile.partnerName, tile.partnerAnswer)}
             </p>
           )}
         </>

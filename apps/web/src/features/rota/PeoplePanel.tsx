@@ -75,6 +75,10 @@ function PersonSheet({
       : pressed?.partner?.id === person.id
         ? pressed.participant
         : null;
+  // Whether they also read a juz' nobody shares with them, which a removal leaves empty.
+  const holdsWholeJuz = view.rows.some(
+    (row) => row.participant?.id === person.id && row.partner === null,
+  );
   const others = view.rows.filter(
     (row) =>
       row.juz !== juz &&
@@ -113,8 +117,16 @@ function PersonSheet({
   if (confirming) {
     return (
       <Sheet title={t.rota.removeTitle(name)} onClose={onClose}>
+        {other && (
+          <p className="leading-relaxed text-ink-soft">
+            {t.rota.leavesAlone(other.name)}
+          </p>
+        )}
         <p className="leading-relaxed text-ink-soft">
-          {other ? t.rota.leavesAlone(other.name) : t.rota.removeBody}
+          {/* A shared juz' keeps its other reader; any juz' they read alone loses its reader. */}
+          {other && !holdsWholeJuz
+            ? t.rota.removeBodyShared
+            : t.rota.removeBody}
         </p>
         <div className="mt-5 grid gap-3">
           <Button
@@ -270,7 +282,11 @@ function PersonSheet({
               <span className="block">{t.rota.freeThis(juz)}</span>
               <span className="block text-base font-normal">
                 {other
-                  ? t.rota.leavesAlone(other.name)
+                  ? `${t.rota.leavesAlone(other.name)}. ${
+                      person.isMe
+                        ? t.rota.freeThisStaysSharedMe
+                        : t.rota.freeThisStaysShared
+                    }`
                   : person.isMe
                     ? t.rota.freeThisHintMe
                     : t.rota.freeThisHint}
@@ -289,7 +305,11 @@ function PersonSheet({
                   <span className="block">{t.rota.stopReading}</span>
                   <span className="block text-base font-normal">
                     {other
-                      ? t.rota.leavesAlone(other.name)
+                      ? `${t.rota.leavesAlone(other.name)}. ${
+                          holdsWholeJuz
+                            ? t.rota.stopReadingHint
+                            : t.rota.stopReadingHintShared
+                        }`
                       : t.rota.stopReadingHint}
                   </span>
                 </span>
@@ -530,6 +550,16 @@ export function PeoplePanel({
             onAddedMany={setSpreadResult}
           />
         </section>
+      )}
+      {/* Every juz' has a reader: saved people still come in, each sharing a juz'. */}
+      {!archived && view.freeJuz.length === 0 && view.sharing.open && (
+        <div className="mt-4 empty:hidden">
+          <PickSavedButton
+            inviteCode={inviteCode}
+            onStart={() => setSpreadResult(null)}
+            onAddedMany={setSpreadResult}
+          />
+        </div>
       )}
       {/* Mounted even once the banner is gone, so the result is still read out. */}
       <p role="status" className="mt-3 font-medium text-green empty:hidden">
