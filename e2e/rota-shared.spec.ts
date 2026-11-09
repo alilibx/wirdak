@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { t } from "../apps/web/src/i18n/ar";
 import {
   allowRota,
@@ -33,6 +33,16 @@ async function addPerson(
   await scope.getByLabel(t.rota.personName).fill(name);
   await scope.getByLabel(t.rota.personPhone).fill(`+${randomPhone()}`);
   await scope.getByRole("button", { name: t.rota.add, exact: true }).click();
+}
+
+/**
+ * Late in the day the server asks when a new reader starts, before adding them. Answer «يبدأ
+ * اليوم», what happens earlier in the day when nobody is asked, so the test passes at any hour.
+ */
+async function startToday(page: Page, added: Locator) {
+  const readsToday = page.getByRole("button", { name: t.rota.readsToday });
+  await expect(readsToday.or(added).first()).toBeVisible();
+  if (await readsToday.isVisible()) await readsToday.click();
 }
 
 // Two readers share one juz' of a rotating khatma, but only once all 30 have a reader. A sets the
@@ -72,6 +82,8 @@ test("rota: an organizer shares a juz' once all 30 have a reader", async ({
     await expect(setupPeople.getByText(name)).toBeVisible();
   }
   await page.getByRole("button", { name: t.rota.spread }).click();
+  // The result line moves «تمّ» down: wait for it, or the tap can land where the button was.
+  await expect(page.getByText(t.rota.spreadResult(3))).toBeVisible();
   await page.getByRole("button", { name: t.rota.done, exact: true }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: KHATMA_NAME }),
@@ -87,6 +99,7 @@ test("rota: an organizer shares a juz' once all 30 have a reader", async ({
     await openRows.first().click();
     const sheet = page.getByRole("dialog");
     await addPerson(sheet, name);
+    await startToday(page, rows.filter({ hasText: name }));
     await expect(sheet).toBeHidden();
     await expect(rows.filter({ hasText: name })).toHaveCount(1);
   }
@@ -110,6 +123,7 @@ test("rota: an organizer shares a juz' once all 30 have a reader", async ({
   await openRows.first().click();
   const lastSheet = page.getByRole("dialog");
   await addPerson(lastSheet, THIRTIETH);
+  await startToday(page, rows.filter({ hasText: THIRTIETH }));
   await expect(lastSheet).toBeHidden();
   await expect(openRows).toHaveCount(0);
 
