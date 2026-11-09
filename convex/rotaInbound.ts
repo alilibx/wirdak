@@ -281,6 +281,14 @@ async function answerDay(
       doneById: participant._id,
     });
   }
+  // This «أتممت» is their answer to a shared juz' the other reader finished
+  // too, so a later «تم» is never drawn back to this day for its thanks.
+  for (const r of [...reading, ...handedOn]) {
+    if (!thanksDue(r, participant._id)) continue;
+    await ctx.db.patch(r._id, {
+      thankedIds: [...(r.thankedIds ?? []), participant._id],
+    });
+  }
   const [first] = marked;
   if (first) await scheduleRotaCheer(ctx, first._id, now, participant._id);
   const done = all.filter((r) => r.doneAt !== null).length + marked.length;

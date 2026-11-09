@@ -1093,6 +1093,51 @@ test("the same in the late window", async () => {
   });
 });
 
+test("a two-slot reader's «أتممت» is their answer to the shared juz' the partner finished", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, [{ slot: 1 }]);
+  const [reader] = s.participants as [Id<"rotaParticipants">];
+  // The reader holds slot 2 too; the partner shares slot 1 with them.
+  await t.run((ctx) =>
+    ctx.db.insert("rotaSlots", {
+      khatmaId: s.khatmaId,
+      slot: 2,
+      participantId: reader,
+    }),
+  );
+  const partner = await shareSlot(t, s, 1);
+  const dayOne = await startDay(t, s);
+  await send(t, PARTNER, "أتممت", {
+    payload: tap("done", dayOne._id, partner),
+  });
+  await send(t, phoneOf(0), "أتممت", {
+    payload: tap("done", dayOne._id, reader),
+  });
+  expect((await juzRead(t, dayOne._id, 2)).doneById).toBe(reader);
+  expect((await juzRead(t, dayOne._id, 1)).thankedIds).toEqual([reader]);
+
+  // Day two starts after midnight; in yesterday's late window, «تم» is for today.
+  vi.setSystemTime(dubai("2027-01-17T00:10"));
+  await t.mutation(internal.rotaDays.tick, { khatmaId: s.khatmaId });
+  const dayTwo = await t.run((ctx) =>
+    ctx.db
+      .query("rotaDays")
+      .withIndex("by_khatma_n", (q) => q.eq("khatmaId", s.khatmaId).eq("n", 2))
+      .unique(),
+  );
+  vi.setSystemTime(dubai("2027-01-17T00:30"));
+  sent = [];
+
+  await send(t, phoneOf(0), "تم");
+
+  const today = (await readsOf(t, dayTwo!._id)).filter((r) =>
+    [r.readerId, r.partnerId].includes(reader),
+  );
+  expect(today).toHaveLength(2);
+  expect(today.every((r) => r.doneAt === Date.now())).toBe(true);
+  expect(sent.map((m) => m.body)).toEqual([`*ختمة*\n${thanksText(2)}`]);
+});
+
 test("B's phone with A's payload changes nothing", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t, [{ slot: 1 }, { slot: 2 }]);
