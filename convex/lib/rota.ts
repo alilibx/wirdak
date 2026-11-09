@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Doc, Id } from "../_generated/dataModel";
 
 /** Which days a rota khatma is read on. Weekday 0 is Sunday, days are 1 to 31. */
 export type ReadingDays =
@@ -97,6 +98,40 @@ export function juzFor(slot: number, number: number): number {
 /** The slot that reads `juz` in khatma `number` (inverse of `juzFor`). */
 export function slotFor(juz: number, number: number): number {
   return ((((juz - number) % ROTA_SIZE) + ROTA_SIZE) % ROTA_SIZE) + 1;
+}
+
+/**
+ * Whether `participantId` reads this juz' of the day: its reader, or the
+ * slot's second reader while nobody else was given it.
+ */
+export function readsFor(
+  read: Doc<"rotaReads">,
+  participantId: Id<"rotaParticipants">,
+): boolean {
+  return (
+    read.readerId === participantId ||
+    (read.partnerId === participantId && read.reassignedAt === null)
+  );
+}
+
+/**
+ * Who shares this juz' with `participantId` that day, by name: the partner for
+ * its reader, the reader for its partner. Null when the juz' isn't shared,
+ * was reassigned, or the other reader isn't in `names`.
+ */
+export function partnersOf(
+  read: Doc<"rotaReads">,
+  participantId: Id<"rotaParticipants">,
+  names: ReadonlyMap<Id<"rotaParticipants">, string>,
+): string | null {
+  if (read.reassignedAt !== null || read.partnerId == null) return null;
+  const other =
+    read.readerId === participantId
+      ? read.partnerId
+      : read.partnerId === participantId
+        ? read.readerId
+        : null;
+  return other === null ? null : (names.get(other) ?? null);
 }
 
 function dayNumber(date: string): number {

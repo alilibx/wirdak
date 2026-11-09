@@ -57,3 +57,17 @@ describe("the rota join link's share message", () => {
     expect(said("monthly")).toContain("، ختمة شهرية بالتناوب.");
   });
 });
+
+describe("where a rota reader goes next", () => {
+  it("is one juz' up in the next khatma, and 30 goes back to 1, for one reader or two", () => {
+    expect(t.rota.walk(5, 2)).toBe(
+      "يقرأ الجزء 5 في الختمة 2، ثم 6 في الختمة 3، وهكذا.",
+    );
+    expect(t.rota.walk(30, 30)).toBe(
+      "يقرأ الجزء 30 في الختمة 30، ثم 1 في الختمة 1، وهكذا.",
+    );
+    expect(t.rota.shareExplain("سعد", "ليلى", 30, 29)).toContain(
+      "الجزء 30 في الختمة 29، ثم الجزء 1 في الختمة 30.",
+    );
+  });
+});

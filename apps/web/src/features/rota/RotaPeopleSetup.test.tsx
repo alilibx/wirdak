@@ -53,10 +53,13 @@ function makeView() {
         isMe: false,
         phone: null,
         juz: [1],
+        heldSlots: 1,
+        shared: [] as number[],
         ...state,
       },
     ],
     freeJuz: [2, 3],
+    unsharedJuz: [] as number[],
     phoneExample: null,
     maxSlots: 2,
   };
@@ -195,6 +198,70 @@ describe("RotaPeopleSetup: bringing people in", () => {
     expect(status).toHaveTextContent(t.rota.importResult(25, 2));
     expect(status).toHaveTextContent("25 شخصاً");
     expect(status).toHaveTextContent("شخصين");
+  });
+
+  it("says how many of those brought in share a juz'", async () => {
+    const user = userEvent.setup();
+    m.fns.importMembers = vi
+      .fn()
+      .mockResolvedValue({ ok: true, added: 45, skipped: 0, shared: 15 });
+    renderSetup();
+    await user.click(
+      screen.getByRole("button", {
+        name: new RegExp(t.rota.importTitle("ختمة الجيران")),
+      }),
+    );
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(t.rota.importResult(45, 0, 15));
+    expect(status).toHaveTextContent("أضفنا 45 شخصاً.");
+    expect(status).toHaveTextContent("يشترك 15 شخصاً منهم في جزء");
+    // None shared, nothing said about it.
+    expect(t.rota.importResult(3, 0, 0)).toBe(t.rota.importResult(3, 0));
+    expect(t.rota.importResult(3, 0)).not.toContain("يشترك");
+  });
+
+  it("marks a juz' two people share in the list", () => {
+    const view = makeView();
+    const [first] = view.participants;
+    m.view = {
+      ...view,
+      participants: [
+        { ...first, juz: [1, 4], heldSlots: 2, shared: [4] },
+        { ...first, id: "p2", name: "منى", juz: [4], shared: [4] },
+        { ...first, id: "p3", name: "هدى", juz: [5], shared: [] },
+      ],
+    };
+    renderSetup();
+    const list = screen.getByRole("list", { name: t.rota.peopleList });
+    const rows = within(list).getAllByRole("listitem");
+    expect(rows[0]).toHaveTextContent("الأجزاء 1 و4 (مشترك)");
+    expect(rows[1]).toHaveTextContent("الجزء 4 (مشترك)");
+    expect(rows[2]).toHaveTextContent("الجزء 5");
+    expect(rows[2]).not.toHaveTextContent("مشترك");
+  });
+
+  it("offers a leftover juz' to whoever the server would still give one to", async () => {
+    const user = userEvent.setup();
+    const view = makeView();
+    const [first] = view.participants;
+    m.view = {
+      ...view,
+      maxSlots: 2,
+      participants: [
+        // Two ajza', but the shared one doesn't count toward the cap.
+        { ...first, juz: [1, 4], heldSlots: 1, shared: [4] },
+        { ...first, id: "p2", name: "منى", juz: [5, 6], heldSlots: 2 },
+      ],
+    };
+    renderSetup();
+    await user.click(
+      screen.getByRole("button", {
+        name: (name) => name.startsWith(t.rota.leftover([2, 3])),
+      }),
+    );
+    const sheet = screen.getByRole("dialog", { name: t.rota.giveTitle(2) });
+    expect(within(sheet).getByRole("button", { name: /سعد/ })).toBeEnabled();
+    expect(within(sheet).getByRole("button", { name: /منى/ })).toBeDisabled();
   });
 
   it("keeps the result when the import leaves nothing to bring, and drops it once another add starts", async () => {

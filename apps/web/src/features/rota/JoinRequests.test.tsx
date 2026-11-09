@@ -1,3 +1,5 @@
+import type { Id } from "@convex/_generated/dataModel";
+import type { PeopleView } from "@convex/lib/rotaOps";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,12 +25,59 @@ vi.mock("convex/react", async () => {
   };
 });
 
-function view(name: string | null) {
+const reader = (n: number) => ({
+  id: `p${n}` as Id<"rotaParticipants">,
+  name: `قارئ ${n}`,
+  isMe: false,
+  slots: 1,
+  phone: null,
+  joined: true,
+  stopped: false,
+  silenced: false,
+  isOrganizer: false,
+  isCoOrganizer: false,
+  hasAccount: false,
+});
+
+/** One request; juz' 4 and 5 have no reader, unless `full`, when juz' 1 is also shared. */
+function view(name: string | null, full = false): PeopleView {
+  const freeJuz = full ? [] : [4, 5];
+  const rows = Array.from({ length: 30 }, (_, i) => ({
+    juz: i + 1,
+    participant: freeJuz.includes(i + 1) ? null : reader(i + 1),
+    partner: full && i === 0 ? reader(31) : null,
+  }));
   return {
-    requests: [{ id: "r1", name, phoneMasked: "+971 50 ••• 2233" }],
-    freeJuz: [4, 5],
+    title: "ختمة العائلة",
+    archived: false,
+    daysKind: "daily",
+    joinLink: null,
+    requests: [
+      {
+        id: "r1" as Id<"rotaJoinRequests">,
+        name,
+        phoneMasked: "+971 50 ••• 2233",
+        createdAt: 0,
+      },
+    ],
+    target: { number: 2, date: "2026-10-31", isFirst: false },
+    rows,
+    participants: [],
+    freeJuz,
+    // As the server lists them: the ajza' one person reads, once sharing is open.
+    unsharedJuz: full
+      ? rows.filter((r) => r.partner === null).map((r) => r.juz)
+      : [],
+    maxSlots: 2,
     phoneExample: null,
-  } as never;
+    leftoverBox: true,
+    sharing: {
+      on: true,
+      open: full,
+      readers: full ? 31 : 28,
+      shared: full ? 1 : 0,
+    },
+  };
 }
 
 beforeEach(() => {
@@ -97,5 +146,76 @@ describe("JoinRequests", () => {
       requestId: "r1",
       juz: 4,
     });
+  });
+
+  it("a join request can be shared onto a juz' when all are taken", async () => {
+    const user = userEvent.setup();
+    render(<JoinRequests inviteCode="CODE" view={view("خالد", true)} />);
+    expect(
+      screen.queryByRole("button", { name: t.rota.acceptRequest }),
+    ).toBeNull();
+    const picker = screen.getByLabelText(t.rota.requestJuz);
+    const options = within(picker)
+      .getAllByRole("option")
+      .map((o) => Number((o as HTMLOptionElement).value));
+    // Juz' 1 has two readers already.
+    expect(options).toEqual(Array.from({ length: 29 }, (_, i) => i + 2));
+    expect(
+      within(picker).getByRole("option", {
+        name: t.rota.shareJuzOption(5, "قارئ 5"),
+      }),
+    ).toBeInTheDocument();
+    await user.selectOptions(picker, "5");
+    // What follows, before the organizer confirms.
+    const explain = screen.getByText(
+      t.rota.shareExplain("قارئ 5", "خالد", 5, 2),
+    );
+    expect(
+      explain.compareDocumentPosition(
+        screen.getByRole("button", { name: t.rota.shareRequest }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: t.rota.shareRequest }));
+    expect(m.fns.acceptJoinRequest).toHaveBeenCalledWith({
+      sessionToken: "tok",
+      inviteCode: "CODE",
+      requestId: "r1",
+      juz: 5,
+      share: true,
+    });
+  });
+
+  it("offers only the ajza' the server says the viewer may share", () => {
+    // A co-organizer looking: juz' 2 and 3 belong to people running the khatma.
+    const coView = view("خالد", true);
+    coView.unsharedJuz = coView.unsharedJuz.filter((j) => j !== 2 && j !== 3);
+    render(<JoinRequests inviteCode="CODE" view={coView} />);
+    const options = within(screen.getByLabelText(t.rota.requestJuz))
+      .getAllByRole("option")
+      .map((o) => Number((o as HTMLOptionElement).value));
+    expect(options).toEqual(Array.from({ length: 27 }, (_, i) => i + 4));
+  });
+
+  it("with every juz' taken and sharing closed, says so and offers no accept", () => {
+    const closed = view("خالد", true);
+    closed.sharing = { ...closed.sharing, open: false };
+    closed.unsharedJuz = [];
+    render(<JoinRequests inviteCode="CODE" view={closed} />);
+    expect(screen.getByText(t.rota.addErrors.no_free_juz!)).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: t.rota.shareRequest }),
+    ).toBeNull();
+  });
+
+  it("an already_shared refusal shows in Arabic", async () => {
+    m.fns.acceptJoinRequest = vi
+      .fn()
+      .mockResolvedValue({ error: "already_shared" });
+    const user = userEvent.setup();
+    render(<JoinRequests inviteCode="CODE" view={view("خالد", true)} />);
+    await user.click(screen.getByRole("button", { name: t.rota.shareRequest }));
+    expect(
+      await screen.findByText(t.rota.errors.already_shared!),
+    ).toBeInTheDocument();
   });
 });

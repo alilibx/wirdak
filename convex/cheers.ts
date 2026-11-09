@@ -5,6 +5,7 @@ import { internalMutation, type MutationCtx } from "./_generated/server";
 import { cheerConfig, cheerDue } from "./lib/cheer";
 import { JUZ_COUNT } from "./lib/juz";
 import { isArchived } from "./lib/khatma";
+import { readsFor } from "./lib/rota";
 import { getSetting, quietHours } from "./lib/settings";
 import { localDate, nextAwake } from "./lib/wakingTime";
 import { notify } from "./notes";
@@ -174,13 +175,22 @@ export const afterRead = internalMutation({
       .collect();
     const done = reads.filter((r) => r.doneAt !== null).length;
     if (done >= JUZ_COUNT - QUIET_LAST_AJZA) return;
-    const unread = reads.filter((r) => r.doneAt === null);
-    const reading = new Set(unread.map((r) => r.readerId));
-    const heldBack = new Set(
-      unread
-        .filter((r) => day.reminderSentAt != null || r.notYetAt != null)
-        .map((r) => r.readerId),
-    );
+    // Both readers of a shared juz' are still reading it, until it's
+    // reassigned; each one's «ليس بعد» holds back that one alone.
+    const reading = new Set<Id<"rotaParticipants">>();
+    const heldBack = new Set<Id<"rotaParticipants">>();
+    for (const r of reads) {
+      if (r.doneAt !== null) continue;
+      const readers = [
+        { id: r.readerId, notYetAt: r.notYetAt },
+        { id: r.partnerId, notYetAt: r.partnerNotYetAt },
+      ];
+      for (const { id, notYetAt } of readers) {
+        if (id == null || !readsFor(r, id)) continue;
+        reading.add(id);
+        if (day.reminderSentAt != null || notYetAt != null) heldBack.add(id);
+      }
+    }
     const participants = await ctx.db
       .query("rotaParticipants")
       .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
@@ -190,9 +200,12 @@ export const afterRead = internalMutation({
     );
     // One tap can finish several ajza': they share its moment.
     const juz = reads.filter((r) => r.doneAt === args.doneAt).map((r) => r.juz);
+    // Neither reader of the finished juz' hears about it, whoever tapped: a
+    // cheer would tell one that the other replied. A partner it was taken
+    // from doesn't read it any more, so to them it's anyone's juz'.
     for (const participant of participants) {
       if (
-        participant._id === finished.readerId ||
+        readsFor(finished, participant._id) ||
         participant._id === args.actorId ||
         !reachable(participant) ||
         heldBack.has(participant._id) ||

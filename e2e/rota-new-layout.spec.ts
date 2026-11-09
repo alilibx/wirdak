@@ -43,6 +43,13 @@ test("rota, new layout: people first, the day as a card, settings as a tab", asy
   await page.getByLabel(t.rota.personName).fill("سارة");
   await page.getByLabel(t.rota.personPhone).fill(`+${randomPhone()}`);
   await page.getByRole("button", { name: t.rota.add, exact: true }).click();
+  // The new row moves «تمّ» down: wait for it, or the tap can land where the button was.
+  await expect(
+    page
+      .getByRole("list", { name: t.rota.peopleList })
+      .getByRole("listitem")
+      .filter({ hasText: "سارة" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: t.rota.done, exact: true }).click();
 
   // --- The page: people first, no settings link, the day as a card --------------------------

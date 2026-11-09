@@ -131,7 +131,7 @@ export const SETTING_DEFAULTS = {
   oldOwnerStaysOn: true,
   /** organizers can add a second reader to a rota juz' */
   rotaSharedSlotsOn: true,
-  /** a half counts as a slot in rotaMaxSlotsPerPerson */
+  /** a shared slot counts toward rotaMaxSlotsPerPerson for each of its readers (the key keeps its old name) */
   rotaHalfCountsAsSlot: true,
   /** every organizer gets the new rota page layout; off leaves it to each person's `rotaNewLayout` */
   rotaNewLayoutOn: false,

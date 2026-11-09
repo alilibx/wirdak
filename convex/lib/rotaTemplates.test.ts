@@ -100,6 +100,51 @@ test("the cycle template has a header and no parameters or buttons", () => {
   });
 });
 
+test("the juz', reminder and assigned messages name each juz' partner", () => {
+  const partners = new Map([[5, "سارة"]]);
+  expect(juzTemplate(khatma, two, 12, payloads, partners).body).toEqual([
+    "12",
+    "الجزآن 5 (مشترك مع سارة) و6",
+  ]);
+  expect(reminderTemplate(khatma, two, payloads, partners).body).toEqual([
+    "الجزأين 5 (مشترك مع سارة) و6",
+  ]);
+  expect(assignedTemplate(khatma, two, 7, payloads, partners).body).toEqual([
+    "الجزأين 5 (مشترك مع سارة) و6",
+    "7",
+  ]);
+  expect(juzText(one, true, new Map([[26, "سارة"]]))).toBe(
+    "السلام عليكم، جزؤكم اليوم هو 26 (مشترك مع سارة). انقروا «أتممت» بعد القراءة.",
+  );
+  expect(juzText(two, false, partners)).toBe(
+    "أجزاؤكم اليوم هي 5 (مشترك مع سارة) و6. انقروا «أتممت» بعد القراءة.",
+  );
+  expect(juzText(three, true, new Map([[6, "سارة"]]))).toBe(
+    "السلام عليكم، أجزاؤكم اليوم هي 3، 5 و6 (مشترك مع سارة). انقروا «أتممت» بعد القراءة.",
+  );
+  expect(reminderText(one, new Map([[26, "سارة"]]))).toBe(
+    "تذكير بقراءتك اليوم: لم تُسجَّل بعد قراءة الجزء 26 (مشترك مع سارة) في هذه الختمة.",
+  );
+  expect(assignedText(two, 7, partners)).toBe(
+    "تحديث على قراءتك: سُجِّلت لك قراءة الجزأين 5 (مشترك مع سارة) و6 في الختمة 7 لهذا اليوم.",
+  );
+});
+
+test("the longest juz' phrase with partners fits a template parameter", () => {
+  const name = "ن".repeat(60);
+  const partners = new Map(three.map((j) => [j, name]));
+  const params = [
+    ...juzTemplate(khatma, three, 30, payloads, partners).body!,
+    ...reminderTemplate(khatma, three, payloads, partners).body!,
+    ...assignedTemplate(khatma, three, 30, payloads, partners).body!,
+  ];
+  for (const param of params) {
+    expect(param.length).toBeLessThan(1024);
+    expect(param).not.toMatch(/\n/);
+  }
+  expect(params[1]).toContain(name);
+});
+
 test("an unnamed khatma gets the untitled-date header", () => {
   expect(cycleTemplate({ name: null, createdAt: 0 }).header).toMatch(/^ختمة /);
 });

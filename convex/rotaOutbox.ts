@@ -8,7 +8,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
-import { juzFor } from "./lib/rota";
+import { juzFor, partnersOf, readsFor } from "./lib/rota";
 import { lastRotaDay, targetDay, type RotaConfig } from "./lib/rotaPlace";
 import { encodePayload } from "./lib/rotaPayload";
 import {
@@ -44,6 +44,8 @@ import {
 
 type Kind = Doc<"rotaOutbox">["kind"];
 type Participant = Doc<"rotaParticipants">;
+/** Who shares each of a message's ajza' with its reader. */
+type Partners = { juz: number; name: string }[];
 
 /** A free-form message, with reply buttons where the template has quick replies. */
 type FreeForm = { text: string; buttons?: { id: string; title: string }[] };
@@ -120,6 +122,7 @@ export async function enqueue(
     juz: number[];
     number: number | null;
     name?: string | null;
+    partners?: Partners;
   },
 ): Promise<Id<"rotaOutbox"> | null> {
   const participant = await ctx.db.get(row.participantId);
@@ -160,8 +163,10 @@ export async function enqueue(
     }
   }
   const now = Date.now();
+  const { partners, ...rest } = row;
   const outboxId = await ctx.db.insert("rotaOutbox", {
-    ...row,
+    ...rest,
+    ...(partners !== undefined && partners.length > 0 && { partners }),
     createdAt: now,
     sentAt: null,
     skippedAt: null,
@@ -201,6 +206,37 @@ async function unassignUnsent(
     else await ctx.db.patch(r._id, { juz: kept });
   }
   return left;
+}
+
+/** The names of the khatma's participants still on its list, to name a juz' partner by. */
+export async function participantNames(
+  ctx: QueryCtx,
+  khatmaId: Id<"khatmas">,
+): Promise<Map<Id<"rotaParticipants">, string>> {
+  const rows = await ctx.db
+    .query("rotaParticipants")
+    .withIndex("by_khatma", (q) => q.eq("khatmaId", khatmaId))
+    .collect();
+  return new Map(
+    rows.filter((p) => p.removedAt == null).map((p) => [p._id, p.name]),
+  );
+}
+
+/** The partners of `participantId`'s shared ajza' among `reads`, for a message's `partners`. */
+export function partnersIn(
+  reads: Doc<"rotaReads">[],
+  participantId: Id<"rotaParticipants">,
+  names: ReadonlyMap<Id<"rotaParticipants">, string>,
+): Partners {
+  return reads.flatMap((r) => {
+    const name = partnersOf(r, participantId, names);
+    return name === null ? [] : [{ juz: r.juz, name }];
+  });
+}
+
+/** A message's `partners` as the juz' phrase takes them. */
+function partnerMap(partners: Partners | undefined): Map<number, string> {
+  return new Map((partners ?? []).map((p) => [p.juz, p.name]));
 }
 
 /** The payloads of a day's «أتممت» and «ليس بعد» buttons. */
@@ -293,7 +329,9 @@ export async function takeFreeJuzToday(
     .query("rotaSlots")
     .withIndex("by_participant", (q) => q.eq("participantId", participantId))
     .collect();
-  for (const { slot } of slots) {
+  for (const { slot, second } of slots) {
+    // A second reader has a first who holds the juz' already.
+    if (second === true) continue;
     const read = await freeRead(ctx, day, slot);
     if (read) {
       await ctx.db.patch(read._id, {
@@ -317,8 +355,9 @@ export async function welcomeGoesNow(
 
 /**
  * The welcome for a member who has just joined: today's juz' with the buttons
- * when a day dated today is open and has unread reads for them, else when their
- * next reading day comes. Free-form: it needs the phone's 24-hour window.
+ * when a day dated today is open and has unread reads for them (a shared juz'
+ * names its other reader), else when their next reading day comes. Free-form:
+ * it needs the phone's 24-hour window.
  */
 export async function welcomeMessage(
   ctx: QueryCtx,
@@ -337,19 +376,32 @@ export async function welcomeMessage(
   }
   const last = await openDayToday(ctx, khatma._id, rota.timeZone, now);
   if (last) {
-    const juz = (
-      await ctx.db
-        .query("rotaReads")
-        .withIndex("by_reader_day", (q) =>
-          q.eq("readerId", participant._id).eq("dayId", last._id),
-        )
-        .collect()
-    )
-      .filter((r) => r.doneAt === null)
-      .map((r) => r.juz)
-      .sort((a, b) => a - b);
-    if (juz.length > 0) {
-      const text = `${welcomeText(participant.name, title, null)}\n${juzText(juz, false)}`;
+    const dayId = last._id;
+    const asReader = await ctx.db
+      .query("rotaReads")
+      .withIndex("by_reader_day", (q) =>
+        q.eq("readerId", participant._id).eq("dayId", dayId),
+      )
+      .collect();
+    const asPartner = await ctx.db
+      .query("rotaReads")
+      .withIndex("by_partner_day", (q) =>
+        q.eq("partnerId", participant._id).eq("dayId", dayId),
+      )
+      .collect();
+    // A shared juz' reassigned to its own partner is in both.
+    const reads = [
+      ...new Map(
+        [...asReader, ...asPartner]
+          .filter((r) => r.doneAt === null && readsFor(r, participant._id))
+          .map((r) => [r._id, r]),
+      ).values(),
+    ].sort((a, b) => a.juz - b.juz);
+    if (reads.length > 0) {
+      const names = await participantNames(ctx, khatma._id);
+      const partners = partnerMap(partnersIn(reads, participant._id, names));
+      const juz = reads.map((r) => r.juz);
+      const text = `${welcomeText(participant.name, title, null)}\n${juzText(juz, false, partners)}`;
       const payloads = donePayloads(
         { dayId: last._id, participantId: participant._id },
         isStaging(),
@@ -388,21 +440,22 @@ function compose(
     case "assigned": {
       if (row.dayId === null || row.number === null) return null;
       const payloads = donePayloads(row, staging);
+      const partners = partnerMap(row.partners);
       if (!inWindow) {
         if (row.kind === "juz") {
-          return juzTemplate(khatma, row.juz, number, payloads);
+          return juzTemplate(khatma, row.juz, number, payloads, partners);
         }
         if (row.kind === "reminder") {
-          return reminderTemplate(khatma, row.juz, payloads);
+          return reminderTemplate(khatma, row.juz, payloads, partners);
         }
-        return assignedTemplate(khatma, row.juz, number, payloads);
+        return assignedTemplate(khatma, row.juz, number, payloads, partners);
       }
       const text =
         row.kind === "juz"
-          ? juzText(row.juz)
+          ? juzText(row.juz, true, partners)
           : row.kind === "reminder"
-            ? reminderText(row.juz)
-            : assignedText(row.juz, number);
+            ? reminderText(row.juz, partners)
+            : assignedText(row.juz, number, partners);
       return {
         text: titled(khatma, text),
         buttons: [
@@ -491,10 +544,14 @@ export const plan = internalQuery({
       );
       // Only reads still waiting on this participant call for the message,
       // and it names those, not the juz' as queued: one may have been
-      // reassigned or read since.
+      // reassigned or read since, by either of its readers.
       waiting = row.juz.filter((_, i) => {
         const read = reads[i];
-        return read?.readerId === participant._id && read.doneAt === null;
+        return (
+          read != null &&
+          readsFor(read, participant._id) &&
+          read.doneAt === null
+        );
       });
       if (waiting.length === 0) return null;
     }

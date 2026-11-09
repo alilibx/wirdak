@@ -425,7 +425,7 @@ test("importMembers adds the pool's members in join order and never shows their 
     inviteCode: s.inviteCode,
     sourceInviteCode: source,
   });
-  expect(result).toEqual({ ok: true, added: 3, skipped: 0 });
+  expect(result).toEqual({ ok: true, added: 3, skipped: 0, shared: 0 });
 
   const view = await peopleView(t, s);
   expect(view?.participants.map((p) => p.name)).toEqual([
@@ -486,8 +486,8 @@ test("importing again skips the people already in", async () => {
       inviteCode: s.inviteCode,
       sourceInviteCode: source,
     });
-  expect(await call()).toEqual({ ok: true, added: 2, skipped: 0 });
-  expect(await call()).toEqual({ ok: true, added: 0, skipped: 2 });
+  expect(await call()).toEqual({ ok: true, added: 2, skipped: 0, shared: 0 });
+  expect(await call()).toEqual({ ok: true, added: 0, skipped: 2, shared: 0 });
   expect(await participantRows(t, s.inviteCode)).toHaveLength(3);
   expect(await contactRows(t)).toHaveLength(2);
 });
@@ -504,12 +504,23 @@ test("a member already typed in by phone is skipped too", async () => {
       inviteCode: s.inviteCode,
       sourceInviteCode: source,
     }),
-  ).toEqual({ ok: true, added: 1, skipped: 1 });
+  ).toEqual({ ok: true, added: 1, skipped: 1, shared: 0 });
 });
+
+const sharingOff = (t: T) =>
+  t.run((ctx) =>
+    ctx.db.insert("settings", {
+      key: "rotaSharedSlotsOn",
+      value: false,
+      updatedAt: 0,
+    }),
+  );
 
 test("the import stops when the ajza' run out and reports the rest as skipped", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t);
+  // With sharing off, nobody can be a juz''s second reader.
+  await sharingOff(t);
   const list = await members(t, 33);
   const source = await pool(t, s, list);
   const result = await t.mutation(api.rota.importMembers, {
@@ -518,10 +529,30 @@ test("the import stops when the ajza' run out and reports the rest as skipped", 
     sourceInviteCode: source,
   });
   // The organizer holds juz' 1: 29 are free.
-  expect(result).toEqual({ ok: true, added: 29, skipped: 4 });
+  expect(result).toEqual({ ok: true, added: 29, skipped: 4, shared: 0 });
   const view = await peopleView(t, s);
   expect(view?.freeJuz).toEqual([]);
   expect(view?.participants.at(-1)?.name).toBe("عضو 29");
+});
+
+test("once every juz' has a reader, the import shares them in order", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const list = await members(t, 31);
+  const source = await pool(t, s, list);
+  expect(
+    await t.mutation(api.rota.importMembers, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      sourceInviteCode: source,
+    }),
+  ).toEqual({ ok: true, added: 31, skipped: 0, shared: 2 });
+  const view = await peopleView(t, s);
+  expect(view?.freeJuz).toEqual([]);
+  expect(view?.rows[0]?.partner?.name).toBe("عضو 30");
+  expect(view?.rows[1]?.partner?.name).toBe("عضو 31");
+  expect(view?.rows[2]?.partner).toBeNull();
+  expect(view?.sharing).toMatchObject({ readers: 32, shared: 2 });
 });
 
 test("importMembers refuses a source that isn't the organizer's live pool khatma", async () => {
@@ -1072,6 +1103,8 @@ test("addSavedMany counts people already in, removed or foreign contacts, and th
   const t = convexTest(schema, modules);
   const s = await setup(t);
   const other = await person(t);
+  // With sharing off, nobody can be a juz''s second reader.
+  await sharingOff(t);
   // Fill all but two free ajza' (juz' 1 is the organizer's).
   for (let juz = 2; juz <= 28; juz++) await add(t, s, { juz });
   const inKhatma = (await saved(t, s))!.find((c) => c.inKhatma)!.id;
@@ -1099,6 +1132,33 @@ test("addSavedMany counts people already in, removed or foreign contacts, and th
   expect(view?.rows[28]?.participant?.name).toBe("أ");
   expect(view?.rows[29]?.participant?.name).toBe("ب");
   expect(view?.participants.map((p) => p.name)).not.toContain("ج");
+});
+
+test("adding saved people fills empty slots, then shares in order", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  for (let juz = 2; juz <= 28; juz++) await add(t, s, { juz });
+  const ids = [
+    await contact(t, s.personId, { name: "أ", phone: "+971505555001" }),
+    await contact(t, s.personId, { name: "ب", phone: "+971505555002" }),
+    await contact(t, s.personId, { name: "ج", phone: "+971505555003" }),
+    await contact(t, s.personId, { name: "د", phone: "+971505555004" }),
+  ];
+
+  expect(await addMany(t, s, ids)).toEqual({
+    ok: true,
+    added: 4,
+    alreadyIn: 0,
+    noRoom: 0,
+    notFound: 0,
+  });
+  const view = await peopleView(t, s);
+  expect(view?.rows[28]?.participant?.name).toBe("أ");
+  expect(view?.rows[29]?.participant?.name).toBe("ب");
+  expect(view?.rows[0]?.partner?.name).toBe("ج");
+  expect(view?.rows[1]?.partner?.name).toBe("د");
+  expect(view?.rows[2]?.partner).toBeNull();
+  expect(view?.sharing).toMatchObject({ readers: 32, shared: 2 });
 });
 
 test("addSavedMany adds a repeated id once", async () => {
@@ -1210,4 +1270,44 @@ test("saved marks people who read in the organizer's other live khatmas and list
     ["دانة", false],
     ["هالة", false],
   ]);
+});
+
+test("addSaved shares a juz' only once all 30 have a reader, with no third reader, and never someone already in", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const shareSaved = (contactId: Id<"rotaContacts">, juz: number) =>
+    t.mutation(api.rota.addSaved, {
+      sessionToken: s.token,
+      inviteCode: s.inviteCode,
+      contactId,
+      juz,
+      share: true,
+    });
+  const first = await contact(t, s.personId, {
+    name: "أ",
+    phone: "+971505556001",
+  });
+  const second = await contact(t, s.personId, {
+    name: "ب",
+    phone: "+971505556002",
+  });
+  for (let juz = 2; juz <= 29; juz++) await add(t, s, { juz });
+
+  // Juz' 30 has no reader yet.
+  expect(await shareSaved(first, 4)).toEqual({ error: "not_full" });
+  expect((await peopleView(t, s))?.rows[3]?.partner).toBeNull();
+
+  const inKhatma = await contact(t, s.personId, {
+    name: "ج",
+    phone: "+971505556003",
+  });
+  await add(t, s, { juz: 30, name: "ج", phone: "+971505556003" });
+  expect(await shareSaved(first, 4)).toMatchObject({ ok: true, juz: 4 });
+  expect(await shareSaved(second, 4)).toEqual({ error: "already_shared" });
+  expect(await shareSaved(inKhatma, 5)).toEqual({ error: "already_added" });
+
+  const view = await peopleView(t, s);
+  expect(view?.rows[3]?.partner?.name).toBe("أ");
+  expect(view?.rows[4]?.partner).toBeNull();
+  expect(view?.sharing).toMatchObject({ readers: 31, shared: 1 });
 });

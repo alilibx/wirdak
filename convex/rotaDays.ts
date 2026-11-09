@@ -7,11 +7,17 @@ import { changeCompletedDays } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
 import { organizerRecipients } from "./lib/organizerRecipients";
 import { clearNotes, notify } from "./notes";
-import { enqueue, windowOpen } from "./rotaOutbox";
+import {
+  enqueue,
+  participantNames,
+  partnersIn,
+  windowOpen,
+} from "./rotaOutbox";
 import {
   cycleOf,
   isReadingDate,
   khatmaNumber,
+  readsFor,
   ROTA_SIZE,
   slotFor,
 } from "./lib/rota";
@@ -20,7 +26,7 @@ import {
   firstDayFloor,
   lastRotaDay,
   lateTapOf,
-  slotRowsByJuz,
+  slotRows,
 } from "./lib/rotaPlace";
 import { getSetting } from "./lib/settings";
 import { localDate, localMinutes } from "./lib/wakingTime";
@@ -127,7 +133,11 @@ async function startDay(
     reminderSentAt: skipIfPast(rota.messages.reminder.at),
     juzSentAt: null,
   });
-  const byJuz = await slotRowsByJuz(ctx, khatma._id, number);
+  const { first: byJuz, second: partners } = await slotRows(
+    ctx,
+    khatma._id,
+    number,
+  );
   for (let juz = 1; juz <= ROTA_SIZE; juz++) {
     const slot = slotFor(juz, number);
     const holderId = byJuz.get(juz)?.participantId ?? null;
@@ -138,6 +148,7 @@ async function startDay(
       slot,
       holderId,
       readerId: holderId,
+      partnerId: partners.get(juz)?.participantId ?? null,
       doneAt: null,
       doneByOrganizer: false,
       reassignedAt: null,
@@ -148,10 +159,34 @@ async function startDay(
   return day;
 }
 
+/** Who reads `read`: its reader, and its partner while it's shared. */
+function readersOf(read: Doc<"rotaReads">): Id<"rotaParticipants">[] {
+  const ids = new Set<Id<"rotaParticipants">>();
+  for (const id of [read.readerId, read.partnerId]) {
+    if (id != null && readsFor(read, id)) ids.add(id);
+  }
+  return [...ids];
+}
+
+/** Each reader's unread ajza' among `reads`, both readers of a shared one. */
+function unreadByReader(
+  reads: Doc<"rotaReads">[],
+): Map<Id<"rotaParticipants">, Doc<"rotaReads">[]> {
+  const byReader = new Map<Id<"rotaParticipants">, Doc<"rotaReads">[]>();
+  for (const r of reads) {
+    if (r.doneAt !== null) continue;
+    for (const id of readersOf(r)) {
+      byReader.set(id, [...(byReader.get(id) ?? []), r]);
+    }
+  }
+  return byReader;
+}
+
 /**
  * One juz' message per reader at the khatma's message time, with all their
- * ajza' of the day. It leaves out what someone has heard already: a juz' read
- * or reassigned since midnight, and anyone who joined since, in their welcome
+ * ajza' of the day: both readers of a shared juz' get it, each naming the
+ * other. It leaves out what someone has heard already: a juz' read or
+ * reassigned since midnight, and anyone who joined since, in their welcome
  * (which only reached them if their window is open). A message a pause held
  * past the reminder's time stands in for the reminder.
  */
@@ -168,17 +203,9 @@ async function sendJuzMessages(
     .query("rotaReads")
     .withIndex("by_day_juz", (q) => q.eq("dayId", day._id))
     .collect();
-  const juzByReader = new Map<Id<"rotaParticipants">, number[]>();
-  for (const r of reads) {
-    if (r.doneAt !== null || r.readerId === null || r.reassignedAt !== null) {
-      continue;
-    }
-    juzByReader.set(r.readerId, [
-      ...(juzByReader.get(r.readerId) ?? []),
-      r.juz,
-    ]);
-  }
-  for (const [participantId, juz] of juzByReader) {
+  const names = await participantNames(ctx, khatma._id);
+  const byReader = unreadByReader(reads.filter((r) => r.reassignedAt === null));
+  for (const [participantId, own] of byReader) {
     const p = await ctx.db.get(participantId);
     if (
       p?.joinedAt != null &&
@@ -192,8 +219,9 @@ async function sendJuzMessages(
       participantId,
       dayId: day._id,
       kind: "juz",
-      juz,
+      juz: own.map((r) => r.juz),
       number: day.number,
+      partners: partnersIn(own, participantId, names),
     });
   }
   const sent = {
@@ -277,7 +305,10 @@ async function sendOrganizerNotes(
   }
 }
 
-/** The reminder for each reader with unread ajza', once on the day dated today. */
+/**
+ * The reminder for each reader with unread ajza', both readers of a shared
+ * one, once on the day dated today.
+ */
 async function sendReminders(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
@@ -297,32 +328,26 @@ async function sendReminders(
     .query("rotaReads")
     .withIndex("by_day_juz", (q) => q.eq("dayId", day._id))
     .collect();
-  const unreadByReader = new Map<Id<"rotaParticipants">, number[]>();
-  for (const r of reads) {
-    if (r.doneAt !== null || r.readerId === null) continue;
-    unreadByReader.set(r.readerId, [
-      ...(unreadByReader.get(r.readerId) ?? []),
-      r.juz,
-    ]);
-  }
-  for (const [participantId, juz] of unreadByReader) {
+  const names = await participantNames(ctx, khatma._id);
+  for (const [participantId, own] of unreadByReader(reads)) {
     await enqueue(ctx, {
       khatmaId: khatma._id,
       participantId,
       dayId: day._id,
       kind: "reminder",
-      juz,
+      juz: own.map((r) => r.juz),
       number: day.number,
+      partners: partnersIn(own, participantId, names),
     });
   }
   await ctx.db.patch(day._id, { reminderSentAt: now });
 }
 
 /**
- * Counts the day against each joined participant who had a read to do and
- * didn't reply since it started (a reply resets the count), tells the
- * organizer at the notice threshold and stops the participant's messages at
- * the stop threshold.
+ * Counts the day against each joined participant who had a read to do (both
+ * readers of a shared juz', whoever finished it) and didn't reply since it
+ * started (a reply resets the count), tells the organizer at the notice
+ * threshold and stops the participant's messages at the stop threshold.
  */
 async function countSilentDay(
   ctx: MutationCtx,
@@ -336,9 +361,7 @@ async function countSilentDay(
     .query("rotaReads")
     .withIndex("by_day_juz", (q) => q.eq("dayId", day._id))
     .collect();
-  const readerIds = new Set(
-    reads.flatMap((r) => (r.readerId === null ? [] : [r.readerId])),
-  );
+  const readerIds = new Set(reads.flatMap(readersOf));
   for (const participantId of readerIds) {
     const p = await ctx.db.get(participantId);
     if (
@@ -384,7 +407,10 @@ async function countSilentDay(
   }
 }
 
-/** After the 30th day of a cycle, a thank-you for everyone who held a slot all cycle. */
+/**
+ * After the 30th day of a cycle, a thank-you for everyone who held a slot all
+ * cycle, a second reader too.
+ */
 async function sendCycleMessages(
   ctx: MutationCtx,
   day: Doc<"rotaDays">,
@@ -401,7 +427,11 @@ async function sendCycleMessages(
       .query("rotaReads")
       .withIndex("by_day_juz", (q) => q.eq("dayId", d._id))
       .collect();
-    return new Set(reads.flatMap((r) => (r.holderId ? [r.holderId] : [])));
+    return new Set(
+      reads.flatMap((r) =>
+        [r.holderId, r.partnerId].filter((id) => id != null),
+      ),
+    );
   };
   const heldFirst = await holdsOn(first);
   const heldLast = await holdsOn(day);

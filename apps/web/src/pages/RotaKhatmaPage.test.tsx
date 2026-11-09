@@ -173,6 +173,10 @@ function todayView(overrides: Record<string, unknown> = {}) {
         readerName: juz === 9 ? "مريم" : "مريم",
         readerId: juz === 9 ? "p2" : juz === 8 ? "p3" : "p2",
         answer: state === "done" ? null : juz === 10 ? "notYet" : "none",
+        partnerId: null,
+        partnerName: null,
+        partnerAnswer: null,
+        doneByName: null,
       };
     }),
     participants: people.map((p) => ({ ...p, doneToday: p.id !== "p3" })),
@@ -185,6 +189,8 @@ const withState = (p: Person) => ({
   joined: true,
   stopped: false,
   silenced: false,
+  heldSlots: p.juz.length,
+  shared: [] as number[],
   ...p,
 });
 
@@ -219,15 +225,18 @@ function peopleView(
               silenced: p.silenced,
             }
           : null,
+        partner: null,
       };
     }),
     participants: holders,
     freeJuz: Array.from({ length: 30 }, (_, i) => i + 1).filter(
       (j) => !byJuz.has(j),
     ),
+    unsharedJuz: [],
     maxSlots: 3,
     leftoverBox: true,
     phoneExample: null,
+    sharing: { on: false, open: false, readers: holders.length, shared: 0 },
   };
 }
 

@@ -1,6 +1,12 @@
 import { DUAS } from "./duas";
 import { toWesternDigits } from "./digits";
-import { cheerLead, juzList, juzPhrase, juzPhraseGenitive } from "./noteText";
+import {
+  cheerLead,
+  juzList,
+  juzPhrase,
+  juzPhraseGenitive,
+  type JuzPartners,
+} from "./noteText";
 import { khatmaTitle, type TemplateMessage } from "./whatsappTemplates";
 
 /**
@@ -35,11 +41,12 @@ export function juzTemplate(
   juz: number[],
   number: number,
   payloads: DonePayloads,
+  partners?: JuzPartners,
 ): TemplateMessage {
   return {
     name: ROTA_JUZ,
     header: khatmaTitle(khatma),
-    body: [toWesternDigits(number), juzPhrase(juz)],
+    body: [toWesternDigits(number), juzPhrase(juz, partners)],
     quickReplies: [payloads.done, payloads.notYet],
   };
 }
@@ -49,11 +56,12 @@ export function reminderTemplate(
   khatma: Khatma,
   juz: number[],
   payloads: DonePayloads,
+  partners?: JuzPartners,
 ): TemplateMessage {
   return {
     name: ROTA_REMINDER,
     header: khatmaTitle(khatma),
-    body: [juzPhraseGenitive(juz)],
+    body: [juzPhraseGenitive(juz, partners)],
     quickReplies: [payloads.done, payloads.notYet],
   };
 }
@@ -64,11 +72,12 @@ export function assignedTemplate(
   juz: number[],
   number: number,
   payloads: DonePayloads,
+  partners?: JuzPartners,
 ): TemplateMessage {
   return {
     name: ROTA_ASSIGNED,
     header: khatmaTitle(khatma),
-    body: [juzPhraseGenitive(juz), toWesternDigits(number)],
+    body: [juzPhraseGenitive(juz, partners), toWesternDigits(number)],
     quickReplies: [payloads.done, payloads.notYet],
   };
 }
@@ -113,12 +122,16 @@ export function cycleTemplate(khatma: Khatma): TemplateMessage {
  * window. Each repeats its template's body word for word, so a member reads
  * the same message in or out of the window.
  */
-export function reminderText(juz: number[]): string {
-  return `تذكير بقراءتك اليوم: لم تُسجَّل بعد قراءة ${juzPhraseGenitive(juz)} في هذه الختمة.`;
+export function reminderText(juz: number[], partners?: JuzPartners): string {
+  return `تذكير بقراءتك اليوم: لم تُسجَّل بعد قراءة ${juzPhraseGenitive(juz, partners)} في هذه الختمة.`;
 }
 
-export function assignedText(juz: number[], number: number): string {
-  return `تحديث على قراءتك: سُجِّلت لك قراءة ${juzPhraseGenitive(juz)} في الختمة ${toWesternDigits(number)} لهذا اليوم.`;
+export function assignedText(
+  juz: number[],
+  number: number,
+  partners?: JuzPartners,
+): string {
+  return `تحديث على قراءتك: سُجِّلت لك قراءة ${juzPhraseGenitive(juz, partners)} في الختمة ${toWesternDigits(number)} لهذا اليوم.`;
 }
 
 export function completeText(number: number): string {
@@ -183,13 +196,18 @@ export const NEW_MEMBER_NAME = "مشارك جديد";
 
 /**
  * The juz' message as free-form text; the done and not-yet buttons go with it.
- * `greet` is false after the welcome, which already says hello.
+ * `greet` is false after the welcome, which already says hello. A juz' in
+ * `partners` names who shares it, right after its number.
  */
-export function juzText(juz: number[], greet = true): string {
+export function juzText(
+  juz: number[],
+  greet = true,
+  partners?: JuzPartners,
+): string {
   const today =
     juz.length === 1
-      ? `جزؤكم اليوم هو ${juzList(juz)}`
-      : `أجزاؤكم اليوم هي ${juzList(juz)}`;
+      ? `جزؤكم اليوم هو ${juzList(juz, partners)}`
+      : `أجزاؤكم اليوم هي ${juzList(juz, partners)}`;
   const text = `${today}. انقروا «${ROTA_BUTTONS.done}» بعد القراءة.`;
   return greet ? `السلام عليكم، ${text}` : text;
 }

@@ -303,11 +303,13 @@ export default defineSchema({
     .index("by_owner_phone", ["ownerPersonId", "phone"])
     .index("by_owner_person", ["ownerPersonId", "personId"]),
 
-  /** Which participant owns each of the 30 slots. */
+  /** Which participant owns each of the 30 slots: a first reader, and at most one second. */
   rotaSlots: defineTable({
     khatmaId: v.id("khatmas"),
     slot: v.number(),
     participantId: v.id("rotaParticipants"),
+    /** The slot's second reader, who reads the same juz' as its first; missing means first. */
+    second: v.optional(v.boolean()),
   })
     .index("by_khatma_slot", ["khatmaId", "slot"])
     .index("by_participant", ["participantId"]),
@@ -353,9 +355,18 @@ export default defineSchema({
     reassignedAt: nullableNumber,
     /** The reader answered «ليس بعد»; missing means no. */
     notYetAt: v.optional(nullableNumber),
+    /** The slot's second reader that day, fixed when the day starts; missing on older days. */
+    partnerId: v.optional(v.union(v.id("rotaParticipants"), v.null())),
+    /** The reader whose tap marked it done, or null for an organizer's mark. */
+    doneById: v.optional(v.union(v.id("rotaParticipants"), v.null())),
+    /** The partner answered «ليس بعد»; missing means no. */
+    partnerNotYetAt: v.optional(nullableNumber),
+    /** Readers who answered «أتممت» after the juz' was already done. */
+    thankedIds: v.optional(v.array(v.id("rotaParticipants"))),
   })
     .index("by_day_juz", ["dayId", "juz"])
     .index("by_reader_day", ["readerId", "dayId"])
+    .index("by_partner_day", ["partnerId", "dayId"])
     .index("by_khatma", ["khatmaId"]),
 
   /** Someone who sent a rota khatma's join code and waits for the organizer's answer. */
@@ -427,6 +438,10 @@ export default defineSchema({
     number: nullableNumber,
     /** Who finished, in a cheer that shows it. */
     name: v.optional(v.union(v.string(), v.null())),
+    /** Who shares each of these ajza' with the reader, by juz'. */
+    partners: v.optional(
+      v.array(v.object({ juz: v.number(), name: v.string() })),
+    ),
     createdAt: v.number(),
     sentAt: nullableNumber,
     skippedAt: nullableNumber,

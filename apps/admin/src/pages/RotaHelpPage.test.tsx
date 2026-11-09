@@ -48,6 +48,10 @@ const tile = {
   readerName: "أم خالد",
   readerId: "p1",
   answer: "none",
+  partnerId: null,
+  partnerName: null,
+  partnerAnswer: null,
+  doneByName: null,
 };
 const today = {
   day: {
@@ -113,11 +117,14 @@ const people = {
   rows: Array.from({ length: 30 }, (_, i) => ({
     juz: i + 1,
     participant: i === 0 ? { ...organizer, slots: 1 } : null,
+    partner: null,
   })),
-  participants: [{ ...organizer, juz: [1] }],
+  participants: [{ ...organizer, juz: [1], heldSlots: 1, shared: [] }],
   freeJuz: Array.from({ length: 29 }, (_, i) => i + 2),
+  unsharedJuz: [],
   maxSlots: 3,
   leftoverBox: true,
+  sharing: { on: false, open: false, readers: 1, shared: 0 },
 };
 
 function renderPage() {

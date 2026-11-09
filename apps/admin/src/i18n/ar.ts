@@ -88,7 +88,7 @@ const labels: Record<SettingKey, string> = {
   handoverToCoOrganizerOn: "التسليم التلقائي يبدأ بالمنظّمين المساعدين",
   oldOwnerStaysOn: "بقاء المالك السابق منظّماً مساعداً بعد النقل",
   rotaSharedSlotsOn: "قارئ ثانٍ لجزء في الختمة بالتناوب",
-  rotaHalfCountsAsSlot: "النصف يُحسب جزءاً في حدّ القارئ",
+  rotaHalfCountsAsSlot: "الجزء المشترك يُحسب في حدّ القارئ",
   rotaNewLayoutOn: "الشكل الجديد لصفحة الختمة بالتناوب للجميع",
   rotaLeftoverBoxOn: "مربع الأجزاء التي بلا قارئ في قائمة المشاركين",
 };

@@ -55,30 +55,52 @@ const dayMonthFormat = new Intl.DateTimeFormat("ar", {
 
 const DAYS: CountForms = { few: "أيام", many: "يوماً", other: "يوم" };
 
-/** `12`, `12 و15`, `3، 12 و15`. */
-export function juzList(juz: readonly number[]): string {
-  const digits = juz.map((n) => toWesternDigits(n));
-  if (digits.length <= 1) return digits.join("");
-  return `${digits.slice(0, -1).join("، ")} و${digits[digits.length - 1]}`;
+/** Who shares each juz' with the reader, by juz'. */
+export type JuzPartners = ReadonlyMap<number, string>;
+
+/**
+ * `12`, `12 و15`, `3، 12 و15`. A juz' in `partners` names who shares it, right
+ * after its number: `5 (مشترك مع سارة) و6`.
+ */
+export function juzList(
+  juz: readonly number[],
+  partners?: JuzPartners,
+): string {
+  const items = juz.map((n) => {
+    const partner = partners?.get(n);
+    const digits = toWesternDigits(n);
+    return partner === undefined ? digits : `${digits} (مشترك مع ${partner})`;
+  });
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join("، ")} و${items[items.length - 1]}`;
 }
 
 /**
  * `الجزء 26`, `الجزآن 5 و6`, `الأجزاء 3، 5 و6`: the word agreeing with the list,
- * as a subject. Empty for an empty list.
+ * as a subject. A juz' in `partners` names who shares it, right after its
+ * number: `الجزء 26 (مشترك مع سارة)`. Empty for an empty list.
  */
-export function juzPhrase(juz: readonly number[]): string {
+export function juzPhrase(
+  juz: readonly number[],
+  partners?: JuzPartners,
+): string {
   if (juz.length === 0) return "";
   const word =
     juz.length === 1 ? "الجزء" : juz.length === 2 ? "الجزآن" : "الأجزاء";
-  return `${word} ${juzList(juz)}`;
+  return `${word} ${juzList(juz, partners)}`;
 }
 
 /**
  * The same phrase after a noun or preposition («قراءة الجزأين 5 و6»): the dual
  * takes its genitive form. Empty for an empty list.
  */
-export function juzPhraseGenitive(juz: readonly number[]): string {
-  return juz.length === 2 ? `الجزأين ${juzList(juz)}` : juzPhrase(juz);
+export function juzPhraseGenitive(
+  juz: readonly number[],
+  partners?: JuzPartners,
+): string {
+  return juz.length === 2
+    ? `الجزأين ${juzList(juz, partners)}`
+    : juzPhrase(juz, partners);
 }
 
 /**

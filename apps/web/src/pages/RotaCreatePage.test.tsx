@@ -78,6 +78,8 @@ function peopleView(people: Person[]) {
     joined: false,
     stopped: false,
     silenced: false,
+    heldSlots: p.juz.length,
+    shared: [] as number[],
     ...p,
   }));
   const holder = new Map<number, Person>();
@@ -107,6 +109,7 @@ function peopleView(people: Person[]) {
     freeJuz: Array.from({ length: 30 }, (_, i) => i + 1).filter(
       (juz) => !holder.has(juz),
     ),
+    unsharedJuz: [],
     maxSlots: 3,
   };
 }

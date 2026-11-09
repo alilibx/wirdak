@@ -228,6 +228,61 @@ test("the next day closes the old one and moves every slot up one juz'", async (
   expect(held[0]?.juz).toBe(2);
 });
 
+test("two readers on one slot rotate together", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, second } = await t.run(async (ctx) => {
+    const reader = (name: string, phone: string) =>
+      ctx.db.insert("rotaParticipants", {
+        khatmaId: s.khatmaId,
+        name,
+        phone,
+        personId: null,
+        addedAt: 0,
+        removedAt: null,
+      });
+    const first = await reader("الأول", "+971500000002");
+    const second = await reader("الثاني", "+971500000003");
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: s.khatmaId,
+      slot: 7,
+      participantId: first,
+    });
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: s.khatmaId,
+      slot: 7,
+      participantId: second,
+      second: true,
+    });
+    return { first, second };
+  });
+  await tickAt(t, s, "2027-01-16T08:00");
+  await tickAt(t, s, "2027-01-17T08:00");
+  const [one, two] = await days(t, s);
+  const firstDay = await reads(t, one!._id);
+  expect(firstDay.find((r) => r.juz === 7)).toMatchObject({
+    holderId: first,
+    readerId: first,
+    partnerId: second,
+  });
+  const rows = await reads(t, two!._id);
+  expect(rows.find((r) => r.juz === 8)).toMatchObject({
+    slot: 7,
+    holderId: first,
+    readerId: first,
+    partnerId: second,
+  });
+  // The organizer's slot 1 has no second reader.
+  expect(rows.find((r) => r.juz === 2)).toMatchObject({
+    holderId: s.participantId,
+    partnerId: null,
+  });
+  expect(rows.find((r) => r.juz === 1)).toMatchObject({
+    holderId: null,
+    partnerId: null,
+  });
+});
+
 test("a pause date starts nothing and the next date is the next day", async () => {
   const t = convexTest(schema, modules);
   const s = await setup(t, { pauseDates: ["2027-01-17"] });
@@ -550,4 +605,178 @@ test("completeIfDone is true once, when the 30th read is done", async () => {
   expect(outcomes.filter(Boolean)).toHaveLength(1);
   expect(outcomes.indexOf(true)).toBe(29);
   expect((await days(t, s))[0]?.completedAt).not.toBeNull();
+});
+
+/**
+ * Two readers sharing slot 7, «الأول» first and «الثاني» second. Both joined
+ * long ago unless given.
+ */
+async function sharedSlot(
+  t: T,
+  s: Setup,
+  joined: { first?: number | null; second?: number | null } = {},
+) {
+  return await t.run(async (ctx) => {
+    const reader = (name: string, phone: string, joinedAt: number | null) =>
+      ctx.db.insert("rotaParticipants", {
+        khatmaId: s.khatmaId,
+        name,
+        phone,
+        personId: null,
+        addedAt: 0,
+        removedAt: null,
+        joinedAt,
+      });
+    const first = await reader(
+      "الأول",
+      "+971500000002",
+      joined.first === undefined ? 0 : joined.first,
+    );
+    const second = await reader(
+      "الثاني",
+      "+971500000003",
+      joined.second === undefined ? 0 : joined.second,
+    );
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: s.khatmaId,
+      slot: 7,
+      participantId: first,
+    });
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: s.khatmaId,
+      slot: 7,
+      participantId: second,
+      second: true,
+    });
+    return { first, second };
+  });
+}
+
+function outboxRows(t: T, kind: string) {
+  return t.run(async (ctx) =>
+    (await ctx.db.query("rotaOutbox").collect())
+      .filter((r) => r.kind === kind)
+      .map((r) => ({
+        participantId: r.participantId,
+        juz: r.juz,
+        partners: r.partners,
+      })),
+  );
+}
+
+test("both joined readers get the juz' message naming each other", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, second } = await sharedSlot(t, s);
+  await tickAt(t, s, "2027-01-16T08:00");
+  expect(await outboxRows(t, "juz")).toEqual([
+    { participantId: first, juz: [7], partners: [{ juz: 7, name: "الثاني" }] },
+    { participantId: second, juz: [7], partners: [{ juz: 7, name: "الأول" }] },
+  ]);
+});
+
+test("a reader who hasn't joined gets nothing, and the joined partner does", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { second } = await sharedSlot(t, s, { first: null });
+  await tickAt(t, s, "2027-01-16T08:00");
+  // The partner is named whether or not they joined.
+  expect(await outboxRows(t, "juz")).toEqual([
+    { participantId: second, juz: [7], partners: [{ juz: 7, name: "الأول" }] },
+  ]);
+});
+
+test("both readers get the reminder while the juz' isn't done, and neither once it is", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, second } = await sharedSlot(t, s);
+  await tickAt(t, s, "2027-01-16T08:00");
+  await tickAt(t, s, "2027-01-16T16:00");
+  expect(await outboxRows(t, "reminder")).toEqual([
+    { participantId: first, juz: [7], partners: [{ juz: 7, name: "الثاني" }] },
+    { participantId: second, juz: [7], partners: [{ juz: 7, name: "الأول" }] },
+  ]);
+
+  await tickAt(t, s, "2027-01-17T08:00");
+  const [, day] = await days(t, s);
+  const juz8 = (await reads(t, day!._id)).find((r) => r.juz === 8)!;
+  await t.run((ctx) =>
+    ctx.db.patch(juz8._id, { doneAt: Date.now(), doneById: first }),
+  );
+  await tickAt(t, s, "2027-01-17T16:00");
+  expect(await outboxRows(t, "reminder")).toHaveLength(2);
+});
+
+test("a partner who never replies is still silenced after rotaSilenceStopDays", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const { first, second } = await sharedSlot(t, s);
+  await t.run(async (ctx) => {
+    await ctx.db.insert("settings", {
+      key: "rotaSilenceNoticeDays",
+      value: 1,
+      updatedAt: 0,
+    });
+    await ctx.db.insert("settings", {
+      key: "rotaSilenceStopDays",
+      value: 2,
+      updatedAt: 0,
+    });
+  });
+  // The first reader answers every day; the partner never does.
+  for (const d of ["16", "17", "18"]) {
+    await tickAt(t, s, `2027-01-${d}T08:00`);
+    await t.run((ctx) => ctx.db.patch(first, { lastReplyAt: Date.now() }));
+  }
+  const after = await t.run(async (ctx) => ({
+    first: (await ctx.db.get(first))!,
+    second: (await ctx.db.get(second))!,
+  }));
+  expect(after.first.silencedAt ?? null).toBeNull();
+  expect(after.second.silencedAt).toBe(dubai("2027-01-18T08:00"));
+  const silenced = (await notes(t, s)).filter((n) => n.kind === "rotaSilenced");
+  expect(silenced.map((n) => n.name)).toEqual(["الثاني"]);
+});
+
+test("both readers of a shared slot get the cycle note", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t, { firstDate: "2027-01-01" });
+  const { first, second } = await sharedSlot(t, s);
+  await t.run(async (ctx) => {
+    for (const [n, date] of [
+      [1, "2027-01-01"],
+      [30, "2027-01-15"],
+    ] as const) {
+      const dayId = await ctx.db.insert("rotaDays", {
+        khatmaId: s.khatmaId,
+        n,
+        number: n,
+        cycle: 1,
+        date,
+        startedAt: dubai(`${date}T08:00`),
+        closesAt: dubai(`${date}T08:00`) + 24 * 3_600_000,
+        completedAt: null,
+        closedAt: n === 1 ? 1 : null,
+        unreadSentAt: null,
+        summarySentAt: null,
+      });
+      await ctx.db.insert("rotaReads", {
+        dayId,
+        khatmaId: s.khatmaId,
+        juz: juzFor(7, n),
+        slot: 7,
+        holderId: first,
+        readerId: first,
+        partnerId: second,
+        doneAt: null,
+        doneByOrganizer: false,
+        reassignedAt: null,
+      });
+    }
+  });
+  await tickAt(t, s, "2027-01-16T08:00");
+  expect((await outboxRows(t, "cycle")).map((r) => r.participantId)).toEqual([
+    first,
+    second,
+  ]);
 });

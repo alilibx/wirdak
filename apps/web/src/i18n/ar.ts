@@ -38,6 +38,14 @@ function forPeople(n: number): string {
   return n <= 2 ? `ل${said}` : `لـ${said}`;
 }
 
+/**
+ * Where a reader of `juz` in khatma `number` goes next: each khatma moves them up one juz', and
+ * after 30 both go back to 1.
+ */
+function nextOnWalk(juz: number, number: number) {
+  return { juz: (juz % 30) + 1, number: (number % 30) + 1 };
+}
+
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
@@ -643,6 +651,12 @@ export const ar = {
       past: "هذا اليوم مضى.",
       archived: "هذه الختمة مؤرشفة، فلا يمكن تغييرها.",
       not_archived: "أرشِف الختمة أولاً، ثم ابدأ منها من جديد أو احذفها.",
+      // A second reader on a juz': refused by any of the add screens.
+      not_full: "لا تُشارَك الأجزاء إلا بعد أن يكون لكل جزء قارئ.",
+      sharing_off: "مشاركة الجزء غير متاحة الآن.",
+      already_shared: "لهذا الجزء قارئان.",
+      is_organizer:
+        "يقرأ هذا الجزءَ من يدير الختمة، ولا يضيف إليه قارئاً إلا صاحبها.",
     } as Record<string, string>,
     setupTitle: "من سيقرأ معك؟",
     personName: "الاسم",
@@ -668,10 +682,14 @@ export const ar = {
       juz_taken: "هذا الجزء له قارئ. حاول مرة أخرى.",
       already_added: "هذا الرقم مضاف في الختمة.",
     } as Record<string, string>,
-    juzOf: (juz: number[]) =>
-      juz.length === 1
-        ? `الجزء ${toWesternDigits(juz[0] ?? 0)}`
-        : `الأجزاء ${juz.map((j) => toWesternDigits(j)).join(" و")}`,
+    /** «الجزء 4», «الأجزاء 1 و4»; each of `shared` reads «4 (مشترك)». */
+    juzOf: (juz: number[], shared: number[] = []) => {
+      const one = (j: number) =>
+        `${toWesternDigits(j)}${shared.includes(j) ? " (مشترك)" : ""}`;
+      return juz.length === 1
+        ? `الجزء ${one(juz[0] ?? 0)}`
+        : `الأجزاء ${juz.map(one).join(" و")}`;
+    },
     /** The banner when ajza' have no reader; the numbers are named only while they are few. */
     leftover: (juz: number[]) => {
       const n = juz.length;
@@ -723,6 +741,10 @@ export const ar = {
       name ? `${name} · ${phone}` : phone,
     requestJuz: "جزؤه",
     acceptRequest: "أضفه واختر جزأه",
+    /** Every juz' has a reader: the request joins one as its second reader. */
+    shareRequest: "شارِك جزءاً",
+    shareJuzOption: (juz: number, name: string) =>
+      `${toWesternDigits(juz)} · مع ${name}`,
     declineRequest: "لا",
     joinRequestErrors: {
       not_found: "لم نجد هذا الطلب. أعد تحميل الصفحة.",
@@ -774,6 +796,12 @@ export const ar = {
     holder: (name: string) => `صاحبه اليوم: ${name}`,
     readerNow: (name: string) => `يقرؤه الآن: ${name}`,
     readBy: (name: string) => `قرأه: ${name}`,
+    /** A shared juz': both readers, and what each answered. */
+    holders: (a: string, b: string) => `صاحباه اليوم: ${a} و${b}`,
+    answerOf: (name: string, answer: "notYet" | "none") =>
+      `${name}: ${answer === "notYet" ? "ليس بعد" : "لم يردّ"}`,
+    /** Who of a shared juz''s readers said they finished it first. */
+    doneBy: (name: string) => `أتمّه: ${name}`,
     assign: "أسنده إلى مشارك",
     readMyself: "سأقرؤه أنا",
     markDone: "سجّله تامّاً",
@@ -795,13 +823,38 @@ export const ar = {
       `الختمة ${toWesternDigits(number)}${date ? ` يوم ${date}` : ""}. هذا جزء كل مشارك فيها، ويتقدّم كلٌّ منهم جزءاً في كل ختمة.`,
     addReader: (juz: number) => `+ أضف قارئاً للجزء ${toWesternDigits(juz)}`,
     secondJuz: "جزء ثانٍ",
+    // A second reader on a juz'
+    shareAction: "أضف قارئاً يشاركه الجزء",
+    /** What follows a share: both read the juz' and move on together, and one «أتممت» is enough. */
+    shareExplain: (a: string, b: string, juz: number, number: number) => {
+      const next = nextOnWalk(juz, number);
+      return `يقرأ \u200E${a}\u200E و\u200E${b}\u200E الجزء ${toWesternDigits(juz)} في الختمة ${toWesternDigits(number)}، ثم الجزء ${toWesternDigits(next.juz)} في الختمة ${toWesternDigits(next.number)}. أيّهما سجّل أنه أتمّه يُحسب الجزء مقروءاً`;
+    },
+    /** Said before one reader of a shared juz' leaves it. */
+    leavesAlone: (name: string) => `سيقرأ ${name} الجزء وحده`,
+    /** After `leavesAlone`, what else a change to one reader of a shared juz' does. */
+    freeThisStaysShared: "يبقى في الختمة.",
+    freeThisStaysSharedMe: "تبقى في الختمة.",
+    removeBodyShared: "تبقى قراءته اليوم كما هي.",
+    stopReadingHintShared: "تبقى منظّم الختمة.",
+    /** Above the list once a juz' is shared: «42 قارئاً، 12 جزءاً مشتركاً». */
+    sharedCount: (readers: number, shared: number) =>
+      `${counted(readers, {
+        one: "قارئ واحد",
+        two: "قارئان",
+        few: "قرّاء",
+        many: "قارئاً",
+      })}، ${counted(shared, {
+        one: "جزء واحد مشترك",
+        two: "جزءان مشتركان",
+        few: "أجزاء مشتركة",
+        many: "جزءاً مشتركاً",
+      })}`,
     noReader: "بلا قارئ",
     readerTitle: (juz: number) => `قارئ الجزء ${toWesternDigits(juz)}`,
     walk: (juz: number, number: number) => {
-      // Each khatma moves a reader up one juz', and after 30 it goes back to 1.
-      const nextJuz = (juz % 30) + 1;
-      const nextNumber = (number % 30) + 1;
-      return `يقرأ الجزء ${toWesternDigits(juz)} في الختمة ${toWesternDigits(number)}، ثم ${toWesternDigits(nextJuz)} في الختمة ${toWesternDigits(nextNumber)}، وهكذا.`;
+      const next = nextOnWalk(juz, number);
+      return `يقرأ الجزء ${toWesternDigits(juz)} في الختمة ${toWesternDigits(number)}، ثم ${toWesternDigits(next.juz)} في الختمة ${toWesternDigits(next.number)}، وهكذا.`;
     },
     moveLabel: "انقله إلى الجزء",
     moveOption: (juz: number, other: string | null) =>
@@ -834,6 +887,7 @@ export const ar = {
       juz_taken: "هذا الجزء له قارئ الآن.",
       too_many: "لا يمكنه أن يقرأ أكثر من هذا.",
       bad_name: "اكتب اسم الشخص.",
+      shared: "انقل القارئ إلى جزء بلا قارئ.",
     } as Record<string, string>,
     // Saved participants and pool members
     savedFrom: "من ختمات سابقة",
@@ -847,6 +901,9 @@ export const ar = {
       not_found: "لم نجد هذا الشخص. أعد تحميل الصفحة.",
     } as Record<string, string>,
     savedManyHint: "حدّد من تريد إضافتهم، ويأخذ كلٌّ منهم أول جزء بلا قارئ.",
+    /** Every juz' has a reader and sharing is open: the ones added share ajza'. */
+    savedShareHint:
+      "لكل جزء قارئ الآن. حدّد من تريد إضافتهم، ويشارك كلٌّ منهم قارئاً جزأه، بدءاً من الجزء الأصغر رقماً.",
     savedActive: "يقرأ معك الآن",
     savedPickActive: "حدّد من يقرأ معك الآن",
     /** How many more can be ticked: the ajza' with no reader left. */
@@ -892,7 +949,8 @@ export const ar = {
     importCount: (n: number) =>
       `${counted(n, { one: "عضو واحد", two: "عضوان", few: "أعضاء", many: "عضواً" })}، بالأسماء فقط`,
     importHint: "لا ترى أرقامهم، وكلٌّ منهم ينضمّ بنفسه من رابط الانضمام.",
-    importResult: (added: number, skipped: number) => {
+    /** `shared`: how many of those added share a juz', once every juz' had a reader. */
+    importResult: (added: number, skipped: number, shared = 0) => {
       const people = (n: number) =>
         counted(n, {
           one: "شخصاً واحداً",
@@ -900,10 +958,22 @@ export const ar = {
           few: "أشخاص",
           many: "شخصاً",
         });
-      const first = added > 0 ? `أضفنا ${people(added)}.` : "لم نضف أحداً.";
-      return skipped > 0
-        ? `${first} تركنا ${people(skipped)}، لأنهم في الختمة أو لأن الأجزاء اكتملت.`
-        : first;
+      const parts = [added > 0 ? `أضفنا ${people(added)}.` : "لم نضف أحداً."];
+      if (shared > 0) {
+        const who = counted(shared, {
+          one: "شخص واحد",
+          two: "شخصان",
+          few: "أشخاص",
+          many: "شخصاً",
+        });
+        parts.push(`يشترك ${who} منهم في جزء مع قارئ آخر، لأن لكل جزء قارئاً.`);
+      }
+      if (skipped > 0) {
+        parts.push(
+          `تركنا ${people(skipped)}، لأنهم في الختمة أو لأن الأجزاء اكتملت.`,
+        );
+      }
+      return parts.join(" ");
     },
     importErrors: {
       not_found: "لم نجد تلك الختمة. أعد تحميل الصفحة.",

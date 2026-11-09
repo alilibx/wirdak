@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   internalMutation,
   internalQuery,
@@ -9,6 +9,7 @@ import { scheduleRotaCheer } from "./cheers";
 import { isBlocked } from "./lib/blocked";
 import { refreshPhone } from "./lib/directory";
 import { isArchived } from "./lib/khatma";
+import { readsFor } from "./lib/rota";
 import { organizerRecipients } from "./lib/organizerRecipients";
 import { notify } from "./notes";
 import { celebrateIfComplete, completeIfDone } from "./rotaDays";
@@ -143,20 +144,40 @@ async function recordReply(
 }
 
 /**
- * A day's reads as one participant sees them: the ones they read now, and the
- * ones they hold that went to someone else (their «أتممت» still counts for
- * those, spec 6.2), with all of the day's reads.
+ * A day's reads as one participant sees them: the ones they read now (a
+ * shared juz' too), and the ones they hold or share that went to someone else
+ * (their «أتممت» still counts for those, spec 6.2), with all of the day's reads.
  */
 async function readsOf(ctx: MutationCtx, participant: Participant, day: Day) {
   const all = await ctx.db
     .query("rotaReads")
     .withIndex("by_day_juz", (q) => q.eq("dayId", day._id))
     .collect();
-  const reading = all.filter((r) => r.readerId === participant._id);
+  const reading = all.filter((r) => readsFor(r, participant._id));
   const handedOn = all.filter(
-    (r) => r.holderId === participant._id && r.readerId !== participant._id,
+    (r) =>
+      (r.holderId === participant._id || r.partnerId === participant._id) &&
+      !readsFor(r, participant._id),
   );
   return { all, reading, handedOn };
+}
+
+/**
+ * Whether a done shared juz' still owes this reader the thanks reply: the
+ * other reader or the organizer finished it, and they haven't had it yet. Not
+ * one reassigned to a third person: both readers were told it was read for them.
+ */
+function thanksDue(
+  read: Doc<"rotaReads">,
+  participantId: Id<"rotaParticipants">,
+): boolean {
+  return (
+    read.doneAt !== null &&
+    read.partnerId != null &&
+    read.reassignedAt === null &&
+    read.doneById !== participantId &&
+    !(read.thankedIds ?? []).includes(participantId)
+  );
 }
 
 /** The day's reminder time, when it is on and still ahead today. */
@@ -206,7 +227,8 @@ async function answerableDays(
  * handed to someone else too; the tap that completes the day brings the dua
  * with the thanks, and everyone else gets the completion message. «ليس بعد»
  * marks only what they read now. Changes nothing on a closed day or with
- * nothing left to read.
+ * nothing left to read, except that a shared juz' the other reader finished
+ * thanks this one once, for either answer.
  */
 async function answerDay(
   ctx: MutationCtx,
@@ -224,25 +246,53 @@ async function answerDay(
   const { all, reading, handedOn } = await readsOf(ctx, participant, day);
   const unread = reading.filter((r) => r.doneAt === null);
   const unreadHandedOn = handedOn.filter((r) => r.doneAt === null);
+  const thanks = (done: number) =>
+    about(khatma, late ? lateThanksText(day.number) : thanksText(done));
   if (unread.length === 0 && unreadHandedOn.length === 0) {
-    return [about(khatma, alreadyText)];
+    const owed = [...reading, ...handedOn].filter((r) =>
+      thanksDue(r, participant._id),
+    );
+    if (owed.length === 0) return [about(khatma, alreadyText)];
+    for (const r of owed) {
+      await ctx.db.patch(r._id, {
+        thankedIds: [...(r.thankedIds ?? []), participant._id],
+      });
+    }
+    return [thanks(all.filter((r) => r.doneAt !== null).length)];
   }
   if (action === "notYet") {
     // A juz' handed to someone else is theirs to answer for now.
-    for (const r of unread) await ctx.db.patch(r._id, { notYetAt: now });
+    for (const r of unread) {
+      await ctx.db.patch(
+        r._id,
+        r.readerId === participant._id
+          ? { notYetAt: now }
+          : { partnerNotYetAt: now },
+      );
+    }
     const reminder = unread.length > 0 ? reminderAhead(rota, day, now) : null;
     return [about(khatma, notYetText(reminder))];
   }
   const marked = [...unread, ...unreadHandedOn];
   for (const r of marked) {
-    await ctx.db.patch(r._id, { doneAt: now, doneByOrganizer: false });
+    await ctx.db.patch(r._id, {
+      doneAt: now,
+      doneByOrganizer: false,
+      doneById: participant._id,
+    });
+  }
+  // This «أتممت» is their answer to a shared juz' the other reader finished
+  // too, so a later «تم» is never drawn back to this day for its thanks.
+  for (const r of [...reading, ...handedOn]) {
+    if (!thanksDue(r, participant._id)) continue;
+    await ctx.db.patch(r._id, {
+      thankedIds: [...(r.thankedIds ?? []), participant._id],
+    });
   }
   const [first] = marked;
   if (first) await scheduleRotaCheer(ctx, first._id, now, participant._id);
   const done = all.filter((r) => r.doneAt !== null).length + marked.length;
-  const replies = [
-    about(khatma, late ? lateThanksText(day.number) : thanksText(done)),
-  ];
+  const replies = [thanks(done)];
   if (await completeIfDone(ctx, day._id)) {
     await celebrateIfComplete(ctx, day._id, participant._id);
     replies.push(about(khatma, duaText()));
@@ -494,7 +544,9 @@ function distinctTitles(titles: string[]): string[] {
 
 /**
  * A typed «تم» or «ليس بعد». It acts only when exactly one open day has
- * unread reads for the phone; with several, the reply asks which khatma,
+ * unread reads for the phone, or a shared juz' that owes it the thanks reply
+ * (so a «تم» meant for that juz' never marks another one); with several, the
+ * reply asks which khatma,
  * with one button per khatma (or, with more than buttons fit, names them),
  * and changes nothing.
  */
@@ -514,9 +566,13 @@ async function answerTyped(
       const reads = [...reading, ...handedOn];
       if (reads.length === 0) continue;
       anyRead = true;
-      if (!reads.some((r) => r.doneAt === null)) continue;
+      if (
+        !reads.some((r) => r.doneAt === null || thanksDue(r, participant._id))
+      ) {
+        continue;
+      }
       open.push({ participant, khatma, day });
-      // The older unread day first; the next «تم» reaches the newer one.
+      // The older open day first; the next «تم» reaches the newer one.
       break;
     }
   }

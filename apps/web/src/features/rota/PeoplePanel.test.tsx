@@ -1,4 +1,6 @@
+import type { Id } from "@convex/_generated/dataModel";
 import { toWesternDigits } from "@convex/lib/digits";
+import type { PeopleView } from "@convex/lib/rotaOps";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,52 +31,77 @@ vi.mock("convex/react", async () => {
   };
 });
 
+type Row = PeopleView["rows"][number];
+type Reader = NonNullable<Row["participant"]>;
+const pid = (id: string) => id as Id<"rotaParticipants">;
+
 const state = {
   joined: false,
   stopped: false,
   silenced: false,
   isOrganizer: false,
   isCoOrganizer: false,
+  hasAccount: false,
 };
 const hidden = {
-  id: "p1",
+  id: pid("p1"),
   name: "سعد",
   isMe: false,
-  phone: null,
+  phone: null as string | null,
   ...state,
 };
 const shown = {
-  id: "p2",
+  id: pid("p2"),
   name: "منى",
   isMe: false,
-  phone: "+971501234567",
+  phone: "+971501234567" as string | null,
   ...state,
 };
 
-function makeView() {
+/** A participant's ajza', each counting toward the cap, none of them shared. */
+const held = (juz: number[]) => ({
+  juz,
+  heldSlots: juz.length,
+  shared: [] as number[],
+});
+
+/** One of the 30 rows: its first reader, and a second one when it is shared. */
+function slot(
+  juz: number,
+  participant: Reader | null,
+  partner: Reader | null = null,
+): Row {
+  return { juz, participant, partner };
+}
+
+function makeView(): PeopleView {
   return {
     title: "ختمة العائلة",
+    archived: false,
     daysKind: "daily",
     joinLink: "https://wa.me/971500000000?text=JOIN",
     requests: [],
     target: { number: 2, date: "2026-10-31", isFirst: false },
-    rows: Array.from({ length: 30 }, (_, i) => ({
-      juz: i + 1,
-      participant:
+    rows: Array.from({ length: 30 }, (_, i) =>
+      slot(
+        i + 1,
         i === 0
           ? { ...hidden, slots: 1 }
           : i === 1
             ? { ...shown, slots: 1 }
             : null,
-    })),
+      ),
+    ),
     participants: [
-      { ...hidden, juz: [1] },
-      { ...shown, juz: [2] },
+      { ...hidden, ...held([1]) },
+      { ...shown, ...held([2]) },
     ],
     freeJuz: Array.from({ length: 28 }, (_, i) => i + 3),
+    unsharedJuz: [],
     phoneExample: null,
     maxSlots: 2,
     leftoverBox: true,
+    sharing: { on: true, open: false, readers: 2, shared: 0 },
   };
 }
 
@@ -138,11 +165,11 @@ describe("PeoplePanel", () => {
     m.view = {
       ...view,
       participants: [
-        { ...hidden, juz: [1, 3] },
-        { ...shown, juz: [2], stopped: true },
-        { ...shown, id: "p3", juz: [4], silenced: true },
+        { ...hidden, ...held([1, 3]) },
+        { ...shown, ...held([2]), stopped: true },
+        { ...shown, id: pid("p3"), ...held([4]), silenced: true },
         // Stopped reading on purpose: holds none, and the spread gives none back.
-        { ...shown, id: "p4", juz: [] },
+        { ...shown, id: pid("p4"), ...held([]) },
       ],
     };
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
@@ -165,6 +192,37 @@ describe("PeoplePanel", () => {
     expect(screen.getByRole("button", { name: /سعد/ })).not.toHaveTextContent(
       "+",
     );
+  });
+
+  it("offers one more juz' by the count the server checks, not by how many ajza' are listed", async () => {
+    const view = makeView();
+    // Saad reads juz' 1 alone and shares juz' 3, which doesn't count toward the cap.
+    view.rows[2] = slot(3, { ...shown, slots: 1 }, { ...hidden, slots: 1 });
+    view.participants[0] = {
+      ...hidden,
+      juz: [1, 3],
+      heldSlots: 1,
+      shared: [3],
+    };
+    view.freeJuz = view.freeJuz.filter((j) => j !== 3);
+    m.view = view;
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+    await user.click(screen.getAllByRole("button", { name: /سعد/ })[0]!);
+    const sheet = screen.getByRole("dialog");
+    expect(within(sheet).getByText(t.rota.giveMore)).toBeInTheDocument();
+  });
+
+  it("offers no more once the server's count reaches the cap", async () => {
+    const view = makeView();
+    view.participants[0] = { ...hidden, juz: [1], heldSlots: 2, shared: [] };
+    m.view = view;
+    const user = userEvent.setup();
+    render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+    await user.click(screen.getByRole("button", { name: /سعد/ }));
+    expect(
+      within(screen.getByRole("dialog")).queryByText(t.rota.giveMore),
+    ).toBeNull();
   });
 
   it("an empty juz' also offers the saved people, and adds the one picked to that juz'", async () => {
@@ -382,11 +440,8 @@ describe("PeoplePanel", () => {
     const user = userEvent.setup();
     const view = makeView();
     // An admin's view: the organizer's row isn't "me".
-    view.rows[0] = {
-      juz: 1,
-      participant: { ...hidden, isOrganizer: true, slots: 1 },
-    };
-    view.participants[0] = { ...hidden, isOrganizer: true, juz: [1] };
+    view.rows[0] = slot(1, { ...hidden, isOrganizer: true, slots: 1 });
+    view.participants[0] = { ...hidden, isOrganizer: true, ...held([1]) };
     m.view = view;
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
 
@@ -410,9 +465,9 @@ describe("PeoplePanel", () => {
     /** Muna reads juz' 2 and juz' 5. */
     function twoView() {
       const view = makeView();
-      view.rows[4] = { juz: 5, participant: { ...shown, slots: 2 } };
-      view.rows[1] = { juz: 2, participant: { ...shown, slots: 2 } };
-      view.participants[1] = { ...shown, juz: [2, 5] };
+      view.rows[4] = slot(5, { ...shown, slots: 2 });
+      view.rows[1] = slot(2, { ...shown, slots: 2 });
+      view.participants[1] = { ...shown, ...held([2, 5]) };
       view.freeJuz = view.freeJuz.filter((j) => j !== 5);
       return view;
     }
@@ -451,9 +506,9 @@ describe("PeoplePanel", () => {
       const view = makeView();
       // An admin's view: the organizer's row isn't "me".
       const organizer = { ...hidden, isOrganizer: true };
-      view.rows[0] = { juz: 1, participant: { ...organizer, slots: 2 } };
-      view.rows[2] = { juz: 3, participant: { ...organizer, slots: 2 } };
-      view.participants[0] = { ...organizer, juz: [1, 3] };
+      view.rows[0] = slot(1, { ...organizer, slots: 2 });
+      view.rows[2] = slot(3, { ...organizer, slots: 2 });
+      view.participants[0] = { ...organizer, ...held([1, 3]) };
       view.freeJuz = view.freeJuz.filter((j) => j !== 3);
       m.view = view;
       const user = userEvent.setup();
@@ -476,11 +531,8 @@ describe("PeoplePanel", () => {
 
     it("an admin frees the organizer's only juz' too, since the organizer can't be taken out", async () => {
       const view = makeView();
-      view.rows[0] = {
-        juz: 1,
-        participant: { ...hidden, isOrganizer: true, slots: 1 },
-      };
-      view.participants[0] = { ...hidden, isOrganizer: true, juz: [1] };
+      view.rows[0] = slot(1, { ...hidden, isOrganizer: true, slots: 1 });
+      view.participants[0] = { ...hidden, isOrganizer: true, ...held([1]) };
       m.view = view;
       const user = userEvent.setup();
       render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
@@ -494,9 +546,9 @@ describe("PeoplePanel", () => {
     it("the owner frees one of their own two ajza', besides stopping altogether", async () => {
       const view = makeView();
       const me = { ...hidden, isOrganizer: true, isMe: true };
-      view.rows[0] = { juz: 1, participant: { ...me, slots: 2 } };
-      view.rows[2] = { juz: 3, participant: { ...me, slots: 2 } };
-      view.participants[0] = { ...me, juz: [1, 3] };
+      view.rows[0] = slot(1, { ...me, slots: 2 });
+      view.rows[2] = slot(3, { ...me, slots: 2 });
+      view.participants[0] = { ...me, ...held([1, 3]) };
       view.freeJuz = view.freeJuz.filter((j) => j !== 3);
       m.view = view;
       const user = userEvent.setup();
@@ -531,20 +583,440 @@ describe("PeoplePanel", () => {
     });
   });
 
+  describe("a second reader on a juz'", () => {
+    /** Every juz' has a reader: Saad 1, Muna 2, and 28 others. */
+    function fullView(): PeopleView {
+      const view = makeView();
+      const others = Array.from({ length: 28 }, (_, i) => ({
+        ...shown,
+        id: pid(`q${i + 3}`),
+        name: `قارئ ${i + 3}`,
+        phone: null,
+      }));
+      view.rows = view.rows.map((row, i) => {
+        const other = others[i - 2];
+        return other ? slot(row.juz, { ...other, slots: 1 }) : row;
+      });
+      view.participants.push(
+        ...others.map((p, i) => ({ ...p, ...held([i + 3]) })),
+      );
+      view.freeJuz = [];
+      view.unsharedJuz = view.rows.map((row) => row.juz);
+      view.sharing = { on: true, open: true, readers: 30, shared: 0 };
+      return view;
+    }
+
+    const layla = {
+      ...shown,
+      id: pid("p9"),
+      name: "ليلى",
+      phone: "+971507654321",
+      joined: true,
+    };
+
+    /** Layla reads juz' 1 with Saad. */
+    function sharedView(): PeopleView {
+      const view = fullView();
+      view.rows[0] = slot(1, { ...hidden, slots: 1 }, { ...layla, slots: 1 });
+      view.participants.push({ ...layla, ...held([1]) });
+      view.unsharedJuz = view.unsharedJuz.filter((juz) => juz !== 1);
+      view.sharing = { on: true, open: true, readers: 31, shared: 1 };
+      return view;
+    }
+
+    const shareButton = { name: t.rota.shareAction };
+
+    it("no share action while a slot is empty", async () => {
+      // Sharing is on, but juz' 3 to 30 have no reader.
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /سعد/ }));
+      const sheet = screen.getByRole("dialog", { name: "سعد" });
+      expect(within(sheet).queryByRole("button", shareButton)).toBeNull();
+    });
+
+    it("no share action when sharing is off", async () => {
+      m.view = {
+        ...fullView(),
+        unsharedJuz: [],
+        sharing: { on: false, open: false, readers: 30, shared: 0 },
+      };
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /سعد/ }));
+      const sheet = screen.getByRole("dialog", { name: "سعد" });
+      expect(within(sheet).queryByRole("button", shareButton)).toBeNull();
+    });
+
+    it("adding a second reader spells out what follows", async () => {
+      m.view = fullView();
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /سعد/ }));
+      await user.click(screen.getByRole("button", shareButton));
+      const sheet = screen.getByRole("dialog", { name: t.rota.shareAction });
+      await user.type(within(sheet).getByLabelText(t.rota.personName), "ليلى");
+      await user.type(
+        within(sheet).getByLabelText(t.rota.personPhone),
+        "+971507654321",
+      );
+      const explain = within(sheet).getByText(
+        t.rota.shareExplain("سعد", "ليلى", 1, 2),
+      );
+      const add = within(sheet).getByRole("button", { name: t.rota.add });
+      expect(
+        explain.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      await user.click(add);
+      expect(m.fns.addParticipant).toHaveBeenCalledWith({
+        sessionToken: "tok",
+        inviteCode: "CODE",
+        name: "ليلى",
+        phone: "+971507654321",
+        juz: 1,
+        share: true,
+      });
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("a saved person shares the juz' once the organizer confirms what follows", async () => {
+      m.view = fullView();
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /سعد/ }));
+      await user.click(screen.getByRole("button", shareButton));
+      await user.click(
+        within(
+          screen.getByRole("dialog", { name: t.rota.shareAction }),
+        ).getByRole("button", { name: t.rota.savedFrom }),
+      );
+      const picker = screen.getByRole("dialog", { name: t.rota.savedTitle });
+      await user.click(within(picker).getByRole("button", { name: /أم خالد/ }));
+      expect(m.fns.addSaved).not.toHaveBeenCalled();
+      expect(
+        within(picker).getByText(t.rota.shareExplain("سعد", "أم خالد", 1, 2)),
+      ).toBeInTheDocument();
+      await user.click(
+        within(picker).getByRole("button", { name: t.rota.add }),
+      );
+      expect(m.fns.addSaved).toHaveBeenCalledWith({
+        sessionToken: "tok",
+        inviteCode: "CODE",
+        contactId: "c1",
+        juz: 1,
+        share: true,
+      });
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("a not_full refusal shows in Arabic", async () => {
+      // A juz' lost its reader after the sheet opened.
+      m.view = fullView();
+      m.fns.addParticipant = vi.fn().mockResolvedValue({ error: "not_full" });
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /سعد/ }));
+      await user.click(screen.getByRole("button", shareButton));
+      const sheet = screen.getByRole("dialog", { name: t.rota.shareAction });
+      await user.type(within(sheet).getByLabelText(t.rota.personName), "ليلى");
+      await user.type(
+        within(sheet).getByLabelText(t.rota.personPhone),
+        "+971507654321",
+      );
+      await user.click(within(sheet).getByRole("button", { name: t.rota.add }));
+      expect(
+        await within(sheet).findByText(t.rota.errors.not_full!),
+      ).toBeInTheDocument();
+    });
+
+    it("a shared row shows both names", () => {
+      m.view = sharedView();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      const first = screen.getAllByRole("listitem")[0] as HTMLElement;
+      expect(within(first).getByRole("button", { name: /سعد/ })).toBeVisible();
+      expect(within(first).getByRole("button", { name: /ليلى/ })).toBeVisible();
+      // Each with whether they joined: Saad hasn't, Layla has.
+      expect(within(first).getByText(t.rota.notJoinedShort)).toBeVisible();
+      expect(within(first).getByText(t.rota.joined)).toBeVisible();
+      // Above the list: how many read now.
+      expect(
+        screen
+          .getByText(t.rota.sharedCount(31, 1))
+          .compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("removing a reader who also reads a juz' alone says that juz' is left empty", async () => {
+      const view = sharedView();
+      view.rows[2] = slot(3, { ...layla, slots: 2 });
+      view.participants[view.participants.length - 1] = {
+        ...layla,
+        ...held([1, 3]),
+      };
+      m.view = view;
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getAllByRole("button", { name: /ليلى/ })[0]!);
+      await user.click(screen.getByRole("button", { name: t.rota.remove }));
+      const confirm = screen.getByRole("dialog", {
+        name: t.rota.removeTitle("ليلى"),
+      });
+      expect(
+        within(confirm).getByText(t.rota.leavesAlone("سعد")),
+      ).toBeVisible();
+      expect(within(confirm).getByText(t.rota.removeBody)).toBeVisible();
+    });
+
+    it("offers the saved list once every juz' has a reader and sharing is open", () => {
+      m.view = fullView();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      expect(
+        screen.getByRole("button", { name: t.rota.savedFrom }),
+      ).toBeInTheDocument();
+    });
+
+    it("offers no saved list once every juz' has a reader but sharing is closed", () => {
+      m.view = {
+        ...fullView(),
+        unsharedJuz: [],
+        sharing: { on: true, open: false, readers: 30, shared: 0 },
+      };
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      expect(
+        screen.queryByRole("button", { name: t.rota.savedFrom }),
+      ).toBeNull();
+    });
+
+    it("no count of readers while nothing is shared", () => {
+      m.view = fullView();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      expect(screen.queryByText(/مشترك/)).toBeNull();
+    });
+
+    it("a shared row's sheet offers no share", async () => {
+      m.view = sharedView();
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /سعد/ }));
+      const sheet = screen.getByRole("dialog", { name: "سعد" });
+      expect(within(sheet).queryByRole("button", shareButton)).toBeNull();
+    });
+
+    it("removing one reader warns the other reads it alone", async () => {
+      m.view = sharedView();
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /ليلى/ }));
+      await user.click(screen.getByRole("button", { name: t.rota.remove }));
+      const confirm = screen.getByRole("dialog", {
+        name: t.rota.removeTitle("ليلى"),
+      });
+      expect(
+        within(confirm).getByText(t.rota.leavesAlone("سعد")),
+      ).toBeInTheDocument();
+      // Her reading today stays; she reads no juz' alone, so none is left empty.
+      expect(
+        within(confirm).getByText(t.rota.removeBodyShared),
+      ).toBeInTheDocument();
+      expect(within(confirm).queryByText(t.rota.removeBody)).toBeNull();
+      await user.click(
+        within(confirm).getByRole("button", { name: t.rota.removeConfirm }),
+      );
+      expect(m.fns.removeParticipant).toHaveBeenCalledWith({
+        sessionToken: "tok",
+        inviteCode: "CODE",
+        participantId: "p9",
+      });
+    });
+
+    it("freeing one reader of a shared juz' says the other reads it alone", async () => {
+      const view = sharedView();
+      // Saad reads juz' 3 too, so his juz' 1 can be freed.
+      view.rows[2] = slot(3, { ...hidden, slots: 2 });
+      view.participants[0] = { ...hidden, ...held([1, 3]) };
+      m.view = view;
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getAllByRole("button", { name: /سعد/ })[0]!);
+      const free = screen.getByRole("button", {
+        name: new RegExp(t.rota.freeThis(1)),
+      });
+      expect(free).toHaveTextContent(t.rota.leavesAlone("ليلى"));
+      expect(free).toHaveTextContent(t.rota.freeThisStaysShared);
+    });
+
+    it("a reader of a shared juz' moves only to an empty one, and is told the other stays", async () => {
+      const view = sharedView();
+      // Juz' 30 lost its reader since: sharing stays, and closes to new shares.
+      view.rows[29] = slot(30, null);
+      view.freeJuz = [30];
+      view.unsharedJuz = [];
+      view.sharing = { on: true, open: false, readers: 30, shared: 1 };
+      m.view = view;
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /ليلى/ }));
+      const sheet = screen.getByRole("dialog", { name: "ليلى" });
+      const targets = within(within(sheet).getByRole("combobox"))
+        .getAllByRole("option")
+        .map((o) => Number((o as HTMLOptionElement).value));
+      expect(targets).toEqual([30]);
+      expect(within(sheet).getByText(t.rota.leavesAlone("سعد"))).toBeVisible();
+      await user.click(
+        within(sheet).getByRole("button", { name: t.rota.move }),
+      );
+      expect(m.fns.moveJuz).toHaveBeenCalledWith({
+        sessionToken: "tok",
+        inviteCode: "CODE",
+        participantId: "p9",
+        fromJuz: 1,
+        toJuz: 30,
+      });
+    });
+
+    it("a whole juz' can't swap into a shared one, and a refused swap says why", async () => {
+      m.view = sharedView();
+      m.fns.moveJuz = vi.fn().mockResolvedValue({ error: "shared" });
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /منى/ }));
+      const sheet = screen.getByRole("dialog", { name: "منى" });
+      const targets = within(within(sheet).getByRole("combobox"))
+        .getAllByRole("option")
+        .map((o) => Number((o as HTMLOptionElement).value));
+      expect(targets).not.toContain(1);
+      await user.click(
+        within(sheet).getByRole("button", { name: t.rota.move }),
+      );
+      expect(
+        await within(sheet).findByText(t.rota.peopleErrors.shared!),
+      ).toBeInTheDocument();
+    });
+
+    it("says why moving a second reader to a juz' of their own was refused", async () => {
+      // Off the shared juz', it counts toward the cap. Juz' 30 lost its reader.
+      const view = sharedView();
+      view.rows[29] = slot(30, null);
+      view.freeJuz = [30];
+      view.unsharedJuz = [];
+      view.sharing = { ...view.sharing, open: false };
+      m.view = view;
+      m.fns.moveJuz = vi.fn().mockResolvedValue({ error: "too_many" });
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /ليلى/ }));
+      const sheet = screen.getByRole("dialog", { name: "ليلى" });
+      await user.click(
+        within(sheet).getByRole("button", { name: t.rota.move }),
+      );
+      expect(
+        await within(sheet).findByText(t.rota.peopleErrors.too_many!),
+      ).toBeInTheDocument();
+    });
+
+    /** Saad owns the khatma and Muna, who is looking, helps run it. */
+    function coRunView(): PeopleView {
+      const view = fullView();
+      view.rows[0] = slot(1, { ...hidden, isOrganizer: true, slots: 1 });
+      view.rows[1] = slot(2, {
+        ...shown,
+        isCoOrganizer: true,
+        isMe: true,
+        slots: 1,
+      });
+      view.participants[0] = { ...hidden, isOrganizer: true, ...held([1]) };
+      view.participants[1] = {
+        ...shown,
+        isCoOrganizer: true,
+        isMe: true,
+        ...held([2]),
+      };
+      return view;
+    }
+
+    it("a co-organizer can't add a second reader to a juz' of someone running the khatma", async () => {
+      m.view = coRunView();
+      const user = userEvent.setup();
+      render(
+        <PeoplePanel
+          inviteCode="CODE"
+          archived={false}
+          viewerIsOwner={false}
+        />,
+      );
+      for (const name of ["سعد", t.rota.me]) {
+        await user.click(
+          screen.getByRole("button", { name: new RegExp(name) }),
+        );
+        const sheet = screen.getByRole("dialog", { name });
+        expect(within(sheet).queryByRole("button", shareButton)).toBeNull();
+        await user.click(
+          within(sheet).getByRole("button", { name: t.sheet.close }),
+        );
+      }
+      // Anyone else's juz' they may share.
+      await user.click(screen.getByRole("button", { name: /قارئ 3(?!\d)/ }));
+      expect(
+        within(screen.getByRole("dialog", { name: "قارئ 3" })).getByRole(
+          "button",
+          shareButton,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("the owner can add a second reader to a co-organizer's juz'", async () => {
+      m.view = coRunView();
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /منظّم مساعد/ }));
+      expect(
+        within(screen.getByRole("dialog")).getByRole("button", shareButton),
+      ).toBeInTheDocument();
+    });
+
+    it("says why a share onto someone running the khatma was refused", async () => {
+      // Huda was named a co-organizer since this screen loaded.
+      m.view = fullView();
+      m.fns.addParticipant = vi
+        .fn()
+        .mockResolvedValue({ error: "is_organizer" });
+      const user = userEvent.setup();
+      render(
+        <PeoplePanel
+          inviteCode="CODE"
+          archived={false}
+          viewerIsOwner={false}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: /قارئ 3(?!\d)/ }));
+      await user.click(screen.getByRole("button", shareButton));
+      const sheet = screen.getByRole("dialog", { name: t.rota.shareAction });
+      await user.type(within(sheet).getByLabelText(t.rota.personName), "ليلى");
+      await user.type(
+        within(sheet).getByLabelText(t.rota.personPhone),
+        "+971507654321",
+      );
+      await user.click(within(sheet).getByRole("button", { name: t.rota.add }));
+      expect(
+        await within(sheet).findByText(t.rota.errors.is_organizer!),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("co-organizers", () => {
     /** Saad owns the khatma, Muna helps run it, and Huda only reads. */
     function runView() {
       const view = makeView();
       const owner = { ...hidden, isOrganizer: true };
       const co = { ...shown, isCoOrganizer: true };
-      const huda = { ...shown, id: "p3", name: "هدى" };
-      view.rows[0] = { juz: 1, participant: { ...owner, slots: 1 } };
-      view.rows[1] = { juz: 2, participant: { ...co, slots: 1 } };
-      view.rows[2] = { juz: 3, participant: { ...huda, slots: 1 } };
+      const huda = { ...shown, id: pid("p3"), name: "هدى" };
+      view.rows[0] = slot(1, { ...owner, slots: 1 });
+      view.rows[1] = slot(2, { ...co, slots: 1 });
+      view.rows[2] = slot(3, { ...huda, slots: 1 });
       view.participants = [
-        { ...owner, juz: [1] },
-        { ...co, juz: [2] },
-        { ...huda, juz: [3] },
+        { ...owner, ...held([1]) },
+        { ...co, ...held([2]) },
+        { ...huda, ...held([3]) },
       ];
       view.freeJuz = view.freeJuz.filter((j) => j !== 3);
       return view;
@@ -618,15 +1090,17 @@ describe("PeoplePanel", () => {
 
     it("a co-organizer is not offered to stop reading their own ajza'", async () => {
       const view = runView();
-      view.rows[1] = {
-        juz: 2,
-        participant: { ...shown, isCoOrganizer: true, isMe: true, slots: 1 },
-      };
+      view.rows[1] = slot(2, {
+        ...shown,
+        isCoOrganizer: true,
+        isMe: true,
+        slots: 1,
+      });
       view.participants[1] = {
         ...shown,
         isCoOrganizer: true,
         isMe: true,
-        juz: [2],
+        ...held([2]),
       };
       m.view = view;
       const user = userEvent.setup();
@@ -678,19 +1152,26 @@ describe("PeoplePanel", () => {
     it("a co-organizer can't move the owner's, another co-organizer's or their own juz', nor swap into them", async () => {
       const view = runView();
       // Muna, the co-organizer, is the one looking.
-      view.rows[1] = {
-        juz: 2,
-        participant: { ...shown, isCoOrganizer: true, isMe: true, slots: 1 },
-      };
+      view.rows[1] = slot(2, {
+        ...shown,
+        isCoOrganizer: true,
+        isMe: true,
+        slots: 1,
+      });
       view.participants[1] = {
         ...shown,
         isCoOrganizer: true,
         isMe: true,
-        juz: [2],
+        ...held([2]),
       };
-      const other = { ...shown, id: "p4", name: "ريم", isCoOrganizer: true };
-      view.rows[3] = { juz: 4, participant: { ...other, slots: 1 } };
-      view.participants.push({ ...other, juz: [4] });
+      const other = {
+        ...shown,
+        id: pid("p4"),
+        name: "ريم",
+        isCoOrganizer: true,
+      };
+      view.rows[3] = slot(4, { ...other, slots: 1 });
+      view.participants.push({ ...other, ...held([4]) });
       view.freeJuz = view.freeJuz.filter((j) => j !== 4);
       m.view = view;
       const user = userEvent.setup();

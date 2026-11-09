@@ -22,7 +22,18 @@ import { allows, roleIn, type OrganizerRole } from "../organizerAuth";
 import { isArchived } from "../khatma";
 import { isOwnerRow } from "../rotaOwner";
 import { khatmaJoinLink } from "../rotaJoin";
-import { slotRowsByJuz, targetDay, type RotaConfig } from "../rotaPlace";
+import {
+  countHeld,
+  heldSlotCount,
+  leaveSlot,
+  sharingOpen,
+  slotRows,
+  slotRowsByJuz,
+  slotsOf,
+  targetDay,
+  type RotaConfig,
+  type SlotRows,
+} from "../rotaPlace";
 import { NEW_MEMBER_NAME } from "../rotaTemplates";
 import { getSetting } from "../settings";
 import {
@@ -143,28 +154,53 @@ export type PeopleView = {
   target: { number: number; date: string | null; isFirst: boolean };
   rows: {
     juz: number;
-    participant:
-      | ({
-          id: Id<"rotaParticipants">;
-          name: string;
-          isMe: boolean;
-          slots: number;
-        } & PersonState)
-      | null;
+    /** The juz''s first reader. */
+    participant: SlotReader | null;
+    /** The second reader who shares the juz'. */
+    partner: SlotReader | null;
   }[];
   participants: ({
     id: Id<"rotaParticipants">;
     name: string;
     isMe: boolean;
     juz: number[];
+    /** How many of their ajza' count toward `maxSlots`, as `heldSlotCount` counts them. */
+    heldSlots: number;
+    /** Their ajza' that have two readers. */
+    shared: number[];
   } & PersonState)[];
   freeJuz: number[];
+  /**
+   * The ajza' the viewer may add a second reader to now, lowest first: read by
+   * one person, while sharing is open (else none). A co-organizer's leaves out
+   * those of the people running the khatma, as the server refuses them.
+   */
+  unsharedJuz: number[];
   maxSlots: number;
   /** A local number from the organizer's country, for the phone field's hint. */
   phoneExample: string | null;
   /** The list opens with the box about juz' left without a reader (`rotaLeftoverBoxOn`). */
   leftoverBox: boolean;
+  sharing: {
+    /** Organizers may add a second reader to a juz' (`rotaSharedSlotsOn`). */
+    on: boolean;
+    /** A juz' may take a second reader now: it's on and every juz' has a reader. */
+    open: boolean;
+    /** How many people hold a juz', as its first or second reader. */
+    readers: number;
+    /** How many ajza' have a second reader. */
+    shared: number;
+  };
 };
+
+/** One reader of a juz', as the people view shows them. */
+type SlotReader = {
+  id: Id<"rotaParticipants">;
+  name: string;
+  isMe: boolean;
+  /** How many of their ajza' count toward `maxSlots`, as `heldSlotCount` counts them. */
+  slots: number;
+} & PersonState;
 
 /** A number typed without a country code is one from the organizer's country. */
 function homeCountry(organizer: Doc<"people"> | null) {
@@ -257,7 +293,10 @@ export async function people(
   actor: Actor,
 ): Promise<PeopleView> {
   const target = await targetDay(ctx, khatma);
-  const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
+  const slots = await slotRows(ctx, khatma._id, target.number);
+  const { first: byJuz, second: partners } = slots;
+  const sharingOn = await getSetting(ctx, "rotaSharedSlotsOn");
+  const open = sharingOpen(sharingOn, slots);
   const participants = (
     await ctx.db
       .query("rotaParticipants")
@@ -267,13 +306,29 @@ export async function people(
     .filter((p) => p.removedAt === null)
     .sort((a, b) => a.addedAt - b.addedAt || a._creationTime - b._creationTime);
   const heldBy = new Map<Id<"rotaParticipants">, number[]>();
+  const sharedBy = new Map<Id<"rotaParticipants">, number[]>();
+  // Counted toward the cap the way `heldSlotCount` counts them.
+  const countsSecond = await getSetting(ctx, "rotaHalfCountsAsSlot");
+  const counted = new Map<Id<"rotaParticipants">, number>();
+  const push = (
+    map: Map<Id<"rotaParticipants">, number[]>,
+    id: Id<"rotaParticipants">,
+    juz: number,
+  ) => map.set(id, [...(map.get(id) ?? []), juz]);
   for (let juz = 1; juz <= ROTA_SIZE; juz++) {
-    const row = byJuz.get(juz);
-    if (!row) continue;
-    heldBy.set(row.participantId, [
-      ...(heldBy.get(row.participantId) ?? []),
-      juz,
-    ]);
+    const first = byJuz.get(juz);
+    const second = partners.get(juz);
+    for (const row of [first, second]) {
+      if (!row) continue;
+      push(heldBy, row.participantId, juz);
+      if (first && second) push(sharedBy, row.participantId, juz);
+      if (row === first || countsSecond) {
+        counted.set(
+          row.participantId,
+          (counted.get(row.participantId) ?? 0) + 1,
+        );
+      }
+    }
   }
   const byId = new Map(participants.map((p) => [p._id, p]));
   const requests = (
@@ -286,16 +341,39 @@ export async function people(
   ).sort((a, b) => a.createdAt - b.createdAt);
   const organizer = await ctx.db.get(savedOwner(khatma, actor));
   const owner = await ctx.db.get(khatma.creatorPersonId);
-  const coOrganizerPhones = new Set(
-    (
-      await ctx.db
-        .query("coOrganizers")
-        .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
-        .collect()
-    ).map((row) => row.phone),
-  );
+  const coOrganizerPhones = await coOrganizerPhonesOf(ctx, khatma._id);
   const hidden = await hiddenFromViewer(ctx, khatma, participants, actor);
   const withAccount = await participantsWithAccount(ctx, participants);
+  const reader = (row: Doc<"rotaSlots"> | undefined): SlotReader | null => {
+    const p = row ? byId.get(row.participantId) : undefined;
+    if (!p) return null;
+    return {
+      id: p._id,
+      name: p.name,
+      isMe: isActor(p, actor),
+      slots: counted.get(p._id) ?? 0,
+      ...personState(p, khatma, owner, coOrganizerPhones, hidden, withAccount),
+    };
+  };
+  const rows = Array.from({ length: ROTA_SIZE }, (_, i) => ({
+    juz: i + 1,
+    participant: reader(byJuz.get(i + 1)),
+    partner: reader(partners.get(i + 1)),
+  }));
+  // Only the owner and an admin give a second reader to someone running the khatma.
+  const viewerRunsAll =
+    actor.personId === null || actor.personId === khatma.creatorPersonId;
+  const unsharedJuz = open
+    ? rows
+        .filter(
+          ({ participant, partner }) =>
+            participant !== null &&
+            partner === null &&
+            (viewerRunsAll ||
+              !(participant.isOrganizer || participant.isCoOrganizer)),
+        )
+        .map((row) => row.juz)
+    : [];
   return {
     title: khatmaTitle(khatma),
     archived: isArchived(khatma),
@@ -312,48 +390,136 @@ export async function people(
       date: target.date,
       isFirst: target.n === 1,
     },
-    rows: Array.from({ length: ROTA_SIZE }, (_, i) => {
-      const juz = i + 1;
-      const holderId = byJuz.get(juz)?.participantId;
-      const holder = holderId ? byId.get(holderId) : undefined;
-      return {
-        juz,
-        participant: holder
-          ? {
-              id: holder._id,
-              name: holder.name,
-              isMe: isActor(holder, actor),
-              slots: heldBy.get(holder._id)?.length ?? 0,
-              ...personState(
-                holder,
-                khatma,
-                owner,
-                coOrganizerPhones,
-                hidden,
-                withAccount,
-              ),
-            }
-          : null,
-      };
-    }),
+    rows,
     participants: participants.map((p) => ({
       id: p._id,
       name: p.name,
       isMe: isActor(p, actor),
       juz: heldBy.get(p._id) ?? [],
+      heldSlots: counted.get(p._id) ?? 0,
+      shared: sharedBy.get(p._id) ?? [],
       ...personState(p, khatma, owner, coOrganizerPhones, hidden, withAccount),
     })),
     freeJuz: freeJuzOf(byJuz),
+    unsharedJuz,
     maxSlots: await getSetting(ctx, "rotaMaxSlotsPerPerson"),
     phoneExample: localPhoneExample(homeCountry(organizer)),
     leftoverBox: await getSetting(ctx, "rotaLeftoverBoxOn"),
+    sharing: {
+      on: sharingOn,
+      open,
+      readers: heldBy.size,
+      shared: partners.size,
+    },
   };
 }
 
 /**
+ * How a new participant is placed:
+ * - `empty`: on a juz' with no reader.
+ * - `share`: as the second reader of a juz' that has one, which needs
+ *   `rotaSharedSlotsOn` and a reader on every juz'.
+ * - `fill`: on the lowest juz' with no reader, or once every juz' has one and
+ *   sharing is open, as the second reader of the lowest juz' that has none.
+ */
+export type PlaceMode = "empty" | "share" | "fill";
+
+export type PlaceError =
+  | "no_free_juz"
+  | "juz_taken"
+  | "ask_today"
+  | "not_full"
+  | "sharing_off"
+  | "already_shared"
+  | "is_organizer";
+
+/**
+ * The participants whose juz' `actor` may not give a second reader: for a
+ * co-organizer, everyone running the khatma (the owner and each co-organizer,
+ * themselves included), since only the owner changes what they hold (spec 4.2).
+ * Nobody for the owner or an admin.
+ */
+async function unshareableFor(
+  ctx: QueryCtx,
+  khatma: Doc<"khatmas">,
+  actor: Actor,
+): Promise<Set<Id<"rotaParticipants">>> {
+  const blocked = new Set<Id<"rotaParticipants">>();
+  if (actor.personId === null || actor.personId === khatma.creatorPersonId) {
+    return blocked;
+  }
+  const owner = await ctx.db.get(khatma.creatorPersonId);
+  const coOrganizerPhones = await coOrganizerPhonesOf(ctx, khatma._id);
+  const participants = await ctx.db
+    .query("rotaParticipants")
+    .withIndex("by_khatma", (q) => q.eq("khatmaId", khatma._id))
+    .collect();
+  for (const p of participants) {
+    if (
+      p.removedAt === null &&
+      (isOwnerRow(p, khatma, owner) || coOrganizerPhones.has(p.phone))
+    ) {
+      blocked.add(p._id);
+    }
+  }
+  return blocked;
+}
+
+/** The phones of the khatma's co-organizers. */
+async function coOrganizerPhonesOf(
+  ctx: QueryCtx,
+  khatmaId: Id<"khatmas">,
+): Promise<Set<string>> {
+  return new Set(
+    (
+      await ctx.db
+        .query("coOrganizers")
+        .withIndex("by_khatma", (q) => q.eq("khatmaId", khatmaId))
+        .collect()
+    ).map((row) => row.phone),
+  );
+}
+
+/** Why `juz` can't take a second reader now, or null when it can. */
+async function shareRefusal(
+  ctx: QueryCtx,
+  rows: SlotRows,
+  juz: number,
+): Promise<"not_full" | "sharing_off" | "already_shared" | null> {
+  if (!(await getSetting(ctx, "rotaSharedSlotsOn"))) return "sharing_off";
+  if (rows.first.size < ROTA_SIZE) return "not_full";
+  return rows.second.has(juz) ? "already_shared" : null;
+}
+
+/**
+ * The lowest juz' of khatma `number` with no second reader, when sharing is
+ * open, passing over the ajza' whose first reader is in `blocked`.
+ */
+async function lowestUnshared(
+  ctx: QueryCtx,
+  rows: SlotRows,
+  blocked: ReadonlySet<Id<"rotaParticipants">>,
+): Promise<number | undefined> {
+  const on = await getSetting(ctx, "rotaSharedSlotsOn");
+  if (!sharingOpen(on, rows)) return undefined;
+  return Array.from({ length: ROTA_SIZE }, (_, i) => i + 1).find((j) => {
+    const first = rows.first.get(j);
+    return !rows.second.has(j) && !(first && blocked.has(first.participantId));
+  });
+}
+
+/** An add screen's placement: `share` asks for the second reader's place on the juz' chosen. */
+function placeMode(args: { share?: boolean }): PlaceMode {
+  return args.share === true ? "share" : "empty";
+}
+
+/**
  * Adds a new participant to the khatma on the juz' (or the lowest free one
- * when `juz` is undefined) of the next day to start. `joinedAt` is set only
- * for someone who already sent their join message.
+ * when `juz` is undefined) of the next day to start, placed as `mode` says.
+ * `joinedAt` is set only for someone who already sent their join message.
+ * A co-organizer `actor` never gives a second reader to the juz' of someone
+ * running the khatma: `share` refuses with `is_organizer`, and `fill` passes
+ * over those ajza' to the next one.
  */
 export async function placeNewParticipant(
   ctx: MutationCtx,
@@ -366,19 +532,47 @@ export async function placeNewParticipant(
     phoneHidden?: boolean;
   },
   juz: number | undefined,
-  joinedAt?: number,
-  /** The organizer's add screens: late in the day, they say when the person starts. */
-  late?: { readsToday: boolean | undefined },
+  opts: {
+    joinedAt?: number;
+    /** The organizer's add screens: late in the day, they say when the person starts. */
+    late?: { readsToday: boolean | undefined };
+    mode?: PlaceMode;
+    /** Who adds them; an admin by default. */
+    actor?: Actor;
+  } = {},
 ): Promise<
-  | { participantId: Id<"rotaParticipants">; juz: number }
-  | { error: "no_free_juz" | "juz_taken" | "ask_today" }
+  | { participantId: Id<"rotaParticipants">; juz: number; second: boolean }
+  | { error: PlaceError }
 > {
+  const { joinedAt, late, mode = "empty", actor = { personId: null } } = opts;
   const target = await targetDay(ctx, khatma);
-  const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
-  if (juz === undefined) {
-    juz = Array.from({ length: ROTA_SIZE }, (_, i) => i + 1).find(
-      (j) => !byJuz.has(j),
-    );
+  const rows = await slotRows(ctx, khatma._id, target.number);
+  const byJuz = rows.first;
+  let second = false;
+  if (mode === "share") {
+    if (juz === undefined || !isJuz(juz)) {
+      throw new ConvexError({ code: "invalid_juz" });
+    }
+    const refused = await shareRefusal(ctx, rows, juz);
+    if (refused !== null) return { error: refused };
+    const first = byJuz.get(juz);
+    if (
+      first &&
+      (await unshareableFor(ctx, khatma, actor)).has(first.participantId)
+    ) {
+      return { error: "is_organizer" };
+    }
+    second = true;
+  } else if (juz === undefined) {
+    juz = freeJuzOf(byJuz)[0];
+    if (juz === undefined && mode === "fill") {
+      juz = await lowestUnshared(
+        ctx,
+        rows,
+        await unshareableFor(ctx, khatma, actor),
+      );
+      second = juz !== undefined;
+    }
     if (juz === undefined) return { error: "no_free_juz" };
   } else if (!isJuz(juz)) {
     throw new ConvexError({ code: "invalid_juz" });
@@ -387,7 +581,9 @@ export async function placeNewParticipant(
   }
 
   const slot = slotFor(juz, target.number);
+  // A second reader never takes today's juz', so they're never asked about it.
   const asks =
+    !second &&
     late !== undefined &&
     target.date !== null &&
     (await lateInTheDay(ctx, khatma, who.phone, slot, joinedAt !== undefined));
@@ -410,8 +606,9 @@ export async function placeNewParticipant(
     khatmaId: khatma._id,
     slot,
     participantId,
+    ...(second ? { second: true } : {}),
   });
-  return { participantId, juz };
+  return { participantId, juz, second };
 }
 
 /**
@@ -437,19 +634,18 @@ export async function addParticipant(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
   _rota: RotaConfig,
-  args: { name: string; phone: string; juz?: number; readsToday?: boolean },
+  args: {
+    name: string;
+    phone: string;
+    juz?: number;
+    readsToday?: boolean;
+    /** As the second reader of `juz`. */
+    share?: boolean;
+  },
   actor: Actor,
 ): Promise<
   | { ok: true; participantId: Id<"rotaParticipants">; juz: number }
-  | {
-      error:
-        | "bad_name"
-        | "bad_phone"
-        | "no_free_juz"
-        | "juz_taken"
-        | "already_added"
-        | "ask_today";
-    }
+  | { error: "bad_name" | "bad_phone" | "already_added" | PlaceError }
 > {
   const name = cleanDisplayName(args.name);
   if (name === null) return { error: "bad_name" };
@@ -471,8 +667,7 @@ export async function addParticipant(
     khatma,
     { name, phone, personId: null },
     args.juz,
-    undefined,
-    { readsToday: args.readsToday },
+    { late: { readsToday: args.readsToday }, mode: placeMode(args), actor },
   );
   if ("error" in placed) return placed;
   if (organizer) {
@@ -483,7 +678,7 @@ export async function addParticipant(
       personId: null,
     });
   }
-  return { ok: true, ...placed };
+  return { ok: true, participantId: placed.participantId, juz: placed.juz };
 }
 
 export async function giveJuz(
@@ -501,11 +696,10 @@ export async function giveJuz(
   const target = await targetDay(ctx, khatma);
   const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
   if (byJuz.has(args.juz)) return { error: "juz_taken" };
-  const held = await ctx.db
-    .query("rotaSlots")
-    .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
-    .collect();
-  if (held.length >= (await getSetting(ctx, "rotaMaxSlotsPerPerson"))) {
+  if (
+    (await heldSlotCount(ctx, participant._id)) >=
+    (await getSetting(ctx, "rotaMaxSlotsPerPerson"))
+  ) {
     return { error: "too_many" };
   }
   await ctx.db.insert("rotaSlots", {
@@ -546,19 +740,19 @@ export async function spreadFreeJuz(
     )
     .sort((a, b) => a.addedAt - b.addedAt || a._creationTime - b._creationTime);
   // Held counts the way `giveJuz` checks the cap.
+  const countsSecond = await getSetting(ctx, "rotaHalfCountsAsSlot");
   const counted = await Promise.all(
-    active.map(async (p) => ({
-      id: p._id,
-      held: (
-        await ctx.db
-          .query("rotaSlots")
-          .withIndex("by_participant", (q) => q.eq("participantId", p._id))
-          .collect()
-      ).length,
-    })),
+    active.map(async (p) => {
+      const slots = await slotsOf(ctx, p._id);
+      return {
+        id: p._id,
+        held: countHeld(slots, countsSecond),
+        holdsAny: slots.length > 0,
+      };
+    }),
   );
   // Someone holding none stopped reading on purpose (the organizer can), so they get none back.
-  const readers = counted.filter((r) => r.held > 0);
+  const readers = counted.filter((r) => r.holdsAny);
 
   let given = 0;
   for (const juz of free) {
@@ -619,7 +813,11 @@ async function mayTakeSlotsOf(
 /**
  * Moves a participant's juz' of the next day to another one, swapping with its
  * holder if it has one. A co-organizer can't move the owner's or another
- * co-organizer's juz', nor swap one into theirs (`is_organizer`).
+ * co-organizer's juz', nor swap one into theirs (`is_organizer`). Either
+ * reader of a shared slot may move to an empty juz', which leaves the other as
+ * its only reader; a swap never takes a shared slot, from either side (`shared`).
+ * A second reader moved to an empty juz' reads it alone, so it counts toward
+ * `rotaMaxSlotsPerPerson` even when their shared slot didn't (`too_many`).
  */
 export async function moveJuz(
   ctx: MutationCtx,
@@ -631,16 +829,20 @@ export async function moveJuz(
     toJuz: number;
   },
   caller: OrganizerRole | "admin",
-): Promise<{ ok: true } | { error: "not_found" | "is_organizer" }> {
+): Promise<
+  { ok: true } | { error: "not_found" | "is_organizer" | "shared" | "too_many" }
+> {
   if (!isJuz(args.fromJuz) || !isJuz(args.toJuz)) {
     return { error: "not_found" };
   }
   const target = await targetDay(ctx, khatma);
-  const byJuz = await slotRowsByJuz(ctx, khatma._id, target.number);
-  const from = byJuz.get(args.fromJuz);
-  if (!from || from.participantId !== args.participantId) {
-    return { error: "not_found" };
-  }
+  const { first: byJuz, second: partners } = await slotRows(
+    ctx,
+    khatma._id,
+    target.number,
+  );
+  const from = rowOf(byJuz, partners, args.fromJuz, args.participantId);
+  if (!from) return { error: "not_found" };
   const to = byJuz.get(args.toJuz);
   const moved = to
     ? [from.participantId, to.participantId]
@@ -649,18 +851,48 @@ export async function moveJuz(
     return { error: "is_organizer" };
   }
   if (to) {
+    if (partners.has(args.fromJuz) || partners.has(args.toJuz)) {
+      return { error: "shared" };
+    }
     // Swap holders; the slots stay where they are.
     await ctx.db.patch(from._id, { participantId: to.participantId });
     await ctx.db.patch(to._id, { participantId: from.participantId });
   } else {
-    await ctx.db.patch(from._id, {
+    if (
+      from.second === true &&
+      !(await getSetting(ctx, "rotaHalfCountsAsSlot")) &&
+      (await heldSlotCount(ctx, from.participantId)) + 1 >
+        (await getSetting(ctx, "rotaMaxSlotsPerPerson"))
+    ) {
+      return { error: "too_many" };
+    }
+    await leaveSlot(ctx, from);
+    await ctx.db.insert("rotaSlots", {
+      khatmaId: khatma._id,
       slot: slotFor(args.toJuz, target.number),
+      participantId: from.participantId,
     });
   }
   return { ok: true };
 }
 
-/** Frees a juz' of the next day. A co-organizer can't free the owner's or a co-organizer's (`is_organizer`). */
+/** The participant's row on `juz`, as its first or its second reader. */
+function rowOf(
+  byJuz: Map<number, Doc<"rotaSlots">>,
+  partners: Map<number, Doc<"rotaSlots">>,
+  juz: number,
+  participantId: Id<"rotaParticipants">,
+): Doc<"rotaSlots"> | undefined {
+  return [byJuz.get(juz), partners.get(juz)].find(
+    (row) => row?.participantId === participantId,
+  );
+}
+
+/**
+ * Frees a participant's juz' of the next day. Freeing one reader of a shared
+ * slot leaves the other as its only reader. A co-organizer can't free the
+ * owner's or a co-organizer's (`is_organizer`).
+ */
 export async function freeJuz(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
@@ -670,17 +902,14 @@ export async function freeJuz(
 ): Promise<{ ok: true } | { error: "not_found" | "is_organizer" }> {
   if (!isJuz(args.juz)) return { error: "not_found" };
   const target = await targetDay(ctx, khatma);
-  const row = (await slotRowsByJuz(ctx, khatma._id, target.number)).get(
-    args.juz,
-  );
+  const { first, second } = await slotRows(ctx, khatma._id, target.number);
+  const row = rowOf(first, second, args.juz, args.participantId);
   // The screen may be a day behind: only free the slot the organizer saw.
-  if (!row || row.participantId !== args.participantId) {
-    return { error: "not_found" };
-  }
+  if (!row) return { error: "not_found" };
   if (!(await mayTakeSlotsOf(ctx, khatma, [row.participantId], caller))) {
     return { error: "is_organizer" };
   }
-  await ctx.db.delete(row._id);
+  await leaveSlot(ctx, row);
   return { ok: true };
 }
 
@@ -715,8 +944,9 @@ export async function removeParticipant(
     .query("rotaSlots")
     .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
     .collect();
-  for (const slot of slots) await ctx.db.delete(slot._id);
-  // Today's reads keep their reader: only the slots go.
+  // A shared slot they leave keeps its other reader.
+  for (const slot of slots) await leaveSlot(ctx, slot);
+  // Today's reads keep their readers: only the slots go.
   await ctx.db.patch(participant._id, { removedAt: Date.now() });
   await endCoOrganizer(ctx, khatma._id, participant.phone);
   await refreshPhone(ctx, participant.phone);
@@ -1009,18 +1239,17 @@ export async function addSaved(
   ctx: MutationCtx,
   khatma: Doc<"khatmas">,
   _rota: RotaConfig,
-  args: { contactId: Id<"rotaContacts">; juz?: number; readsToday?: boolean },
+  args: {
+    contactId: Id<"rotaContacts">;
+    juz?: number;
+    readsToday?: boolean;
+    /** As the second reader of `juz`. */
+    share?: boolean;
+  },
   actor: Actor,
 ): Promise<
   | { ok: true; participantId: Id<"rotaParticipants">; juz: number }
-  | {
-      error:
-        | "not_found"
-        | "no_free_juz"
-        | "juz_taken"
-        | "already_added"
-        | "ask_today";
-    }
+  | { error: "not_found" | "already_added" | PlaceError }
 > {
   const who = await resolveContact(
     ctx,
@@ -1029,16 +1258,13 @@ export async function addSaved(
     await activeIdentities(ctx, khatma._id),
   );
   if ("error" in who) return who;
-  const placed = await placeNewParticipant(
-    ctx,
-    khatma,
-    who,
-    args.juz,
-    undefined,
-    { readsToday: args.readsToday },
-  );
+  const placed = await placeNewParticipant(ctx, khatma, who, args.juz, {
+    late: { readsToday: args.readsToday },
+    mode: placeMode(args),
+    actor,
+  });
   if ("error" in placed) return placed;
-  return { ok: true, ...placed };
+  return { ok: true, participantId: placed.participantId, juz: placed.juz };
 }
 
 // ---------------------------------------------------------------------------
@@ -1147,13 +1373,18 @@ export async function acceptJoinRequest(
     juz: number;
     name?: string;
     readsToday?: boolean;
+    /** As the second reader of `juz`. */
+    share?: boolean;
   },
   actor: Actor,
 ): Promise<
   | { ok: true; participantId: Id<"rotaParticipants"> }
   | {
       error:
-        "not_found" | "juz_taken" | "already_added" | "bad_name" | "ask_today";
+        | "not_found"
+        | "already_added"
+        | "bad_name"
+        | Exclude<PlaceError, "no_free_juz">;
     }
 > {
   const request = await openRequest(ctx, khatma._id, args.requestId);
@@ -1229,12 +1460,18 @@ export async function acceptJoinRequest(
     khatma,
     { name, phone: request.phone, personId, phoneHidden },
     args.juz,
-    now,
-    { readsToday: args.readsToday },
+    {
+      joinedAt: now,
+      late: { readsToday: args.readsToday },
+      mode: placeMode(args),
+      actor,
+    },
   );
   if ("error" in placed) {
     // `juz` was given, so a juz' is always chosen.
-    return { error: placed.error === "ask_today" ? "ask_today" : "juz_taken" };
+    return {
+      error: placed.error === "no_free_juz" ? "juz_taken" : placed.error,
+    };
   }
   const organizer = await ctx.db.get(accepter);
   if (organizer) {

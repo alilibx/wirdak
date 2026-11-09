@@ -11,15 +11,18 @@ import { useAddCall } from "./useAddCall";
 
 type Request = PeopleView["requests"][number];
 
-/** One number that sent the join code: give it a juz' of the next khatma, or say no. */
+/**
+ * One number that sent the join code: give it a juz' of the next khatma, or say no. Once every
+ * juz' has a reader and sharing is open, it joins a juz' one person reads, as its second reader.
+ */
 function JoinRequestCard({
   inviteCode,
   request,
-  freeJuz,
+  view,
 }: {
   inviteCode: string;
   request: Request;
-  freeJuz: number[];
+  view: PeopleView;
 }) {
   const backend = useRotaBackend(inviteCode);
   const accept = useMutation(backend.acceptJoinRequest);
@@ -31,8 +34,17 @@ function JoinRequestCard({
   const selectId = useId();
   const [name, setName] = useState(request.name ?? "");
   const [chosen, setChosen] = useState<number | null>(null);
-  // The juz' may be taken while the card is open: fall back to the first free one.
-  const juz = chosen !== null && freeJuz.includes(chosen) ? chosen : freeJuz[0];
+  const share = view.freeJuz.length === 0 && view.sharing.open;
+  // The ajza' to pick from, each with who reads it when it is shared onto.
+  const choices: { juz: number; with: string | null }[] = share
+    ? view.unsharedJuz.map((n) => ({
+        juz: n,
+        with: view.rows[n - 1]?.participant?.name ?? null,
+      }))
+    : view.freeJuz.map((n) => ({ juz: n, with: null }));
+  // The juz' may be taken while the card is open: fall back to the first one left.
+  const choice = choices.find((c) => c.juz === chosen) ?? choices[0];
+  const juz = choice?.juz;
   const args = backend.authArgs();
   // Left as it came, the server cleans WhatsApp's name itself, or gives its usual one.
   const nameArg =
@@ -69,12 +81,25 @@ function JoinRequestCard({
             onChange={(event) => setChosen(Number(event.target.value))}
             className={fieldClass}
           >
-            {freeJuz.map((n) => (
-              <option key={n} value={n}>
-                {toWesternDigits(n)}
+            {choices.map((c) => (
+              <option key={c.juz} value={c.juz}>
+                {c.with === null
+                  ? toWesternDigits(c.juz)
+                  : t.rota.shareJuzOption(c.juz, c.with)}
               </option>
             ))}
           </select>
+          {/* Shared onto a juz': what follows, once there is a name to say it with. */}
+          {choice?.with != null && name.trim() !== "" && (
+            <p className="mt-3 leading-relaxed">
+              {t.rota.shareExplain(
+                choice.with,
+                name.trim(),
+                choice.juz,
+                view.target.number,
+              )}
+            </p>
+          )}
         </>
       )}
       {question ?? (
@@ -88,12 +113,13 @@ function JoinRequestCard({
                   requestId: request.id,
                   juz: juz ?? 0,
                   ...nameArg,
+                  ...(share ? { share } : {}),
                   ...today,
                 }),
               )
             }
           >
-            {t.rota.acceptRequest}
+            {share ? t.rota.shareRequest : t.rota.acceptRequest}
           </Button>
           <Button
             variant="ghost"
@@ -132,7 +158,7 @@ export function JoinRequests({
             key={request.id}
             inviteCode={inviteCode}
             request={request}
-            freeJuz={view.freeJuz}
+            view={view}
           />
         ))}
       </ul>
