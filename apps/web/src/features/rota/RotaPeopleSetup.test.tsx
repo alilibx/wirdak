@@ -59,6 +59,7 @@ function makeView() {
       },
     ],
     freeJuz: [2, 3],
+    unsharedJuz: [] as number[],
     phoneExample: null,
     maxSlots: 2,
   };

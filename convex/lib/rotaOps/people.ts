@@ -170,6 +170,12 @@ export type PeopleView = {
     shared: number[];
   } & PersonState)[];
   freeJuz: number[];
+  /**
+   * The ajza' the viewer may add a second reader to now, lowest first: read by
+   * one person, while sharing is open (else none). A co-organizer's leaves out
+   * those of the people running the khatma, as the server refuses them.
+   */
+  unsharedJuz: number[];
   maxSlots: number;
   /** A local number from the organizer's country, for the phone field's hint. */
   phoneExample: string | null;
@@ -349,6 +355,25 @@ export async function people(
       ...personState(p, khatma, owner, coOrganizerPhones, hidden, withAccount),
     };
   };
+  const rows = Array.from({ length: ROTA_SIZE }, (_, i) => ({
+    juz: i + 1,
+    participant: reader(byJuz.get(i + 1)),
+    partner: reader(partners.get(i + 1)),
+  }));
+  // Only the owner and an admin give a second reader to someone running the khatma.
+  const viewerRunsAll =
+    actor.personId === null || actor.personId === khatma.creatorPersonId;
+  const unsharedJuz = open
+    ? rows
+        .filter(
+          ({ participant, partner }) =>
+            participant !== null &&
+            partner === null &&
+            (viewerRunsAll ||
+              !(participant.isOrganizer || participant.isCoOrganizer)),
+        )
+        .map((row) => row.juz)
+    : [];
   return {
     title: khatmaTitle(khatma),
     archived: isArchived(khatma),
@@ -365,11 +390,7 @@ export async function people(
       date: target.date,
       isFirst: target.n === 1,
     },
-    rows: Array.from({ length: ROTA_SIZE }, (_, i) => ({
-      juz: i + 1,
-      participant: reader(byJuz.get(i + 1)),
-      partner: reader(partners.get(i + 1)),
-    })),
+    rows,
     participants: participants.map((p) => ({
       id: p._id,
       name: p.name,
@@ -380,6 +401,7 @@ export async function people(
       ...personState(p, khatma, owner, coOrganizerPhones, hidden, withAccount),
     })),
     freeJuz: freeJuzOf(byJuz),
+    unsharedJuz,
     maxSlots: await getSetting(ctx, "rotaMaxSlotsPerPerson"),
     phoneExample: localPhoneExample(homeCountry(organizer)),
     leftoverBox: await getSetting(ctx, "rotaLeftoverBoxOn"),

@@ -701,7 +701,7 @@ export function PeoplePanel({
           person={person}
           juz={open.juz}
           viewerIsOwner={viewerIsOwner}
-          canShare={view.sharing.on && view.sharing.open && !archived}
+          canShare={view.sharing.open && !archived}
           onClose={() => setOpen(null)}
         />
       )}

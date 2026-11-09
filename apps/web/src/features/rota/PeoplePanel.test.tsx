@@ -97,6 +97,7 @@ function makeView(): PeopleView {
       { ...shown, ...held([2]) },
     ],
     freeJuz: Array.from({ length: 28 }, (_, i) => i + 3),
+    unsharedJuz: [],
     phoneExample: null,
     maxSlots: 2,
     leftoverBox: true,
@@ -600,6 +601,7 @@ describe("PeoplePanel", () => {
         ...others.map((p, i) => ({ ...p, ...held([i + 3]) })),
       );
       view.freeJuz = [];
+      view.unsharedJuz = view.rows.map((row) => row.juz);
       view.sharing = { on: true, open: true, readers: 30, shared: 0 };
       return view;
     }
@@ -617,6 +619,7 @@ describe("PeoplePanel", () => {
       const view = fullView();
       view.rows[0] = slot(1, { ...hidden, slots: 1 }, { ...layla, slots: 1 });
       view.participants.push({ ...layla, ...held([1]) });
+      view.unsharedJuz = view.unsharedJuz.filter((juz) => juz !== 1);
       view.sharing = { on: true, open: true, readers: 31, shared: 1 };
       return view;
     }
@@ -635,6 +638,7 @@ describe("PeoplePanel", () => {
     it("no share action when sharing is off", async () => {
       m.view = {
         ...fullView(),
+        unsharedJuz: [],
         sharing: { on: false, open: false, readers: 30, shared: 0 },
       };
       const user = userEvent.setup();
@@ -774,6 +778,7 @@ describe("PeoplePanel", () => {
     it("offers no saved list once every juz' has a reader but sharing is closed", () => {
       m.view = {
         ...fullView(),
+        unsharedJuz: [],
         sharing: { on: true, open: false, readers: 30, shared: 0 },
       };
       render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
@@ -845,6 +850,7 @@ describe("PeoplePanel", () => {
       // Juz' 30 lost its reader since: sharing stays, and closes to new shares.
       view.rows[29] = slot(30, null);
       view.freeJuz = [30];
+      view.unsharedJuz = [];
       view.sharing = { on: true, open: false, readers: 30, shared: 1 };
       m.view = view;
       const user = userEvent.setup();
@@ -892,6 +898,8 @@ describe("PeoplePanel", () => {
       const view = sharedView();
       view.rows[29] = slot(30, null);
       view.freeJuz = [30];
+      view.unsharedJuz = [];
+      view.sharing = { ...view.sharing, open: false };
       m.view = view;
       m.fns.moveJuz = vi.fn().mockResolvedValue({ error: "too_many" });
       const user = userEvent.setup();

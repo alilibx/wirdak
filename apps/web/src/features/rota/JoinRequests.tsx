@@ -37,11 +37,10 @@ function JoinRequestCard({
   const share = view.freeJuz.length === 0 && view.sharing.open;
   // The ajza' to pick from, each with who reads it when it is shared onto.
   const choices: { juz: number; with: string | null }[] = share
-    ? view.rows.flatMap((row) =>
-        row.participant !== null && row.partner === null
-          ? [{ juz: row.juz, with: row.participant.name }]
-          : [],
-      )
+    ? view.unsharedJuz.map((n) => ({
+        juz: n,
+        with: view.rows[n - 1]?.participant?.name ?? null,
+      }))
     : view.freeJuz.map((n) => ({ juz: n, with: null }));
   // The juz' may be taken while the card is open: fall back to the first one left.
   const choice = choices.find((c) => c.juz === chosen) ?? choices[0];

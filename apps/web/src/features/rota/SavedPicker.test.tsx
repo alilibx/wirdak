@@ -68,6 +68,11 @@ function freeJuz(
   { open = false, shared = 0 }: { open?: boolean; shared?: number } = {},
 ): PeopleView {
   const free = Array.from({ length: n }, (_, i) => i + 2);
+  const rows = Array.from({ length: 30 }, (_, i) => ({
+    juz: i + 1,
+    participant: free.includes(i + 1) ? null : reader(i + 1),
+    partner: i < shared ? reader(31 + i) : null,
+  }));
   return {
     title: "ختمة العائلة",
     archived: false,
@@ -75,13 +80,15 @@ function freeJuz(
     joinLink: null,
     requests: [],
     target: { number: 2, date: "2026-10-31", isFirst: false },
-    rows: Array.from({ length: 30 }, (_, i) => ({
-      juz: i + 1,
-      participant: free.includes(i + 1) ? null : reader(i + 1),
-      partner: i < shared ? reader(31 + i) : null,
-    })),
+    rows,
     participants: [],
     freeJuz: free,
+    // As the server lists them: the ajza' one person reads, once sharing is open.
+    unsharedJuz: open
+      ? rows
+          .filter((r) => r.participant !== null && r.partner === null)
+          .map((r) => r.juz)
+      : [],
     maxSlots: 2,
     phoneExample: null,
     leftoverBox: true,

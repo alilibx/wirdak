@@ -232,6 +232,7 @@ function peopleView(
     freeJuz: Array.from({ length: 30 }, (_, i) => i + 1).filter(
       (j) => !byJuz.has(j),
     ),
+    unsharedJuz: [],
     maxSlots: 3,
     leftoverBox: true,
     phoneExample: null,

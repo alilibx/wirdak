@@ -121,6 +121,7 @@ const people = {
   })),
   participants: [{ ...organizer, juz: [1], heldSlots: 1, shared: [] }],
   freeJuz: Array.from({ length: 29 }, (_, i) => i + 2),
+  unsharedJuz: [],
   maxSlots: 3,
   leftoverBox: true,
   sharing: { on: false, open: false, readers: 1, shared: 0 },

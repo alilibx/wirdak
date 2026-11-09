@@ -64,6 +64,10 @@ function view(name: string | null, full = false): PeopleView {
     rows,
     participants: [],
     freeJuz,
+    // As the server lists them: the ajza' one person reads, once sharing is open.
+    unsharedJuz: full
+      ? rows.filter((r) => r.partner === null).map((r) => r.juz)
+      : [],
     maxSlots: 2,
     phoneExample: null,
     leftoverBox: true,
@@ -181,9 +185,21 @@ describe("JoinRequests", () => {
     });
   });
 
+  it("offers only the ajza' the server says the viewer may share", () => {
+    // A co-organizer looking: juz' 2 and 3 belong to people running the khatma.
+    const coView = view("خالد", true);
+    coView.unsharedJuz = coView.unsharedJuz.filter((j) => j !== 2 && j !== 3);
+    render(<JoinRequests inviteCode="CODE" view={coView} />);
+    const options = within(screen.getByLabelText(t.rota.requestJuz))
+      .getAllByRole("option")
+      .map((o) => Number((o as HTMLOptionElement).value));
+    expect(options).toEqual(Array.from({ length: 27 }, (_, i) => i + 4));
+  });
+
   it("with every juz' taken and sharing closed, says so and offers no accept", () => {
     const closed = view("خالد", true);
     closed.sharing = { ...closed.sharing, open: false };
+    closed.unsharedJuz = [];
     render(<JoinRequests inviteCode="CODE" view={closed} />);
     expect(screen.getByText(t.rota.addErrors.no_free_juz!)).toBeVisible();
     expect(

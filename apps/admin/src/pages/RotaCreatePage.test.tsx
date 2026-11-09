@@ -79,6 +79,7 @@ const people = {
   rows: [],
   participants: [organizer],
   freeJuz: [],
+  unsharedJuz: [],
   maxSlots: 3,
 };
 

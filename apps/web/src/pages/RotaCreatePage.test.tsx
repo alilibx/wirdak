@@ -109,6 +109,7 @@ function peopleView(people: Person[]) {
     freeJuz: Array.from({ length: 30 }, (_, i) => i + 1).filter(
       (juz) => !holder.has(juz),
     ),
+    unsharedJuz: [],
     maxSlots: 3,
   };
 }

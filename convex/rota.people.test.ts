@@ -1940,3 +1940,36 @@ test("a co-organizer's batch of saved people passes over the ajza' of those runn
     null,
   ]);
 });
+
+test("people lists the ajza' the viewer may share, once sharing is open", async () => {
+  const t = convexTest(schema, modules);
+  const s = await setup(t);
+  const co = await person(t);
+  const coPhone = (await t.run((ctx) => ctx.db.get(co.personId)))!.phone;
+  const coP = participantId(await add(t, s, { juz: 2, phone: coPhone }));
+  await fillAll(t, s, [2, 30]);
+  await t.mutation(api.coOrganizers.set, {
+    sessionToken: s.token,
+    inviteCode: s.inviteCode,
+    candidateId: `p:${coP}`,
+    readings: true,
+    people: true,
+    settings: true,
+  });
+  // Juz' 30 has no reader yet: nothing can be shared.
+  expect((await people(t, s))?.unsharedJuz).toEqual([]);
+
+  await add(t, s, { juz: 30 });
+  await share(t, s, 4);
+  const all = Array.from({ length: 30 }, (_, i) => i + 1);
+  expect((await people(t, s))?.unsharedJuz).toEqual(all.filter((j) => j !== 4));
+  // A co-organizer may not share the owner's juz' 1, nor their own juz' 2.
+  const coView = await t.query(api.rota.people, {
+    sessionToken: co.token,
+    inviteCode: s.inviteCode,
+  });
+  expect(coView?.unsharedJuz).toEqual(all.filter((j) => j > 2 && j !== 4));
+
+  await setSetting(t, "rotaSharedSlotsOn", false);
+  expect((await people(t, s))?.unsharedJuz).toEqual([]);
+});

@@ -219,13 +219,10 @@ function Checklist({
   // reads, lowest first. Nothing says so while a juz' is empty.
   const sharing =
     people != null && people.freeJuz.length === 0 && people.sharing.open;
-  const unshared = sharing
-    ? people.rows.filter(
-        (row) => row.participant !== null && row.partner === null,
-      ).length
-    : 0;
   // Until the free ajza' load, the server's own count is the limit (it reports who didn't fit).
-  const free = people ? people.freeJuz.length + unshared : Infinity;
+  const free = people
+    ? people.freeJuz.length + people.unsharedJuz.length
+    : Infinity;
   const room = Math.max(0, free - ticked.size);
   const locked = busy || question !== null;
   const canTick = (c: SavedContact) =>
