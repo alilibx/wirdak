@@ -82,6 +82,8 @@ test("rota: an organizer shares a juz' once all 30 have a reader", async ({
     await expect(setupPeople.getByText(name)).toBeVisible();
   }
   await page.getByRole("button", { name: t.rota.spread }).click();
+  // The result line moves «تمّ» down: wait for it, or the tap can land where the button was.
+  await expect(page.getByText(t.rota.spreadResult(3))).toBeVisible();
   await page.getByRole("button", { name: t.rota.done, exact: true }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: KHATMA_NAME }),
