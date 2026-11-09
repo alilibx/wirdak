@@ -65,8 +65,8 @@ describe("SwitchKhatmaSheet", () => {
   it("lists every khatma with progress, the held juz' and the note dot", () => {
     setup();
     const family = screen.getByRole("link", { name: /ختمة العائلة/ });
-    expect(family).toHaveTextContent(t.home.doneOf("١٨", "٣٠"));
-    expect(family).toHaveTextContent(/جزؤك: الجزء ١٢/);
+    expect(family).toHaveTextContent(t.home.doneOf("18", "30"));
+    expect(family).toHaveTextContent(/جزؤك: الجزء 12/);
     const work = screen.getByRole("link", { name: /ختمة الزملاء/ });
     expect(work).toHaveTextContent(t.notes.newMessage);
     expect(family).not.toHaveTextContent(t.notes.newMessage);
@@ -124,7 +124,7 @@ describe("SwitchKhatmaSheet", () => {
       name: /ختمة العائلة/,
       current: false,
     });
-    expect(row).toHaveTextContent("ختمة بالتناوب، ٢٦ من ٣٠ اليوم");
+    expect(row).toHaveTextContent("ختمة بالتناوب، 26 من 30 اليوم");
   });
 
   it("leaves archived khatmas out", () => {

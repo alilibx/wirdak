@@ -16,7 +16,7 @@ describe("previewTags", () => {
       PAGE,
     );
     expect(tags.title).toBe("ختمة العائلة · وِردك");
-    expect(tags.description).toBe("تمّ ١٨ من ٣٠ جزءاً · الختمة ٤ · دعاك أحمد");
+    expect(tags.description).toBe("تمّ 18 من 30 جزءاً · الختمة 4 · دعاك أحمد");
     expect(tags.url).toBe(PAGE);
   });
 
@@ -25,7 +25,7 @@ describe("previewTags", () => {
       { name: "ن", createdAt: 0, done: 0, round: 1, inviterName: null },
       PAGE,
     );
-    expect(tags.description).toBe("تمّ ٠ من ٣٠ جزءاً · الختمة ١");
+    expect(tags.description).toBe("تمّ 0 من 30 جزءاً · الختمة 1");
   });
 
   it("titles an unnamed khatma by its date", () => {
@@ -34,7 +34,7 @@ describe("previewTags", () => {
       { name: null, createdAt, done: 3, round: 1, inviterName: null },
       PAGE,
     );
-    expect(tags.title).toBe("ختمة ٣٠ أكتوبر · وِردك");
+    expect(tags.title).toBe("ختمة 30 أكتوبر · وِردك");
   });
 
   it("dates an unnamed khatma in Dubai, not UTC", () => {
@@ -43,7 +43,7 @@ describe("previewTags", () => {
       { name: null, createdAt: lateUtc, done: 0, round: 1, inviterName: null },
       PAGE,
     );
-    expect(tags.title).toBe("ختمة ٣١ أكتوبر · وِردك");
+    expect(tags.title).toBe("ختمة 31 أكتوبر · وِردك");
   });
 
   it("gives generic tags for null", () => {

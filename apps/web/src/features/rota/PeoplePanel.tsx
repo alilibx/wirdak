@@ -1,5 +1,5 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import type { PeopleView as View } from "@convex/lib/rotaOps";
 import { useMutation, useQuery } from "convex/react";
 import { useId, useState, type ReactNode } from "react";
@@ -585,7 +585,7 @@ export function PeoplePanel({
             }`;
           const number = (
             <span className="w-7 shrink-0 text-center font-semibold text-green-deep">
-              {toArabicDigits(row.juz)}
+              {toWesternDigits(row.juz)}
             </span>
           );
           /** One line of the row: a reader of it, or its add button when it has none. */

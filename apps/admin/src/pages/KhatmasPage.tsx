@@ -1,5 +1,5 @@
 import { api } from "@convex/_generated/api";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { formatDate } from "@web/lib/format";
 import { usePaginatedQuery } from "convex/react";
 import { useId } from "react";
@@ -112,8 +112,8 @@ export function KhatmasPage() {
   const today = (row: Row) =>
     row.today
       ? t.khatmas.todayProgress(
-          toArabicDigits(row.today.done),
-          toArabicDigits(row.today.total),
+          toWesternDigits(row.today.done),
+          toWesternDigits(row.today.total),
         )
       : "—";
 

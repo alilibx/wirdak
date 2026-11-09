@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Button } from "../../components/Button";
 import { Sheet } from "../../components/Sheet";
 import { t } from "../../i18n/ar";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { useRotaBackend } from "./backend";
 import { ErrorLine } from "./ErrorLine";
 import { useRotaCall } from "./useRotaCall";
@@ -63,7 +63,7 @@ export function GridTile({
           <path d="m5 12.5 4.5 4.5L19 7.5" />
         </svg>
       )}
-      {toArabicDigits(tile.juz)}
+      {toWesternDigits(tile.juz)}
     </button>
   );
 }
@@ -247,7 +247,7 @@ export function TileSheet({
   );
 }
 
-/** The line about the next reading day: «التالي: الختمة ١٣ · غداً ٨:٠٠ ص». */
+/** The line about the next reading day: «التالي: الختمة 13 · غداً 8:00 ص». */
 export function nextLine(view: TodayView, dayAt: number, timeZone: string) {
   if (view.next.date === null) return null;
   const tomorrow = addDays(localDate(Date.now(), timeZone), 1);

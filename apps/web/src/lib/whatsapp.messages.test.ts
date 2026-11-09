@@ -18,23 +18,23 @@ describe("remindMessage", () => {
     );
   });
 
-  it("lists open ajza' in Eastern digits and includes the date and link", () => {
+  it("lists open ajza' in Western digits and includes the date and link", () => {
     const end = Date.UTC(2026, 9, 30, 12);
     const text = remindMessage("ختمة العائلة", [14, 19], end, url);
-    expect(text).toContain("١٤، ١٩");
+    expect(text).toContain("14، 19");
     expect(text).toContain("حتى ");
     expect(text).toContain("بقي جزءان");
     expect(text).toContain(url);
-    expect(text.replace(url, "")).not.toMatch(/[0-9]/);
+    expect(text.replace(url, "")).not.toMatch(/[٠-٩]/);
   });
 
   it("uses natural Arabic counts", () => {
     expect(remindMessage("ن", [5], null, url)).toContain("بقي جزء واحد");
     expect(remindMessage("ن", [1, 2, 3, 4, 5], null, url)).toContain(
-      "بقي ٥ أجزاء",
+      "بقي 5 أجزاء",
     );
     expect(
       remindMessage("ن", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], null, url),
-    ).toContain("بقي ١١ جزءاً");
+    ).toContain("بقي 11 جزءاً");
   });
 });

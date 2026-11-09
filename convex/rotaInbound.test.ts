@@ -240,7 +240,7 @@ test("a join text from a listed phone joins and replies with today's juz' button
     {
       to: phoneOf(0),
       body:
-        "*ختمة*\nأهلاً قارئ 1، انضممت إلى ختمة.\nتحديث على قراءتك اليوم في الختمة ١: المسجَّل لك الجزء ١ من هذه الختمة." +
+        "*ختمة*\nأهلاً قارئ 1، انضممت إلى ختمة.\nجزؤكم اليوم هو 1. انقروا «أتممت» بعد القراءة." +
         `\n[أتممت] ${tap("done", day._id, pid)}` +
         `\n[ليس بعد] ${tap("notYet", day._id, pid)}`,
     },
@@ -285,7 +285,7 @@ test("someone added after the day started takes today's free juz' when they join
     {
       to: LATE,
       body:
-        "*ختمة*\nأهلاً جديد، انضممت إلى ختمة.\nتحديث على قراءتك اليوم في الختمة ١: المسجَّل لك الجزء ٥ من هذه الختمة." +
+        "*ختمة*\nأهلاً جديد، انضممت إلى ختمة.\nجزؤكم اليوم هو 5. انقروا «أتممت» بعد القراءة." +
         `\n[أتممت] ${tap("done", day._id, pid)}` +
         `\n[ليس بعد] ${tap("notYet", day._id, pid)}`,
     },
@@ -307,7 +307,7 @@ test("a late joiner leaves today's juz' with whoever was given it, and waits for
 
   expect((await t.run((ctx) => ctx.db.get(juz5._id)))?.readerId).toBe(other);
   expect(sent.map((m) => m.body)).toEqual([
-    "*ختمة*\nأهلاً جديد، انضممت إلى ختمة. تصلك رسالة جزئك يوم الأحد الساعة ٨ صباحاً.",
+    "*ختمة*\nأهلاً جديد، انضممت إلى ختمة. تصلك رسالة جزئك يوم الأحد الساعة 8 صباحاً.",
   ]);
 });
 
@@ -626,7 +626,7 @@ test("a join before any open day says when the first juz' comes", async () => {
   expect((await participant(t, s.participants[0]!)).joinedAt).toBe(Date.now());
   // 2027-01-16 is a Saturday; the juz' message goes at 08:00
   expect(sent.map((m) => m.body)).toEqual([
-    "*ختمة*\nأهلاً قارئ 1، انضممت إلى ختمة. تصلك رسالة جزئك يوم السبت الساعة ٨ صباحاً.",
+    "*ختمة*\nأهلاً قارئ 1، انضممت إلى ختمة. تصلك رسالة جزئك يوم السبت الساعة 8 صباحاً.",
   ]);
 });
 
@@ -801,7 +801,7 @@ test("«أتممت» marks the tapper's reads done once, and a closed day change
   await t.run((ctx) => ctx.db.patch(day._id, { closedAt: Date.now() }));
   await send(t, phoneOf(0), "ليس بعد", { payload: tap("notYet", day._id, a) });
   expect(sent.map((m) => m.body)).toEqual([
-    "*ختمة*\nتقبّل الله منك. ١ من ٣٠ جزءاً تمّت اليوم.",
+    "*ختمة*\nتقبّل الله منك. 1 من 30 جزءاً تمّت اليوم.",
     `*ختمة*\n${alreadyText}`,
     `*ختمة*\n${closedText}`,
   ]);
@@ -834,7 +834,7 @@ test("the holder's «أتممت» still counts after their juz' was reassigned",
     null,
   );
   expect(sent.map((m) => m.body)).toEqual([
-    "*ختمة*\nتقبّل الله منك. ١ من ٣٠ جزءاً تمّت اليوم.",
+    "*ختمة*\nتقبّل الله منك. 1 من 30 جزءاً تمّت اليوم.",
   ]);
 });
 
@@ -854,7 +854,7 @@ test("a holder's typed «تم» counts for the juz' reassigned away", async () =
     Date.now(),
   );
   expect(sent.map((m) => m.body)).toEqual([
-    "*ختمة*\nتقبّل الله منك. ١ من ٣٠ جزءاً تمّت اليوم.",
+    "*ختمة*\nتقبّل الله منك. 1 من 30 جزءاً تمّت اليوم.",
   ]);
 });
 
@@ -960,7 +960,7 @@ test("«ليس بعد» from the partner sets partnerNotYetAt", async () => {
   expect(read.partnerNotYetAt).toBe(Date.now());
   expect(read.notYetAt ?? null).toBeNull();
   expect(read.doneAt).toBeNull();
-  expect(sent.map((m) => m.body)).toEqual([`*ختمة*\n${notYetText("٤ عصراً")}`]);
+  expect(sent.map((m) => m.body)).toEqual([`*ختمة*\n${notYetText("4 عصراً")}`]);
 });
 
 test("«ليس بعد» from the partner after the juz' is done gets the thanks reply", async () => {
@@ -1175,7 +1175,7 @@ test("the tap that completes the day brings the dua, and the others get the comp
   await send(t, phoneOf(0), "أتممت", { payload: tap("done", day._id, a) });
 
   expect(sent.map((m) => m.body)).toEqual([
-    "*ختمة*\nتقبّل الله منك. ٣٠ من ٣٠ جزءاً تمّت اليوم.",
+    "*ختمة*\nتقبّل الله منك. 30 من 30 جزءاً تمّت اليوم.",
     `*ختمة*\n${duaText()}`,
   ]);
   const after = await t.run((ctx) => ctx.db.get(day._id));
@@ -1203,7 +1203,7 @@ test("«ليس بعد» stamps the reads and names the reminder time while it is
   vi.setSystemTime(dubai("2027-01-16T17:00"));
   await send(t, phoneOf(0), "ليس بعد", { payload: tap("notYet", day._id, a) });
   expect(sent.map((m) => m.body)).toEqual([
-    "*ختمة*\nلا بأس، نذكّرك الساعة ٤ عصراً.",
+    "*ختمة*\nلا بأس، نذكّرك الساعة 4 عصراً.",
     "*ختمة*\nلا بأس.",
   ]);
 });
@@ -1351,7 +1351,7 @@ test("typed «تم» with two open khatmas replies with two buttons and changes 
     (await readsOf(t, dayOne._id)).filter((r) => r.doneAt !== null),
   ).toHaveLength(1);
   expect(sent.at(-1)?.body).toBe(
-    "*ختمة*\nتقبّل الله منك. ١ من ٣٠ جزءاً تمّت اليوم.",
+    "*ختمة*\nتقبّل الله منك. 1 من 30 جزءاً تمّت اليوم.",
   );
 
   // And with nothing left, «تم» is already recorded.
@@ -1384,7 +1384,7 @@ test("which-khatma buttons keep titles apart after the 20-character cut", async 
   expect(Array.from(base)).toHaveLength(20);
   const open = await openKhatmas(t, [`${base} أ`, `${base} ب`, "ختمة"]);
   await send(t, phoneOf(0), "تم");
-  const second = `${Array.from(base).slice(0, 18).join("").trimEnd()} ٢`;
+  const second = `${Array.from(base).slice(0, 18).join("").trimEnd()} 2`;
   const ids = open.map(({ s, day }) =>
     tap("done", day._id, s.participants[0]!),
   );
@@ -1413,7 +1413,7 @@ test("typed «ليس بعد» and «الدعاء» answer a joined member", asyn
   await send(t, phoneOf(0), "بعدين");
   await send(t, phoneOf(0), "الدعاء");
   expect(sent.map((m) => m.body)).toEqual([
-    "*ختمة*\nلا بأس، نذكّرك الساعة ٤ عصراً.",
+    "*ختمة*\nلا بأس، نذكّرك الساعة 4 عصراً.",
     duaText(),
   ]);
   expect(

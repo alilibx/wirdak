@@ -221,7 +221,7 @@ describe("SavedPicker", () => {
   it("the room line reads right for one, two, and more", () => {
     expect(t.rota.savedRoom(1)).toBe("يتّسع لشخص واحد.");
     expect(t.rota.savedRoom(2)).toBe("يتّسع لشخصين.");
-    expect(t.rota.savedRoom(5)).toBe("يتّسع لـ٥ أشخاص.");
+    expect(t.rota.savedRoom(5)).toBe("يتّسع لـ5 أشخاص.");
   });
 
   it("the result says who was added, who didn't fit, and who was skipped", () => {
@@ -229,7 +229,7 @@ describe("SavedPicker", () => {
       "أضفنا شخصين. لم يتّسع لشخص واحد لأن الأجزاء اكتملت. تركنا شخصاً واحداً لأنه في الختمة أو لم يعد في قائمتك. لتصلهم رسائل الختمة يرسل كلٌّ منهم رسالة الانضمام من رابط المجموعة.",
     );
     expect(t.rota.savedManyResult({ added: 0, noRoom: 0, skipped: 3 })).toBe(
-      "لم نضف أحداً. تركنا ٣ أشخاص لأنهم في الختمة أو لم يعودوا في قائمتك.",
+      "لم نضف أحداً. تركنا 3 أشخاص لأنهم في الختمة أو لم يعودوا في قائمتك.",
     );
   });
 

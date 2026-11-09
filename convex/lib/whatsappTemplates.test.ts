@@ -30,10 +30,10 @@ const rotaNote = (
 
 test("every note kind maps to its template and body values", () => {
   const cases: [NoteKind, string, string[]][] = [
-    ["almostUp", "wirdak_almost_up", ["١٢"]],
-    ["openForHelp", "wirdak_open_for_help_v3", ["١٢"]],
-    ["thanks", "wirdak_juz_helped", ["١٢"]],
-    ["reminder", "wirdak_reminder_v2", ["١٢"]],
+    ["almostUp", "wirdak_almost_up", ["12"]],
+    ["openForHelp", "wirdak_open_for_help_v3", ["12"]],
+    ["thanks", "wirdak_juz_helped", ["12"]],
+    ["reminder", "wirdak_reminder_v2", ["12"]],
     ["completed", "wirdak_completed_v2", []],
     ["nowOrganizer", "wirdak_now_organizer_v2", []],
     ["organizerMoved", "wirdak_organizer_moved_v2", []],
@@ -56,19 +56,19 @@ test("the organizer's rota notes go out as templates with the open button", () =
   expect(send(rotaNote("rotaUnread", { juz: [5, 6] }))).toEqual({
     name: "wirdak_rota_unread",
     header: "ختمة رمضان",
-    body: ["الجزأين ٥ و٦"],
+    body: ["الجزأين 5 و6"],
     buttonParam: "j/AB12CD",
   });
   expect(send(rotaNote("rotaUnread", { juz: [26] }))?.body).toEqual([
-    "الجزء ٢٦",
+    "الجزء 26",
   ]);
   expect(send(rotaNote("rotaUnread", { juz: [3, 5, 6] }))?.body).toEqual([
-    "الأجزاء ٣، ٥ و٦",
+    "الأجزاء 3، 5 و6",
   ]);
   expect(send(rotaNote("rotaSummary", { count: 24 }))).toEqual({
     name: "wirdak_rota_summary",
     header: "ختمة رمضان",
-    body: ["٢٤"],
+    body: ["24"],
     buttonParam: "j/AB12CD",
   });
   expect(send(rotaNote("rotaJoinRequest", { name: "أحمد" }))).toEqual({
@@ -106,7 +106,7 @@ test("open for help with several ajza' uses the plural template", () => {
     NOW,
   );
   expect(t?.name).toBe(OPEN_FOR_HELP_MANY);
-  expect(t?.body).toEqual(["٣، ١٢ و١٥"]);
+  expect(t?.body).toEqual(["3، 12 و15"]);
 });
 
 test("behind never goes to WhatsApp", () => {
@@ -125,7 +125,7 @@ test("khatmaTitle: the name as one clean line, or the untitled date", () => {
     "ختمة الوالدة",
   );
   expect(khatmaTitle({ name: null, createdAt: NOW })).toBe(
-    "ختمة الخميس، ٢٩ أكتوبر",
+    "ختمة الخميس، 29 أكتوبر",
   );
   expect(khatmaTitle({ name: "ا".repeat(80), createdAt: NOW })).toHaveLength(
     60,

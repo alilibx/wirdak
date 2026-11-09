@@ -401,7 +401,7 @@ export async function welcomeMessage(
       const names = await participantNames(ctx, khatma._id);
       const partners = partnerMap(partnersIn(reads, participant._id, names));
       const juz = reads.map((r) => r.juz);
-      const text = `${welcomeText(participant.name, title, null)}\n${juzText(last.number, juz, partners)}`;
+      const text = `${welcomeText(participant.name, title, null)}\n${juzText(juz, false, partners)}`;
       const payloads = donePayloads(
         { dayId: last._id, participantId: participant._id },
         isStaging(),
@@ -452,7 +452,7 @@ function compose(
       }
       const text =
         row.kind === "juz"
-          ? juzText(number, row.juz, partners)
+          ? juzText(row.juz, true, partners)
           : row.kind === "reminder"
             ? reminderText(row.juz, partners)
             : assignedText(row.juz, number, partners);

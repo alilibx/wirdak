@@ -7,7 +7,7 @@ describe("schedule labels", () => {
   it("are exactly the six agreed labels, in order", () => {
     expect(SCHEDULES.map((s) => t.schedules[s])).toEqual([
       "يومية",
-      "كل ٣ أيام",
+      "كل 3 أيام",
       "أسبوعية",
       "كل أسبوعين",
       "شهرية",
@@ -17,11 +17,11 @@ describe("schedule labels", () => {
 });
 
 describe("separators next to numbers", () => {
-  // "·" beside Eastern Arabic digits reads as the digit zero (٠).
+  // A comma or a space separates a number from the words after it, never a middle dot.
   it("never put a middle dot beside a number", () => {
-    expect(t.home.yours("١٤", "ربما")).toBe("جزؤك: الجزء ١٤ «ربما»");
-    expect(t.celebration.subtitle("ختمة العائلة", "١٢")).toBe(
-      "الحمد لله، ختمة العائلة، الختمة ١٢",
+    expect(t.home.yours("14", "ربما")).toBe("جزؤك: الجزء 14 «ربما»");
+    expect(t.celebration.subtitle("ختمة العائلة", "12")).toBe(
+      "الحمد لله، ختمة العائلة، الختمة 12",
     );
   });
 });

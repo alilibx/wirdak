@@ -46,15 +46,15 @@ describe("CelebrationPage", () => {
     expect(screen.getByText("bar hidden")).toBeInTheDocument();
   });
 
-  it("shows the heading, the subtitle and the participant count in Eastern Arabic digits", () => {
+  it("shows the heading, the subtitle and the participant count in Western digits", () => {
     setup();
     expect(
       screen.getByRole("heading", { level: 1, name: "ختمنا القرآن معاً" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("الحمد لله، ختمة العائلة، الختمة ١٢"),
+      screen.getByText("الحمد لله، ختمة العائلة، الختمة 12"),
     ).toBeInTheDocument();
-    expect(screen.getByText("شارك فيها ٧ من أحبابك")).toBeInTheDocument();
+    expect(screen.getByText("شارك فيها 7 من أحبابك")).toBeInTheDocument();
   });
 
   it("omits the participant line when there is no count", () => {
@@ -66,7 +66,7 @@ describe("CelebrationPage", () => {
     setup();
     expect(screen.getByRole("img")).toHaveAttribute(
       "aria-label",
-      "تمّ ٣٠ من ٣٠ جزءاً",
+      "تمّ 30 من 30 جزءاً",
     );
   });
 
@@ -78,8 +78,8 @@ describe("CelebrationPage", () => {
       expect(dua).toHaveClass("font-quran");
       expect(dua).toHaveAttribute("lang", "ar");
     }
-    expect(screen.getByText("البقرة ١٢٧")).toBeInTheDocument();
-    expect(screen.getByText("البقرة ٢٠١")).toBeInTheDocument();
+    expect(screen.getByText("البقرة 127")).toBeInTheDocument();
+    expect(screen.getByText("البقرة 201")).toBeInTheDocument();
   });
 
   it("shares on WhatsApp with a message that names nobody", () => {
@@ -89,7 +89,7 @@ describe("CelebrationPage", () => {
     expect(href.startsWith("https://wa.me/?text=")).toBe(true);
     const text = decodeURIComponent(href.split("text=")[1] ?? "");
     expect(text).toContain("ختمنا القرآن معاً");
-    expect(text).toContain("١٢");
+    expect(text).toContain("12");
     expect(text).not.toContain("سارة");
     expect(text).not.toContain("ختمة العائلة");
     expect(link).toHaveAttribute("target", "_blank");

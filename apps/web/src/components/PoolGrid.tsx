@@ -1,5 +1,5 @@
 import type { TileView } from "@convex/khatmas";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { t } from "../i18n/ar";
 import { Tile } from "./Tile";
 
@@ -21,7 +21,7 @@ export function PoolGrid({ tiles, onTake, readOnly = false }: Props) {
         {/* Nothing can be taken from an archived khatma, so "N open" would promise it. */}
         {!readOnly && (
           <span className="text-base text-ink-soft">
-            {t.khatma.openCount(toArabicDigits(open))}
+            {t.khatma.openCount(toWesternDigits(open))}
           </span>
         )}
       </div>

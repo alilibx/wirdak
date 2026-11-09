@@ -1,7 +1,8 @@
 import { DUAS } from "./duas";
-import { toArabicDigits } from "./digits";
+import { toWesternDigits } from "./digits";
 import {
   cheerLead,
+  juzList,
   juzPhrase,
   juzPhraseGenitive,
   type JuzPartners,
@@ -45,7 +46,7 @@ export function juzTemplate(
   return {
     name: ROTA_JUZ,
     header: khatmaTitle(khatma),
-    body: [toArabicDigits(number), juzPhrase(juz, partners)],
+    body: [toWesternDigits(number), juzPhrase(juz, partners)],
     quickReplies: [payloads.done, payloads.notYet],
   };
 }
@@ -76,7 +77,7 @@ export function assignedTemplate(
   return {
     name: ROTA_ASSIGNED,
     header: khatmaTitle(khatma),
-    body: [juzPhraseGenitive(juz, partners), toArabicDigits(number)],
+    body: [juzPhraseGenitive(juz, partners), toWesternDigits(number)],
     quickReplies: [payloads.done, payloads.notYet],
   };
 }
@@ -102,7 +103,7 @@ export function completeTemplate(
   return {
     name: ROTA_COMPLETE,
     header: khatmaTitle(khatma),
-    body: [toArabicDigits(number)],
+    body: [toWesternDigits(number)],
     quickReplies: [duaPayload],
   };
 }
@@ -130,11 +131,11 @@ export function assignedText(
   number: number,
   partners?: JuzPartners,
 ): string {
-  return `تحديث على قراءتك: سُجِّلت لك قراءة ${juzPhraseGenitive(juz, partners)} في الختمة ${toArabicDigits(number)} لهذا اليوم.`;
+  return `تحديث على قراءتك: سُجِّلت لك قراءة ${juzPhraseGenitive(juz, partners)} في الختمة ${toWesternDigits(number)} لهذا اليوم.`;
 }
 
 export function completeText(number: number): string {
-  return `تحديث على الختمة: اكتملت قراءة الأجزاء الثلاثين في الختمة ${toArabicDigits(number)} لهذا اليوم.`;
+  return `تحديث على الختمة: اكتملت قراءة الأجزاء الثلاثين في الختمة ${toWesternDigits(number)} لهذا اليوم.`;
 }
 
 export function coveredText(juz: number[]): string {
@@ -159,15 +160,15 @@ export function weekdayText(date: string): string {
   return WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()] ?? "";
 }
 
-/** Minutes after local midnight as a 12-hour time with its part of the day: «٤ عصراً», «٨:٣٠ صباحاً». */
+/** Minutes after local midnight as a 12-hour time with its part of the day: «4 عصراً», «8:30 صباحاً». */
 export function clockText(minutes: number): string {
   const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
   const part =
     h < 12 ? "صباحاً" : h < 15 ? "ظهراً" : h < 18 ? "عصراً" : "مساءً";
-  const hour = toArabicDigits(h % 12 === 0 ? 12 : h % 12);
+  const hour = toWesternDigits(h % 12 === 0 ? 12 : h % 12);
   const time =
-    m === 0 ? hour : `${hour}:${toArabicDigits(String(m).padStart(2, "0"))}`;
+    m === 0 ? hour : `${hour}:${toWesternDigits(String(m).padStart(2, "0"))}`;
   return `${time} ${part}`;
 }
 
@@ -193,22 +194,31 @@ export function welcomeText(
 /** The name of a member accepted from a join request that came without a profile name. */
 export const NEW_MEMBER_NAME = "مشارك جديد";
 
-/** The juz' message as free-form text; the done and not-yet buttons go with it. */
+/**
+ * The juz' message as free-form text; the done and not-yet buttons go with it.
+ * `greet` is false after the welcome, which already says hello. A juz' in
+ * `partners` names who shares it, right after its number.
+ */
 export function juzText(
-  number: number,
   juz: number[],
+  greet = true,
   partners?: JuzPartners,
 ): string {
-  return `تحديث على قراءتك اليوم في الختمة ${toArabicDigits(number)}: المسجَّل لك ${juzPhrase(juz, partners)} من هذه الختمة.`;
+  const today =
+    juz.length === 1
+      ? `جزؤكم اليوم هو ${juzList(juz, partners)}`
+      : `أجزاؤكم اليوم هي ${juzList(juz, partners)}`;
+  const text = `${today}. انقروا «${ROTA_BUTTONS.done}» بعد القراءة.`;
+  return greet ? `السلام عليكم، ${text}` : text;
 }
 
 export function thanksText(doneCount: number): string {
-  return `تقبّل الله منك. ${toArabicDigits(doneCount)} من ٣٠ جزءاً تمّت اليوم.`;
+  return `تقبّل الله منك. ${toWesternDigits(doneCount)} من 30 جزءاً تمّت اليوم.`;
 }
 
 /** The answer to a «أتممت» that counted for the day that just ended, by its khatma number. */
 export function lateThanksText(number: number): string {
-  return `تقبّل الله منك. سُجّلت قراءتك في الختمة ${toArabicDigits(number)}.`;
+  return `تقبّل الله منك. سُجّلت قراءتك في الختمة ${toWesternDigits(number)}.`;
 }
 
 /** A cheer to the other readers: `name` and `juz` are only what the khatma chose to show. */
@@ -217,7 +227,7 @@ export function cheerText(
   name: string | null,
   juz: number[],
 ): string {
-  return `${cheerLead(juz, name)}، وأصبح المقروء ${toArabicDigits(doneCount)} من ٣٠ جزءاً اليوم. بارك الله في قراءتكم.`;
+  return `${cheerLead(juz, name)}، وأصبح المقروء ${toWesternDigits(doneCount)} من 30 جزءاً اليوم. بارك الله في قراءتكم.`;
 }
 
 /** `reminderTime` is the already formatted time of the day's reminder, or null with none. */

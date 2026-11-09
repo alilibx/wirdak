@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { t } from "../i18n/ar";
 import { formatDate } from "./format";
 
@@ -28,11 +28,11 @@ export function remindMessage(
   url: string,
 ): string {
   const list = openJuz
-    .map((n) => toArabicDigits(n))
+    .map((n) => toWesternDigits(n))
     .join(t.common.listSeparator);
   const remaining = t.messages.remindCount(
     openJuz.length,
-    toArabicDigits(openJuz.length),
+    toWesternDigits(openJuz.length),
   );
   const until = targetEndAt === null ? null : formatDate(targetEndAt);
   return [

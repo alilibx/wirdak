@@ -7,14 +7,14 @@ import {
   normalizeDigits,
   normalizePhone,
   phoneCountry,
-  toArabicDigits,
+  toWesternDigits,
 } from "./text";
 
 describe("digits", () => {
-  it("converts to Arabic-Indic digits", () => {
-    expect(toArabicDigits(1430)).toBe("١٤٣٠");
-    expect(toArabicDigits("12/30")).toBe("١٢/٣٠");
-    expect(toArabicDigits(0)).toBe("٠");
+  it("writes numbers and Eastern Arabic digits in Western digits", () => {
+    expect(toWesternDigits(1430)).toBe("1430");
+    expect(toWesternDigits("١٢/٣٠")).toBe("12/30");
+    expect(toWesternDigits("٠")).toBe("0");
   });
 
   it("normalizes Arabic-Indic and Persian digits to ASCII", () => {

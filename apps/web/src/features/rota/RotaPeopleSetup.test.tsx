@@ -173,7 +173,7 @@ describe("RotaPeopleSetup: bringing people in", () => {
     const button = screen.getByRole("button", {
       name: new RegExp(t.rota.importTitle("ختمة الجيران")),
     });
-    expect(button).toHaveTextContent("٢٧ عضواً، بالأسماء فقط");
+    expect(button).toHaveTextContent("27 عضواً، بالأسماء فقط");
     expect(screen.getByText(t.rota.importHint)).toBeInTheDocument();
   });
 
@@ -195,7 +195,7 @@ describe("RotaPeopleSetup: bringing people in", () => {
     });
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(t.rota.importResult(25, 2));
-    expect(status).toHaveTextContent("٢٥ شخصاً");
+    expect(status).toHaveTextContent("25 شخصاً");
     expect(status).toHaveTextContent("شخصين");
   });
 
@@ -212,8 +212,8 @@ describe("RotaPeopleSetup: bringing people in", () => {
     );
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(t.rota.importResult(45, 0, 15));
-    expect(status).toHaveTextContent("أضفنا ٤٥ شخصاً.");
-    expect(status).toHaveTextContent("يشترك ١٥ شخصاً منهم في جزء");
+    expect(status).toHaveTextContent("أضفنا 45 شخصاً.");
+    expect(status).toHaveTextContent("يشترك 15 شخصاً منهم في جزء");
     // None shared, nothing said about it.
     expect(t.rota.importResult(3, 0, 0)).toBe(t.rota.importResult(3, 0));
     expect(t.rota.importResult(3, 0)).not.toContain("يشترك");
@@ -233,9 +233,9 @@ describe("RotaPeopleSetup: bringing people in", () => {
     renderSetup();
     const list = screen.getByRole("list", { name: t.rota.peopleList });
     const rows = within(list).getAllByRole("listitem");
-    expect(rows[0]).toHaveTextContent("الأجزاء ١ و٤ (مشترك)");
-    expect(rows[1]).toHaveTextContent("الجزء ٤ (مشترك)");
-    expect(rows[2]).toHaveTextContent("الجزء ٥");
+    expect(rows[0]).toHaveTextContent("الأجزاء 1 و4 (مشترك)");
+    expect(rows[1]).toHaveTextContent("الجزء 4 (مشترك)");
+    expect(rows[2]).toHaveTextContent("الجزء 5");
     expect(rows[2]).not.toHaveTextContent("مشترك");
   });
 

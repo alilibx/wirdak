@@ -2,10 +2,11 @@
 // file by file without bundling: no Vite aliases (`@convex/…`), no extensionless
 // imports, and nothing from the app (`format.ts`, `i18n/ar.ts`). Keep it that way;
 // invite.node.test.ts loads the compiled closure in plain Node.
-import { toArabicDigits } from "../../../../convex/lib/digits.js";
+import { toWesternDigits } from "../../../../convex/lib/digits.js";
 
 // A fixed zone: the function runs in UTC on Vercel, which would shift the day.
 const dateFormat = new Intl.DateTimeFormat("ar", {
+  numberingSystem: "latn",
   day: "numeric",
   month: "long",
   timeZone: "Asia/Dubai",
@@ -52,8 +53,8 @@ export function previewTags(p: PreviewData | null, pageUrl: string): OgTags {
   }
   // Same wording as `t.khatma.untitled` in i18n/ar.ts; change both together.
   const name =
-    p.name ?? `ختمة ${toArabicDigits(dateFormat.format(p.createdAt))}`;
-  const progress = `تمّ ${toArabicDigits(p.done)} من ٣٠ جزءاً · الختمة ${toArabicDigits(p.round)}`;
+    p.name ?? `ختمة ${toWesternDigits(dateFormat.format(p.createdAt))}`;
+  const progress = `تمّ ${toWesternDigits(p.done)} من 30 جزءاً · الختمة ${toWesternDigits(p.round)}`;
   return {
     title: `${name} · ${BRAND}`,
     description:

@@ -1,6 +1,6 @@
 import type { KhatmaView } from "@convex/khatmas";
 import { JUZ } from "@convex/lib/juz";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { t } from "../i18n/ar";
 import { Button } from "./Button";
 
@@ -45,7 +45,7 @@ export function MainCard({
         </div>
         <div className="mt-1.5 mb-0.5 flex items-baseline gap-3">
           <span className="text-[3.4rem] leading-none font-bold text-saffron-ink">
-            {toArabicDigits(holding)}
+            {toWesternDigits(holding)}
           </span>
           {juz && (
             <span className="font-display text-[2rem] text-ink">
@@ -92,7 +92,7 @@ export function MainCard({
         </Button>
         {juz && (
           <p className="mt-3 text-center text-ink-soft">
-            {t.card.suggest(toArabicDigits(suggestion), juz.name)}
+            {t.card.suggest(toWesternDigits(suggestion), juz.name)}
           </p>
         )}
         <div className="text-center">

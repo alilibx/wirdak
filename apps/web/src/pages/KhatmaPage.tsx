@@ -1,7 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { KhatmaView } from "@convex/khatmas";
 import type { NoteView } from "@convex/notes";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { useQuery } from "convex/react";
 import { useEffect, useId, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
@@ -292,7 +292,7 @@ function Chips({ view }: { view: KhatmaView }) {
   return (
     <div className="mt-2 flex flex-wrap gap-2">
       <span className={chip}>
-        {t.khatma.round(toArabicDigits(view.roundNumber))}
+        {t.khatma.round(toWesternDigits(view.roundNumber))}
       </span>
       <span className={chip}>{t.schedules[view.schedule]}</span>
       {view.targetEndAt !== null && (
@@ -308,7 +308,7 @@ function GroupTotal({ view }: { view: KhatmaView }) {
   if (view.completedRounds === 0) return null;
   return (
     <p className="mt-5 text-center text-ink-soft">
-      {t.khatma.groupTotal(toArabicDigits(view.completedRounds))}
+      {t.khatma.groupTotal(toWesternDigits(view.completedRounds))}
     </p>
   );
 }

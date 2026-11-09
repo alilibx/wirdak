@@ -162,7 +162,7 @@ describe("take", () => {
     m.take.mockResolvedValue({ ok: true });
     const { user } = setup(makeView({ me: signedIn() }));
     await user.click(screen.getByRole("button", { name: "خذ جزءاً" }));
-    const sheet = screen.getByRole("dialog", { name: "الجزء ٣" });
+    const sheet = screen.getByRole("dialog", { name: "الجزء 3" });
     expect(sheet).toHaveTextContent("يبدأ من سورة");
     await user.click(
       within(sheet).getByRole("button", { name: "نعم، هذا جزئي" }),
@@ -172,14 +172,14 @@ describe("take", () => {
       inviteCode: "CODE",
       juz: 3,
     });
-    expect(toast()).toHaveTextContent("الجزء ٣ لك الآن. يسّر الله لك");
+    expect(toast()).toHaveTextContent("الجزء 3 لك الآن. يسّر الله لك");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("opens the sheet for the tile that was tapped, and 'not now' closes it", async () => {
     const { user } = setup(makeView({ me: signedIn() }), "/j/CODE?tab=pool");
-    await user.click(screen.getByRole("button", { name: /^الجزء ٩،/ }));
-    const sheet = screen.getByRole("dialog", { name: "الجزء ٩" });
+    await user.click(screen.getByRole("button", { name: /^الجزء 9،/ }));
+    const sheet = screen.getByRole("dialog", { name: "الجزء 9" });
     await user.click(within(sheet).getByRole("button", { name: "ليس الآن" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(m.take).not.toHaveBeenCalled();
@@ -199,13 +199,13 @@ describe("take", () => {
         me: signedIn({ suggestion: 4 }),
       }),
     );
-    expect(screen.getByRole("dialog", { name: "الجزء ٤" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "الجزء 4" })).toBeInTheDocument();
   });
 
   it("switches to جزئي after a take from الأجزاء", async () => {
     m.take.mockResolvedValue({ ok: true });
     const { user } = setup(makeView({ me: signedIn() }), "/j/CODE?tab=pool");
-    await user.click(screen.getByRole("button", { name: /^الجزء ٥،/ }));
+    await user.click(screen.getByRole("button", { name: /^الجزء 5،/ }));
     await user.click(screen.getByRole("button", { name: "نعم، هذا جزئي" }));
     expect(screen.getByRole("tab", { name: t.nav.tabs.mine })).toHaveAttribute(
       "aria-selected",
@@ -216,7 +216,7 @@ describe("take", () => {
   it("puts focus on the جزئي tab after a take from الأجزاء", async () => {
     m.take.mockResolvedValue({ ok: true });
     const { user } = setup(makeView({ me: signedIn() }), "/j/CODE?tab=pool");
-    await user.click(screen.getByRole("button", { name: /^الجزء ٥،/ }));
+    await user.click(screen.getByRole("button", { name: /^الجزء 5،/ }));
     await user.click(screen.getByRole("button", { name: "نعم، هذا جزئي" }));
     expect(screen.getByRole("tab", { name: t.nav.tabs.mine })).toHaveFocus();
   });
@@ -224,7 +224,7 @@ describe("take", () => {
   it("stays on the pool tab when the take fails", async () => {
     m.take.mockResolvedValue({ ok: false, reason: "taken" });
     const { user } = setup(makeView({ me: signedIn() }), "/j/CODE?tab=pool");
-    await user.click(screen.getByRole("button", { name: /^الجزء ٥،/ }));
+    await user.click(screen.getByRole("button", { name: /^الجزء 5،/ }));
     await user.click(screen.getByRole("button", { name: "نعم، هذا جزئي" }));
     expect(screen.getByRole("tab", { name: t.nav.tabs.pool })).toHaveAttribute(
       "aria-selected",
@@ -331,7 +331,7 @@ describe("take", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await raw.click(screen.getByRole("button", { name: /^الجزء ٩،/ }));
+    await raw.click(screen.getByRole("button", { name: /^الجزء 9،/ }));
     await raw.click(screen.getByRole("button", { name: "نعم، هذا جزئي" }));
     await raw.click(screen.getByRole("link", { name: "other khatma" }));
     expect(screen.getByTestId("where")).toHaveTextContent("/j/OTHER");
@@ -348,10 +348,10 @@ describe("a session revoked elsewhere", () => {
   it("a take forgets the dead token and opens verification for the same juz'", async () => {
     m.take.mockRejectedValue(signedOutError());
     const { user } = setup(makeView({ me: signedIn() }), "/j/CODE?tab=pool");
-    await user.click(screen.getByRole("button", { name: /^الجزء ٩،/ }));
+    await user.click(screen.getByRole("button", { name: /^الجزء 9،/ }));
     await user.click(screen.getByRole("button", { name: t.take.confirm }));
     expect(m.cleared).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("dialog", { name: "الجزء ٩" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "الجزء 9" })).toBeNull();
     const verify = screen.getByRole("dialog", { name: t.verify.beforeTake });
     expect(JSON.parse(verify.dataset.intent ?? "null")).toEqual({
       kind: "take",
@@ -425,7 +425,7 @@ describe("whose account takes the juz' (shared phone)", () => {
   it("the take sheet names the signed-in account", async () => {
     const { user } = setup(makeView({ me: signedIn() }));
     await user.click(screen.getByRole("button", { name: "خذ جزءاً" }));
-    const sheet = screen.getByRole("dialog", { name: "الجزء ٣" });
+    const sheet = screen.getByRole("dialog", { name: "الجزء 3" });
     expect(sheet).toHaveTextContent(t.take.as("علي"));
     expect(
       within(sheet).getByRole("button", { name: t.take.notYou("علي") }),
@@ -438,7 +438,7 @@ describe("whose account takes the juz' (shared phone)", () => {
       makeView({ me: signedIn() }),
       "/j/CODE?tab=pool",
     );
-    await user.click(screen.getByRole("button", { name: /^الجزء ٩،/ }));
+    await user.click(screen.getByRole("button", { name: /^الجزء 9،/ }));
     await user.click(
       screen.getByRole("button", { name: t.take.notYou("علي") }),
     );
@@ -451,13 +451,13 @@ describe("whose account takes the juz' (shared phone)", () => {
       inviteCode: "CODE",
       juz: 9,
     });
-    expect(screen.queryByRole("dialog", { name: "الجزء ٩" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "الجزء 9" })).toBeNull();
 
     show(signedOutView()); // the view reloads without a token
     await user.click(screen.getByRole("button", { name: "verified" }));
     m.token = "sara";
     show(makeView({ me: signedIn({ displayName: "سارة", suggestion: 1 }) }));
-    const sheet = screen.getByRole("dialog", { name: "الجزء ٩" });
+    const sheet = screen.getByRole("dialog", { name: "الجزء 9" });
     expect(sheet).toHaveTextContent(t.take.as("سارة"));
     await user.click(
       within(sheet).getByRole("button", { name: t.take.confirm }),
@@ -477,7 +477,7 @@ describe("whose account takes the juz' (shared phone)", () => {
       screen.getByRole("button", { name: t.take.notYou("علي") }),
     );
     expect(m.cleared).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: "الجزء ٣" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "الجزء 3" })).toBeInTheDocument();
     expect(toast()).toHaveTextContent(t.errors.network);
   });
 });
@@ -520,7 +520,7 @@ describe("stale state", () => {
   it("any user action ends the wait", async () => {
     const { user, show } = await lostRace();
     await user.click(screen.getByRole("tab", { name: t.nav.tabs.pool }));
-    await user.click(screen.getByRole("button", { name: /^الجزء ٩،/ }));
+    await user.click(screen.getByRole("button", { name: /^الجزء 9،/ }));
     await user.click(screen.getByRole("button", { name: "ليس الآن" }));
     show(later());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -529,7 +529,7 @@ describe("stale state", () => {
   it("a finished attempt does not reopen again on the next change", async () => {
     const { user, show } = await lostRace();
     show(later());
-    expect(screen.getByRole("dialog", { name: "الجزء ٤" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "الجزء 4" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "ليس الآن" }));
     show(
       makeView({
@@ -600,7 +600,7 @@ describe("take after verification", () => {
         me: signedIn({ suggestion: 5 }),
       }),
     );
-    expect(screen.getByRole("dialog", { name: "الجزء ٣" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "الجزء 3" })).toBeInTheDocument();
   });
 
   it("does not open the sheet when the person already holds a juz'", async () => {
@@ -648,7 +648,7 @@ describe("take after verification", () => {
       m.token = "new";
       show(makeView({ me: signedIn({ suggestion: 1 }) }));
       expect(
-        screen.getByRole("dialog", { name: "الجزء ٧" }),
+        screen.getByRole("dialog", { name: "الجزء 7" }),
       ).toBeInTheDocument();
     });
 
@@ -844,7 +844,7 @@ describe("release", () => {
       name: "لا بأس، جزاك الله خيراً",
     });
     expect(sheet).toHaveTextContent(
-      "سنعيد الجزء ٥ ليقرأه غيرك. لن يعرف أحد أنك أعدته.",
+      "سنعيد الجزء 5 ليقرأه غيرك. لن يعرف أحد أنك أعدته.",
     );
     await user.click(
       within(sheet).getByRole("button", { name: "أعِده إلى الختمة" }),
@@ -902,12 +902,12 @@ describe("celebration", () => {
       screen.getByRole("heading", { level: 1, name: "ختمنا القرآن معاً" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("الحمد لله، ختمة العائلة، الختمة ١٢"),
+      screen.getByText("الحمد لله، ختمة العائلة، الختمة 12"),
     ).toBeInTheDocument();
-    expect(screen.getByText("شارك فيها ٧ من أحبابك")).toBeInTheDocument();
+    expect(screen.getByText("شارك فيها 7 من أحبابك")).toBeInTheDocument();
     expect(screen.getByText(/رَبَّنَا تَقَبَّلْ/)).toBeInTheDocument();
-    expect(screen.getByText("البقرة ١٢٧")).toBeInTheDocument();
-    expect(screen.getByText("البقرة ٢٠١")).toBeInTheDocument();
+    expect(screen.getByText("البقرة 127")).toBeInTheDocument();
+    expect(screen.getByText("البقرة 201")).toBeInTheDocument();
     expect(screen.queryByText("الأجزاء الثلاثون")).not.toBeInTheDocument();
   });
 
@@ -982,8 +982,8 @@ describe("notes", () => {
       note(),
     ];
     setup(holdingView());
-    const first = screen.getByText(/^أحدهم يُكمل الجزء ٩ الآن/);
-    const second = screen.getByText(/^مهلة الجزء ٥ أوشكت/);
+    const first = screen.getByText(/^أحدهم يُكمل الجزء 9 الآن/);
+    const second = screen.getByText(/^مهلة الجزء 5 أوشكت/);
     const card = screen.getByText(t.card.held);
     expect(
       first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -1064,11 +1064,11 @@ describe("notes", () => {
       }),
     );
     expect(
-      screen.getByText(/^الأجزاء ١٢، ١٥ و١٨ متاحة لمن يساعد/),
+      screen.getByText(/^الأجزاء 12، 15 و18 متاحة لمن يساعد/),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "خذ الجزء" }));
     expect(
-      screen.getByRole("dialog", { name: "الجزء ١٨" }),
+      screen.getByRole("dialog", { name: "الجزء 18" }),
     ).toBeInTheDocument();
   });
 
@@ -1088,7 +1088,7 @@ describe("notes", () => {
       screen.getByRole("region", { name: t.notes.heading }),
     );
     await user.click(inNotes.getByRole("button", { name: "خذ جزءاً" }));
-    expect(screen.getByRole("dialog", { name: "الجزء ٧" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "الجزء 7" })).toBeInTheDocument();
   });
 
   it("ok dismisses the note", async () => {
@@ -1111,7 +1111,7 @@ describe("taken over", () => {
     );
     await user.click(screen.getByRole("button", { name: "أتممتُ القراءة" }));
     expect(toast()).toHaveTextContent(
-      "أحدهم يُكمل الجزء ٥ الآن. جزاكما الله خيراً.",
+      "أحدهم يُكمل الجزء 5 الآن. جزاكما الله خيراً.",
     );
     expect(
       screen.queryByRole("button", { name: t.toast.undo }),

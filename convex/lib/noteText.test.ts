@@ -6,24 +6,24 @@ const DAY = 86_400_000;
 
 const base = { juz: [], count: null, until: null };
 
-test("noteText covers every kind in Eastern digits", () => {
+test("noteText covers every kind in Western digits", () => {
   expect(noteText({ ...base, kind: "almostUp", juz: [12] })).toBe(
-    "مهلة الجزء ١٢ أوشكت على الانتهاء. هل تحتاج وقتاً أطول؟",
+    "مهلة الجزء 12 أوشكت على الانتهاء. هل تحتاج وقتاً أطول؟",
   );
   expect(noteText({ ...base, kind: "openForHelp", juz: [12] })).toBe(
-    "الجزء ١٢ متاح لمن يساعد. هل تأخذه أو ترسل الدعوة؟",
+    "الجزء 12 متاح لمن يساعد. هل تأخذه أو ترسل الدعوة؟",
   );
   expect(noteText({ ...base, kind: "openForHelp", juz: [12, 15] })).toBe(
-    "الأجزاء ١٢ و١٥ متاحة لمن يساعد. هل تأخذ أحدها أو ترسل الدعوة؟",
+    "الأجزاء 12 و15 متاحة لمن يساعد. هل تأخذ أحدها أو ترسل الدعوة؟",
   );
   expect(
     noteText({ ...base, kind: "openForHelp", juz: [3, 12, 15] }),
-  ).toContain("٣، ١٢ و١٥");
+  ).toContain("3، 12 و15");
   expect(noteText({ ...base, kind: "thanks", juz: [7] })).toBe(
-    "أحدهم يُكمل الجزء ٧ الآن. جزاكما الله خيراً.",
+    "أحدهم يُكمل الجزء 7 الآن. جزاكما الله خيراً.",
   );
   expect(noteText({ ...base, kind: "reminder", juz: [30] })).toBe(
-    "الجزء ٣٠ في انتظارك، يسّر الله لك.",
+    "الجزء 30 في انتظارك، يسّر الله لك.",
   );
   expect(noteText({ ...base, kind: "completed" })).toBe(
     "ختمنا القرآن معاً، الحمد لله",
@@ -41,10 +41,10 @@ test("behind agrees the count with the noun", () => {
     noteText({ ...base, kind: "behind", count }, NOW);
   expect(text(1)).toBe("الختمة تحتاج جزءاً واحداً. هل تأخذ جزءاً؟");
   expect(text(2)).toContain("جزأين");
-  expect(text(3)).toContain("٣ أجزاء");
-  expect(text(10)).toContain("١٠ أجزاء");
-  expect(text(11)).toContain("١١ جزءاً");
-  expect(text(12)).toContain("١٢ جزءاً");
+  expect(text(3)).toContain("3 أجزاء");
+  expect(text(10)).toContain("10 أجزاء");
+  expect(text(11)).toContain("11 جزءاً");
+  expect(text(12)).toContain("12 جزءاً");
 });
 
 test("behind names the weekday within 6 days, the date beyond, and nothing once passed", () => {
@@ -55,22 +55,22 @@ test("behind names the weekday within 6 days, the date beyond, and nothing once 
   );
   expect(text(NOW + 6 * DAY)).toContain("قبل الخميس");
   expect(text(NOW + 10 * DAY)).toBe(
-    "الختمة تحتاج جزأين قبل ٢٥ يناير. هل تأخذ جزءاً؟",
+    "الختمة تحتاج جزأين قبل 25 يناير. هل تأخذ جزءاً؟",
   );
   expect(text(NOW - DAY)).toBe("الختمة تحتاج جزأين. هل تأخذ جزءاً؟");
   expect(text(NOW)).toBe("الختمة تحتاج جزأين. هل تأخذ جزءاً؟");
 });
 
-test("the rota participant notes name them and count days in Arabic digits", () => {
+test("the rota participant notes name them and count days in Western digits", () => {
   const input = { ...base, name: "أحمد" };
   expect(noteText({ ...input, kind: "rotaJoinRequest" })).toBe(
     "طلب انضمام من أحمد.",
   );
   expect(noteText({ ...input, kind: "rotaSilent", count: 3 })).toBe(
-    "لم يردّ أحمد منذ ٣ أيام.",
+    "لم يردّ أحمد منذ 3 أيام.",
   );
   expect(noteText({ ...input, kind: "rotaSilent", count: 12 })).toBe(
-    "لم يردّ أحمد منذ ١٢ يوماً.",
+    "لم يردّ أحمد منذ 12 يوماً.",
   );
   expect(noteText({ ...input, kind: "rotaSilenced" })).toBe(
     "أوقفنا رسائل الختمة إلى أحمد لأنه لم يردّ منذ مدة.",
@@ -93,15 +93,15 @@ test("the rotaEnabled note tells the organizer what they can now do", () => {
 });
 
 test("the juz' phrase agrees with one, two and three or more ajza'", () => {
-  expect(juzPhrase([26])).toBe("الجزء ٢٦");
-  expect(juzPhrase([5, 6])).toBe("الجزآن ٥ و٦");
-  expect(juzPhrase([3, 5, 6])).toBe("الأجزاء ٣، ٥ و٦");
+  expect(juzPhrase([26])).toBe("الجزء 26");
+  expect(juzPhrase([5, 6])).toBe("الجزآن 5 و6");
+  expect(juzPhrase([3, 5, 6])).toBe("الأجزاء 3، 5 و6");
 });
 
 test("the genitive phrase differs only in the dual", () => {
-  expect(juzPhraseGenitive([26])).toBe("الجزء ٢٦");
-  expect(juzPhraseGenitive([5, 6])).toBe("الجزأين ٥ و٦");
-  expect(juzPhraseGenitive([3, 5, 6])).toBe("الأجزاء ٣، ٥ و٦");
+  expect(juzPhraseGenitive([26])).toBe("الجزء 26");
+  expect(juzPhraseGenitive([5, 6])).toBe("الجزأين 5 و6");
+  expect(juzPhraseGenitive([3, 5, 6])).toBe("الأجزاء 3، 5 و6");
 });
 
 test("both phrases are empty, with no stray space, for no ajza'", () => {
@@ -111,10 +111,10 @@ test("both phrases are empty, with no stray space, for no ajza'", () => {
 
 test("juzPhrase names a partner after its own juz'", () => {
   expect(juzPhrase([26], new Map([[26, "سارة"]]))).toBe(
-    "الجزء ٢٦ (مشترك مع سارة)",
+    "الجزء 26 (مشترك مع سارة)",
   );
   expect(juzPhrase([5, 6], new Map([[5, "سارة"]]))).toBe(
-    "الجزآن ٥ (مشترك مع سارة) و٦",
+    "الجزآن 5 (مشترك مع سارة) و6",
   );
   expect(
     juzPhrase(
@@ -124,9 +124,9 @@ test("juzPhrase names a partner after its own juz'", () => {
         [6, "سارة"],
       ]),
     ),
-  ).toBe("الأجزاء ٣ (مشترك مع هدى)، ٥ و٦ (مشترك مع سارة)");
+  ).toBe("الأجزاء 3 (مشترك مع هدى)، 5 و6 (مشترك مع سارة)");
   expect(juzPhraseGenitive([5, 6], new Map([[6, "سارة"]]))).toBe(
-    "الجزأين ٥ و٦ (مشترك مع سارة)",
+    "الجزأين 5 و6 (مشترك مع سارة)",
   );
 });
 
@@ -135,5 +135,5 @@ test("juzPhrase without partners is unchanged", () => {
     expect(juzPhrase(juz, new Map())).toBe(juzPhrase(juz));
     expect(juzPhraseGenitive(juz, new Map())).toBe(juzPhraseGenitive(juz));
   }
-  expect(juzPhrase([5, 6], new Map([[7, "سارة"]]))).toBe("الجزآن ٥ و٦");
+  expect(juzPhrase([5, 6], new Map([[7, "سارة"]]))).toBe("الجزآن 5 و6");
 });

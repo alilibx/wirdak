@@ -32,18 +32,18 @@ describe("formatGrace", () => {
   it.each<[Grace, string]>([
     [{ value: 1, unit: "hours" }, "ساعة"],
     [{ value: 2, unit: "hours" }, "ساعتان"],
-    [{ value: 6, unit: "hours" }, "٦ ساعات"],
-    [{ value: 10, unit: "hours" }, "١٠ ساعات"],
-    [{ value: 11, unit: "hours" }, "١١ ساعة"],
-    [{ value: 720, unit: "hours" }, "٧٢٠ ساعة"],
+    [{ value: 6, unit: "hours" }, "6 ساعات"],
+    [{ value: 10, unit: "hours" }, "10 ساعات"],
+    [{ value: 11, unit: "hours" }, "11 ساعة"],
+    [{ value: 720, unit: "hours" }, "720 ساعة"],
     [{ value: 1, unit: "days" }, "يوم"],
     [{ value: 2, unit: "days" }, "يومان"],
-    [{ value: 7, unit: "days" }, "٧ أيام"],
-    [{ value: 30, unit: "days" }, "٣٠ يوماً"],
+    [{ value: 7, unit: "days" }, "7 أيام"],
+    [{ value: 30, unit: "days" }, "30 يوماً"],
     [{ value: 1, unit: "minutes" }, "دقيقة"],
     [{ value: 2, unit: "minutes" }, "دقيقتان"],
-    [{ value: 45, unit: "minutes" }, "٤٥ دقيقة"],
-    [{ value: 5, unit: "minutes" }, "٥ دقائق"],
+    [{ value: 45, unit: "minutes" }, "45 دقيقة"],
+    [{ value: 5, unit: "minutes" }, "5 دقائق"],
   ])("%j is %s", (grace, text) => {
     expect(formatGrace(grace)).toBe(text);
   });
@@ -61,13 +61,13 @@ describe("GraceField", () => {
     ).toBeInTheDocument();
     rerender(<GraceField value={null} schedule="daily" onChange={onChange} />);
     expect(
-      screen.getByRole("button", { name: "مهلة كل جزء: ٦ ساعات · تغيير" }),
+      screen.getByRole("button", { name: "مهلة كل جزء: 6 ساعات · تغيير" }),
     ).toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
 
     rerender(<Harness schedule="daily" onChange={onChange} />);
     await user.click(
-      screen.getByRole("button", { name: "مهلة كل جزء: ٦ ساعات · تغيير" }),
+      screen.getByRole("button", { name: "مهلة كل جزء: 6 ساعات · تغيير" }),
     );
     const input = screen.getByRole("textbox");
     expect(input).toHaveAttribute("inputmode", "numeric");
@@ -83,7 +83,7 @@ describe("GraceField", () => {
     await user.type(input, "10");
     expect(onChange).toHaveBeenLastCalledWith({ value: 10, unit: "minutes" });
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "المهلة بين ٣٠ دقيقة و٣٠ يوماً.",
+      "المهلة بين 30 دقيقة و30 يوماً.",
     );
 
     await user.clear(input);
@@ -129,7 +129,7 @@ describe("GraceField", () => {
     await user.type(input, "3");
     await user.click(screen.getByRole("button", { name: "تمّ" }));
     expect(
-      screen.getByRole("button", { name: "مهلة كل جزء: ٣ أيام · تغيير" }),
+      screen.getByRole("button", { name: "مهلة كل جزء: 3 أيام · تغيير" }),
     ).toBeInTheDocument();
   });
 

@@ -1,5 +1,5 @@
 import { api } from "@convex/_generated/api";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { JUZ, JUZ_COUNT } from "@convex/lib/juz";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -108,7 +108,7 @@ function HomeContent({
               <summary className="flex min-h-14 cursor-pointer items-center gap-2 text-xl font-semibold text-ink-soft">
                 {t.home.archived}
                 <span className="rounded-full bg-paper-2 px-3 py-0.5 text-base font-medium">
-                  {toArabicDigits(archived.length)}
+                  {toWesternDigits(archived.length)}
                 </span>
               </summary>
               <ul className="mt-2 grid gap-3">
@@ -144,8 +144,8 @@ function HomeContent({
 type Card = FunctionReturnType<typeof api.khatmas.mine>[number];
 
 function KhatmaCard({ khatma }: { khatma: Card }) {
-  const total = toArabicDigits(JUZ_COUNT);
-  const done = toArabicDigits(khatma.done);
+  const total = toWesternDigits(JUZ_COUNT);
+  const done = toWesternDigits(khatma.done);
   const name = khatma.name ?? t.khatma.untitled(formatDate(khatma.createdAt));
   const heldName =
     khatma.holding === null
@@ -198,7 +198,7 @@ function KhatmaCard({ khatma }: { khatma: Card }) {
       )}
       {!khatma.archived && khatma.holding !== null && (
         <span className="mt-2 inline-block rounded-full bg-saffron-soft px-3 py-1 text-base font-semibold text-saffron-ink">
-          {t.home.yours(toArabicDigits(khatma.holding), heldName ?? "")}
+          {t.home.yours(toWesternDigits(khatma.holding), heldName ?? "")}
         </span>
       )}
     </Link>

@@ -89,7 +89,7 @@ describe("ReadingDaysField", () => {
     expect(value()).toEqual({ kind: "monthly", days: [1] });
     const group = screen.getByRole("group", { name: "في أيام الشهر:" });
     expect(within(group).getAllByRole("button")).toHaveLength(31);
-    await user.click(within(group).getByRole("button", { name: "١٥" }));
+    await user.click(within(group).getByRole("button", { name: "15" }));
     expect(value()).toEqual({ kind: "monthly", days: [1, 15] });
   });
 

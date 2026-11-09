@@ -1,5 +1,5 @@
 import { counted, type CountForms } from "./arabicCount";
-import { toArabicDigits } from "./digits";
+import { toWesternDigits } from "./digits";
 
 /**
  * The Arabic text of every in-app note and push. The web app imports this file
@@ -42,10 +42,12 @@ const DAY_MS = 86_400_000;
 const TEXT_TZ = "Asia/Dubai";
 
 const weekdayFormat = new Intl.DateTimeFormat("ar", {
+  numberingSystem: "latn",
   timeZone: TEXT_TZ,
   weekday: "long",
 });
 const dayMonthFormat = new Intl.DateTimeFormat("ar", {
+  numberingSystem: "latn",
   timeZone: TEXT_TZ,
   day: "numeric",
   month: "long",
@@ -53,34 +55,30 @@ const dayMonthFormat = new Intl.DateTimeFormat("ar", {
 
 const DAYS: CountForms = { few: "أيام", many: "يوماً", other: "يوم" };
 
-/** `١٢`, `١٢ و١٥`, `٣، ١٢ و١٥`. */
-export function juzList(juz: readonly number[]): string {
-  return listed(juz.map((n) => toArabicDigits(n)));
-}
+/** Who shares each juz' with the reader, by juz'. */
+export type JuzPartners = ReadonlyMap<number, string>;
 
-function listed(items: readonly string[]): string {
+/**
+ * `12`, `12 و15`, `3، 12 و15`. A juz' in `partners` names who shares it, right
+ * after its number: `5 (مشترك مع سارة) و6`.
+ */
+export function juzList(
+  juz: readonly number[],
+  partners?: JuzPartners,
+): string {
+  const items = juz.map((n) => {
+    const partner = partners?.get(n);
+    const digits = toWesternDigits(n);
+    return partner === undefined ? digits : `${digits} (مشترك مع ${partner})`;
+  });
   if (items.length <= 1) return items.join("");
   return `${items.slice(0, -1).join("، ")} و${items[items.length - 1]}`;
 }
 
-/** Who shares each juz' with the reader, by juz'. */
-export type JuzPartners = ReadonlyMap<number, string>;
-
-/** The list with each shared juz' followed by its partner: `٥ (مشترك مع سارة) و٦`. */
-function juzListWith(juz: readonly number[], partners?: JuzPartners): string {
-  return listed(
-    juz.map((n) => {
-      const partner = partners?.get(n);
-      const digits = toArabicDigits(n);
-      return partner === undefined ? digits : `${digits} (مشترك مع ${partner})`;
-    }),
-  );
-}
-
 /**
- * `الجزء ٢٦`, `الجزآن ٥ و٦`, `الأجزاء ٣، ٥ و٦`: the word agreeing with the list,
+ * `الجزء 26`, `الجزآن 5 و6`, `الأجزاء 3، 5 و6`: the word agreeing with the list,
  * as a subject. A juz' in `partners` names who shares it, right after its
- * number: `الجزء ٢٦ (مشترك مع سارة)`. Empty for an empty list.
+ * number: `الجزء 26 (مشترك مع سارة)`. Empty for an empty list.
  */
 export function juzPhrase(
   juz: readonly number[],
@@ -89,11 +87,11 @@ export function juzPhrase(
   if (juz.length === 0) return "";
   const word =
     juz.length === 1 ? "الجزء" : juz.length === 2 ? "الجزآن" : "الأجزاء";
-  return `${word} ${juzListWith(juz, partners)}`;
+  return `${word} ${juzList(juz, partners)}`;
 }
 
 /**
- * The same phrase after a noun or preposition («قراءة الجزأين ٥ و٦»): the dual
+ * The same phrase after a noun or preposition («قراءة الجزأين 5 و6»): the dual
  * takes its genitive form. Empty for an empty list.
  */
 export function juzPhraseGenitive(
@@ -101,7 +99,7 @@ export function juzPhraseGenitive(
   partners?: JuzPartners,
 ): string {
   return juz.length === 2
-    ? `الجزأين ${juzListWith(juz, partners)}`
+    ? `الجزأين ${juzList(juz, partners)}`
     : juzPhrase(juz, partners);
 }
 
@@ -114,24 +112,21 @@ export function cheerLead(juz: readonly number[], name: string | null): string {
   return `تمّت قراءة ${what}${name === null ? "" : ` على يد ${name}`}`;
 }
 
-/** The count with the noun agreeing: جزءاً واحداً, جزأين, ٣ أجزاء, ١١ جزءاً. */
+/** The count with the noun agreeing: جزءاً واحداً, جزأين, 3 أجزاء, 11 جزءاً. */
 function ajzaa(n: number): string {
   if (n === 1) return "جزءاً واحداً";
   if (n === 2) return "جزأين";
-  if (n >= 3 && n <= 10) return `${toArabicDigits(n)} أجزاء`;
-  return `${toArabicDigits(n)} جزءاً`;
+  if (n >= 3 && n <= 10) return `${toWesternDigits(n)} أجزاء`;
+  return `${toWesternDigits(n)} جزءاً`;
 }
 
 /** The weekday within 6 days, otherwise the day and month. */
 function when(until: number, now: number): string {
   if (until - now <= 6 * DAY_MS) return weekdayFormat.format(until);
-  return dayMonthFormat
-    .formatToParts(until)
-    .map((p) => (p.type === "day" ? toArabicDigits(p.value) : p.value))
-    .join("");
+  return toWesternDigits(dayMonthFormat.format(until));
 }
 
-/** `٣ أجزاء قبل الخميس`, or just `٣ أجزاء` with no target end ahead. */
+/** `3 أجزاء قبل الخميس`, or just `3 أجزاء` with no target end ahead. */
 export function behindPhrase(
   count: number,
   until: number | null,
@@ -157,7 +152,7 @@ export function noteText(n: NoteTextInput, now: number = Date.now()): string {
     case "behind":
       return `الختمة تحتاج ${behindPhrase(n.count ?? 0, n.until, now)}. هل تأخذ جزءاً؟`;
     case "cheer":
-      return `${cheerLead(n.juz, n.name ?? null)}، وأصبح المقروء ${toArabicDigits(n.count ?? 0)} من ٣٠ جزءاً في ختمتكم. بارك الله في قراءتكم.`;
+      return `${cheerLead(n.juz, n.name ?? null)}، وأصبح المقروء ${toWesternDigits(n.count ?? 0)} من 30 جزءاً في ختمتكم. بارك الله في قراءتكم.`;
     case "completed":
       return "ختمنا القرآن معاً، الحمد لله";
     case "nowOrganizer":
@@ -169,7 +164,7 @@ export function noteText(n: NoteTextInput, now: number = Date.now()): string {
         ? `لم تُسجَّل بعد قراءة الجزء ${juzList(n.juz)} في ختمة اليوم.`
         : `لم تُسجَّل بعد قراءة الأجزاء ${juzList(n.juz)} في ختمة اليوم.`;
     case "rotaSummary":
-      return `ختمة اليوم: ${toArabicDigits(n.count ?? 0)} من ٣٠ جزءاً تمّت.`;
+      return `ختمة اليوم: ${toWesternDigits(n.count ?? 0)} من 30 جزءاً تمّت.`;
     case "rotaJoinRequest":
       return `طلب انضمام من ${n.name ?? ""}.`;
     case "rotaSilent":

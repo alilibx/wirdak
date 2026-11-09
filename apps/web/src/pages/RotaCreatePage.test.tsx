@@ -182,10 +182,10 @@ afterEach(() => {
 describe("RotaCreatePage (step 1)", () => {
   it("shows step 1 of 2 with the name and the days, every day chosen", () => {
     renderCreate();
-    expect(screen.getByText("١ من ٢")).toBeInTheDocument();
+    expect(screen.getByText("1 من 2")).toBeInTheDocument();
     expect(screen.getByLabelText(t.rota.nameQuestion)).toHaveValue("");
     expect(screen.getByRole("radio", { name: "كل يوم" })).toBeChecked();
-    expect(screen.getByText("غداً، الجمعة ٣٠ أكتوبر")).toBeInTheDocument();
+    expect(screen.getByText("غداً، الجمعة 30 أكتوبر")).toBeInTheDocument();
     expect(screen.getByText("تستمر دائماً")).toBeInTheDocument();
   });
 
@@ -242,7 +242,7 @@ describe("RotaCreatePage (step 1)", () => {
     await user.click(screen.getByRole("button", { name: "الأحد" }));
     await user.click(screen.getByRole("button", { name: "الجمعة" }));
     // Sunday 1 November is the first reading day after Thursday.
-    expect(screen.getByText("الأحد ١ نوفمبر")).toBeInTheDocument();
+    expect(screen.getByText("الأحد 1 نوفمبر")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "التالي" }));
     expect(m.create).toHaveBeenCalledWith(
       expect.objectContaining({ firstDate: "2026-11-01" }),
@@ -269,8 +269,8 @@ describe("RotaCreatePage (step 1)", () => {
     fireEvent.change(screen.getByLabelText(t.rota.endDateInput), {
       target: { value: "2027-03-01" },
     });
-    expect(screen.getByText("الخميس ٥ نوفمبر")).toBeInTheDocument();
-    expect(screen.getByText("الاثنين ١ مارس")).toBeInTheDocument();
+    expect(screen.getByText("الخميس 5 نوفمبر")).toBeInTheDocument();
+    expect(screen.getByText("الاثنين 1 مارس")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "التالي" }));
     expect(m.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -308,7 +308,7 @@ describe("RotaCreatePage (step 1)", () => {
     expect(field).toHaveAttribute("min", "2026-10-29");
     fireEvent.change(field, { target: { value: "2026-10-29" } });
     expect(
-      screen.getByText(t.rota.today("الخميس ٢٩ أكتوبر")),
+      screen.getByText(t.rota.today("الخميس 29 أكتوبر")),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "التالي" }));
     expect(m.create).toHaveBeenCalledWith(
@@ -329,7 +329,7 @@ describe("RotaCreatePage (step 1)", () => {
     fireEvent.change(screen.getByLabelText(t.rota.startDateInput), {
       target: { value: "2026-11-05" },
     });
-    expect(screen.getByText("الجمعة ٦ نوفمبر")).toBeInTheDocument();
+    expect(screen.getByText("الجمعة 6 نوفمبر")).toBeInTheDocument();
     expect(screen.getByLabelText(t.rota.startDateInput)).toHaveValue(
       "2026-11-06",
     );
@@ -419,7 +419,7 @@ describe("RotaCreatePage (step 1)", () => {
 describe("RotaPeopleSetup (step 2)", () => {
   it("shows step 2 of 2, the fields and the organizer first as «أنا»", () => {
     renderSetup();
-    expect(screen.getByText("٢ من ٢")).toBeInTheDocument();
+    expect(screen.getByText("2 من 2")).toBeInTheDocument();
     const phone = screen.getByLabelText(t.rota.personPhone);
     expect(phone).toHaveAttribute("inputmode", "tel");
     expect(phone).toHaveAccessibleDescription(
@@ -427,7 +427,7 @@ describe("RotaPeopleSetup (step 2)", () => {
     );
     const items = within(screen.getByRole("list")).getAllByRole("listitem");
     expect(items).toHaveLength(1);
-    expect(items[0]).toHaveTextContent("١");
+    expect(items[0]).toHaveTextContent("1");
     expect(items[0]).toHaveTextContent("أنا");
   });
 
@@ -511,9 +511,9 @@ describe("RotaPeopleSetup (step 2)", () => {
     });
     const items = within(screen.getByRole("list")).getAllByRole("listitem");
     expect(items.map((li) => li.textContent)).toEqual([
-      expect.stringMatching(/^١.*أنا/),
-      expect.stringMatching(/^٢.*أم أحمد/),
-      expect.stringMatching(/^٣.*خالد/),
+      expect.stringMatching(/^1.*أنا/),
+      expect.stringMatching(/^2.*أم أحمد/),
+      expect.stringMatching(/^3.*خالد/),
     ]);
   });
 
@@ -580,7 +580,7 @@ describe("RotaPeopleSetup (step 2)", () => {
     ]);
     renderSetup();
     expect(
-      screen.getByRole("button", { name: /بقي ٢٨ جزءاً بلا قارئ/ }),
+      screen.getByRole("button", { name: /بقي 28 جزءاً بلا قارئ/ }),
     ).toBeInTheDocument();
   });
 
@@ -593,7 +593,7 @@ describe("RotaPeopleSetup (step 2)", () => {
     const user = userEvent.setup();
     renderSetup();
     const banner = screen.getByRole("button", {
-      name: /بقي ٢٨ جزءاً بلا قارئ/,
+      name: /بقي 28 جزءاً بلا قارئ/,
     });
     const list = screen.getByRole("list", { name: t.rota.peopleList });
     expect(
@@ -629,7 +629,7 @@ describe("RotaPeopleSetup (step 2)", () => {
     );
     renderSetup();
     expect(
-      screen.getByRole("button", { name: /بقي جزءان بلا قارئ \(٢٩ و٣٠\)/ }),
+      screen.getByRole("button", { name: /بقي جزءان بلا قارئ \(29 و30\)/ }),
     ).toBeInTheDocument();
   });
 
@@ -652,7 +652,7 @@ describe("RotaPeopleSetup (step 2)", () => {
     renderSetup();
     await user.click(screen.getByRole("button", { name: /بلا قارئ/ }));
     const sheet = screen.getByRole("dialog", {
-      name: "من يقرأ الجزء ٢ أيضاً؟",
+      name: "من يقرأ الجزء 2 أيضاً؟",
     });
     await user.click(within(sheet).getByRole("button", { name: /أنا/ }));
     expect(m.giveJuz).toHaveBeenCalledWith({
@@ -692,7 +692,7 @@ describe("RotaPeopleSetup (step 2)", () => {
       within(screen.getByRole("dialog")).getByRole("button", { name: /خالد/ }),
     );
     expect(
-      await screen.findByRole("dialog", { name: "من يقرأ الجزء ٣٠ أيضاً؟" }),
+      await screen.findByRole("dialog", { name: "من يقرأ الجزء 30 أيضاً؟" }),
     ).toBeInTheDocument();
     await user.click(
       within(screen.getByRole("dialog")).getByRole("button", { name: /خالد/ }),

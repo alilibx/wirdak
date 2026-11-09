@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { DUAS } from "@convex/lib/duas";
 import { noteText } from "@convex/lib/noteText";
 import type { ReadingDaysKind } from "@convex/lib/rota";
@@ -21,13 +21,13 @@ function counted(
 ): string {
   if (n === 1) return forms.one;
   if (n === 2) return forms.two;
-  const digits = toArabicDigits(n);
+  const digits = toWesternDigits(n);
   return n >= 3 && n <= 10
     ? `${digits} ${forms.few}`
     : `${digits} ${forms.many}`;
 }
 
-/** «ل» before a count of people: `لشخص واحد`, `لشخصين`, `لـ٣ أشخاص`, `لـ١١ شخصاً`. */
+/** «ل» before a count of people: `لشخص واحد`, `لشخصين`, `لـ3 أشخاص`, `لـ11 شخصاً`. */
 function forPeople(n: number): string {
   const said = counted(n, {
     one: "شخص واحد",
@@ -110,7 +110,7 @@ export const ar = {
     errors: {
       rate_limited: "أرسلت رسائل كثيرة. حاول بعد قليل.",
       empty: "اكتب رسالة أو سجّل صوتك.",
-      too_long: "الرسالة أطول من ١٠٠٠ حرف.",
+      too_long: "الرسالة أطول من 1000 حرف.",
       bad_file: "تعذّر إرفاق الملف. حاول مرة أخرى.",
       not_found: "لم نجد هذا الطلب.",
       generic: "تعذّر الإرسال. تأكد من الإنترنت ثم حاول مرة أخرى.",
@@ -149,7 +149,7 @@ export const ar = {
   },
   schedules: {
     daily: "يومية",
-    every3days: "كل ٣ أيام",
+    every3days: "كل 3 أيام",
     weekly: "أسبوعية",
     biweekly: "كل أسبوعين",
     monthly: "شهرية",
@@ -196,7 +196,7 @@ export const ar = {
     allTakenHint: "ننتظر أحبابنا يُتمّون قراءتهم.",
     stillReading: "ما زلت أقرأ",
     openForHelp: "يمكن لغيرك أن يساعد فيه الآن، ويمكنك إتمامه إن شئت.",
-    /** Whole days, 1 to 7: `يوم`, `يومين`, `٣ أيام`. */
+    /** Whole days, 1 to 7: `يوم`, `يومين`, `3 أيام`. */
     pace: (days: number) =>
       `عادةً تُتمّ الجزء في نحو ${counted(days, {
         one: "يوم",
@@ -227,7 +227,7 @@ export const ar = {
     amountLabel: "المدة",
     unitsLabel: "الوحدة",
     units: { minutes: "دقائق", hours: "ساعات", days: "أيام" },
-    range: "المهلة بين ٣٠ دقيقة و٣٠ يوماً.",
+    range: "المهلة بين 30 دقيقة و30 يوماً.",
     amount: {
       minutes: (n: number) =>
         counted(n, {
@@ -251,7 +251,7 @@ export const ar = {
     heading: "رسائل التشجيع",
     explain:
       "حين يتمّ أحد القرّاء جزءاً، تصل غيره رسالة تشجيع. لا تذكر اسمه ولا رقم جزئه إلا إن اخترت ذلك.",
-    rotaHint: "تصل على واتساب، لمن راسلنا خلال آخر ٢٤ ساعة فقط.",
+    rotaHint: "تصل على واتساب، لمن راسلنا خلال آخر 24 ساعة فقط.",
     switchLabel: "أرسل رسائل التشجيع",
     showNameLabel: "اذكر اسم القارئ",
     showJuzLabel: "اذكر رقم الجزء",
@@ -548,7 +548,7 @@ export const ar = {
     startNew: "＋ ابدأ ختمة جديدة",
     startNewPlain: "ابدأ ختمة جديدة",
     settings: "إعداداتي",
-    /** The people in a khatma the viewer runs: `شخص واحد`, `شخصان`, `٣ أشخاص`, `١١ شخصاً`. */
+    /** The people in a khatma the viewer runs: `شخص واحد`, `شخصان`, `3 أشخاص`, `11 شخصاً`. */
     peopleCount: (n: number) =>
       counted(n, {
         one: "شخص واحد",
@@ -571,7 +571,7 @@ export const ar = {
       weekly: "الأكثر شيوعاً",
       none: "نقرأ على راحتنا",
     } as Partial<Record<Schedule, string>>,
-    graceInvalid: "عدّل مهلة كل جزء لتكون بين ٣٠ دقيقة و٣٠ يوماً.",
+    graceInvalid: "عدّل مهلة كل جزء لتكون بين 30 دقيقة و30 يوماً.",
     submit: "أنشئ الختمة",
     submitting: "جارٍ الإنشاء",
     beforeCreate: "قبل أن تنشئ ختمة",
@@ -591,7 +591,7 @@ export const ar = {
     rotaTitle: "ختمة بالتناوب",
     rotaBody: "لكل شخص جزء ثابت يتقدّم مع كل ختمة، ويصله على واتساب مع زرّين.",
     step: (n: number, of: number) =>
-      `${toArabicDigits(n)} من ${toArabicDigits(of)}`,
+      `${toWesternDigits(n)} من ${toWesternDigits(of)}`,
     nameQuestion: "ما اسم الختمة؟",
     namePlaceholder: "مثلاً: ختمة العائلة",
     whenQuestion: "متى تقرؤون؟",
@@ -672,10 +672,10 @@ export const ar = {
       juz_taken: "هذا الجزء له قارئ. حاول مرة أخرى.",
       already_added: "هذا الرقم مضاف في الختمة.",
     } as Record<string, string>,
-    /** «الجزء ٤», «الأجزاء ١ و٤»; each of `shared` reads «٤ (مشترك)». */
+    /** «الجزء 4», «الأجزاء 1 و4»; each of `shared` reads «4 (مشترك)». */
     juzOf: (juz: number[], shared: number[] = []) => {
       const one = (j: number) =>
-        `${toArabicDigits(j)}${shared.includes(j) ? " (مشترك)" : ""}`;
+        `${toWesternDigits(j)}${shared.includes(j) ? " (مشترك)" : ""}`;
       return juz.length === 1
         ? `الجزء ${one(juz[0] ?? 0)}`
         : `الأجزاء ${juz.map(one).join(" و")}`;
@@ -685,12 +685,12 @@ export const ar = {
       const n = juz.length;
       const named =
         juz.length <= 4
-          ? ` (${juz.map((j) => toArabicDigits(j)).join(" و")})`
+          ? ` (${juz.map((j) => toWesternDigits(j)).join(" و")})`
           : "";
       if (n === 1) return `بقي جزء بلا قارئ${named}`;
       if (n === 2) return `بقي جزءان بلا قارئ${named}`;
-      if (n <= 10) return `بقيت ${toArabicDigits(n)} أجزاء بلا قارئ${named}`;
-      return `بقي ${toArabicDigits(n)} جزءاً بلا قارئ`;
+      if (n <= 10) return `بقيت ${toWesternDigits(n)} أجزاء بلا قارئ${named}`;
+      return `بقي ${toWesternDigits(n)} جزءاً بلا قارئ`;
     },
     leftoverHint: "أعطِها لمن يحب أن يقرأ أكثر، أو أضف أشخاصاً.",
     spread: "وزّعها على المشاركين",
@@ -704,7 +704,7 @@ export const ar = {
       no_free_juz: "الأجزاء كلها لها قرّاء الآن.",
       no_room: "كل مشارك معه أكثر ما يمكن من الأجزاء. أضف أشخاصاً.",
     } as Record<string, string>,
-    giveTitle: (juz: number) => `من يقرأ الجزء ${toArabicDigits(juz)} أيضاً؟`,
+    giveTitle: (juz: number) => `من يقرأ الجزء ${toWesternDigits(juz)} أيضاً؟`,
     giveHint: "يقرأ أكثر من جزء كل يوم، ويتقدّمان معاً.",
     giveErrors: {
       juz_taken: "هذا الجزء له قارئ الآن.",
@@ -734,7 +734,7 @@ export const ar = {
     /** Every juz' has a reader: the request joins one as its second reader. */
     shareRequest: "شارِك جزءاً",
     shareJuzOption: (juz: number, name: string) =>
-      `${toArabicDigits(juz)} · مع ${name}`,
+      `${toWesternDigits(juz)} · مع ${name}`,
     declineRequest: "لا",
     joinRequestErrors: {
       not_found: "لم نجد هذا الطلب. أعد تحميل الصفحة.",
@@ -749,17 +749,17 @@ export const ar = {
       `ختمة بالتناوب، ${done} من ${total} اليوم`,
     // Today
     heading: (number: number, date: string) =>
-      `الختمة ${toArabicDigits(number)} · ${date}`,
-    cycle: (cycle: number) => `الدورة ${toArabicDigits(cycle)}`,
+      `الختمة ${toWesternDigits(number)} · ${date}`,
+    cycle: (cycle: number) => `الدورة ${toWesternDigits(cycle)}`,
     progress: (done: number, total: number) =>
-      `${toArabicDigits(done)} / ${toArabicDigits(total)}`,
+      `${toWesternDigits(done)} / ${toWesternDigits(total)}`,
     readToday: "تمّت قراءتها اليوم",
     nextDay: (number: number, when: string) =>
-      `التالي: الختمة ${toArabicDigits(number)} · ${when}`,
+      `التالي: الختمة ${toWesternDigits(number)} · ${when}`,
     nextTomorrow: (time: string) => `غداً ${time}`,
     nextOn: (date: string, time: string) => `${date} ${time}`,
     notStarted: (number: number, date: string, time: string) =>
-      `تبدأ الختمة ${toArabicDigits(number)} يوم ${date} الساعة ${time}`,
+      `تبدأ الختمة ${toWesternDigits(number)} يوم ${date} الساعة ${time}`,
     ended: "انتهت أيام القراءة المحددة.",
     pausedBanner:
       "الختمة موقوفة الآن. لا رسائل ولا يتقدّم رقم الختمة حتى تعيد تشغيلها.",
@@ -769,20 +769,20 @@ export const ar = {
       "لم تبدأ الختمة بعد. يبدؤها صاحبها أو من لديه صلاحية الإعدادات.",
     startKhatma: "ابدأ الختمة",
     completeBanner: (number: number) =>
-      `اكتملت الختمة ${toArabicDigits(number)}. تقبّل الله منكم.`,
+      `اكتملت الختمة ${toWesternDigits(number)}. تقبّل الله منكم.`,
     gridLabel: "أجزاء اليوم",
     /** The day card's button, read out in full: the visible card is a summary. */
     dayCardOpen: (number: number, done: number, total: number) =>
-      `الختمة ${toArabicDigits(number)}: ${toArabicDigits(done)} من ${toArabicDigits(total)} تمّت قراءتها. افتح الأجزاء`,
+      `الختمة ${toWesternDigits(number)}: ${toWesternDigits(done)} من ${toWesternDigits(total)} تمّت قراءتها. افتح الأجزاء`,
     dayCardMore: "الأجزاء",
     startCardHeading: "موعد البداية",
     legendDone: "تمّ",
     legendUnread: "لم يُقرأ",
     legendReassigned: "أُسند",
     tileLabel: (juz: number, state: string) =>
-      `الجزء ${toArabicDigits(juz)}، ${state}`,
-    unreadTitle: (juz: number) => `الجزء ${toArabicDigits(juz)} لم يُقرأ بعد`,
-    doneTitle: (juz: number) => `الجزء ${toArabicDigits(juz)} تمّت قراءته`,
+      `الجزء ${toWesternDigits(juz)}، ${state}`,
+    unreadTitle: (juz: number) => `الجزء ${toWesternDigits(juz)} لم يُقرأ بعد`,
+    doneTitle: (juz: number) => `الجزء ${toWesternDigits(juz)} تمّت قراءته`,
     holder: (name: string) => `صاحبه اليوم: ${name}`,
     readerNow: (name: string) => `يقرؤه الآن: ${name}`,
     readBy: (name: string) => `قرأه: ${name}`,
@@ -796,7 +796,7 @@ export const ar = {
     readMyself: "سأقرؤه أنا",
     markDone: "سجّله تامّاً",
     undoDone: "ليس بعد؟ ألغِ التسجيل",
-    pickTitle: (juz: number) => `من يقرأ الجزء ${toArabicDigits(juz)} اليوم؟`,
+    pickTitle: (juz: number) => `من يقرأ الجزء ${toWesternDigits(juz)} اليوم؟`,
     finishedToday: "أتمّ جزأه اليوم",
     readingIt: "يقرؤه الآن",
     back: "رجوع",
@@ -808,10 +808,10 @@ export const ar = {
     } as Record<string, string>,
     // People
     firstBanner: (date: string | null) =>
-      `جزء كل مشارك في الختمة ١${date ? `، يوم ${date}` : ""}`,
+      `جزء كل مشارك في الختمة 1${date ? `، يوم ${date}` : ""}`,
     nextBanner: (number: number, date: string | null) =>
-      `الختمة ${toArabicDigits(number)}${date ? ` يوم ${date}` : ""}. هذا جزء كل مشارك فيها، ويتقدّم كلٌّ منهم جزءاً في كل ختمة.`,
-    addReader: (juz: number) => `+ أضف قارئاً للجزء ${toArabicDigits(juz)}`,
+      `الختمة ${toWesternDigits(number)}${date ? ` يوم ${date}` : ""}. هذا جزء كل مشارك فيها، ويتقدّم كلٌّ منهم جزءاً في كل ختمة.`,
+    addReader: (juz: number) => `+ أضف قارئاً للجزء ${toWesternDigits(juz)}`,
     secondJuz: "جزء ثانٍ",
     // A second reader on a juz'
     shareAction: "أضف قارئاً يشاركه الجزء",
@@ -819,7 +819,7 @@ export const ar = {
     shareExplain: (a: string, b: string, juz: number, number: number) => {
       const nextJuz = (juz % 30) + 1;
       const nextNumber = (number % 30) + 1;
-      return `يقرأ \u200E${a}\u200E و\u200E${b}\u200E الجزء ${toArabicDigits(juz)} في الختمة ${toArabicDigits(number)}، ثم الجزء ${toArabicDigits(nextJuz)} في الختمة ${toArabicDigits(nextNumber)}. أيّهما سجّل أنه أتمّه يُحسب الجزء مقروءاً`;
+      return `يقرأ \u200E${a}\u200E و\u200E${b}\u200E الجزء ${toWesternDigits(juz)} في الختمة ${toWesternDigits(number)}، ثم الجزء ${toWesternDigits(nextJuz)} في الختمة ${toWesternDigits(nextNumber)}. أيّهما سجّل أنه أتمّه يُحسب الجزء مقروءاً`;
     },
     /** Said before one reader of a shared juz' leaves it. */
     leavesAlone: (name: string) => `سيقرأ ${name} الجزء وحده`,
@@ -828,7 +828,7 @@ export const ar = {
     freeThisStaysSharedMe: "تبقى في الختمة.",
     removeBodyShared: "تبقى قراءته اليوم كما هي.",
     stopReadingHintShared: "تبقى منظّم الختمة.",
-    /** Above the list once a juz' is shared: «٤٢ قارئاً، ١٢ جزءاً مشتركاً». */
+    /** Above the list once a juz' is shared: «42 قارئاً، 12 جزءاً مشتركاً». */
     sharedCount: (readers: number, shared: number) =>
       `${counted(readers, {
         one: "قارئ واحد",
@@ -842,28 +842,28 @@ export const ar = {
         many: "جزءاً مشتركاً",
       })}`,
     noReader: "بلا قارئ",
-    readerTitle: (juz: number) => `قارئ الجزء ${toArabicDigits(juz)}`,
+    readerTitle: (juz: number) => `قارئ الجزء ${toWesternDigits(juz)}`,
     walk: (juz: number, number: number) => {
       // Each khatma moves a reader up one juz', and after 30 it goes back to 1.
       const nextJuz = (juz % 30) + 1;
       const nextNumber = (number % 30) + 1;
-      return `يقرأ الجزء ${toArabicDigits(juz)} في الختمة ${toArabicDigits(number)}، ثم ${toArabicDigits(nextJuz)} في الختمة ${toArabicDigits(nextNumber)}، وهكذا.`;
+      return `يقرأ الجزء ${toWesternDigits(juz)} في الختمة ${toWesternDigits(number)}، ثم ${toWesternDigits(nextJuz)} في الختمة ${toWesternDigits(nextNumber)}، وهكذا.`;
     },
     moveLabel: "انقله إلى الجزء",
     moveOption: (juz: number, other: string | null) =>
-      `الجزء ${toArabicDigits(juz)}${other ? ` · سيتبادل مع ${other}` : ""}`,
+      `الجزء ${toWesternDigits(juz)}${other ? ` · سيتبادل مع ${other}` : ""}`,
     swapsWith: (name: string) => `سيتبادل مع ${name}`,
     swapsWithMe: "سيتبادل معي",
     move: "انقله",
     giveMore: "أعطه جزءاً آخر",
     giveMoreHint: (juz: number) =>
-      `يقرأ معه الجزء ${toArabicDigits(juz)} كل يوم`,
+      `يقرأ معه الجزء ${toWesternDigits(juz)} كل يوم`,
     rename: "غيّر الاسم",
     renameOf: (name: string) => `غيّر اسم ${name}`,
     renameTitle: "غيّر الاسم",
     renameSave: "احفظ الاسم",
     remove: "أزله من الختمة",
-    freeThis: (juz: number) => `أخلِ الجزء ${toArabicDigits(juz)}`,
+    freeThis: (juz: number) => `أخلِ الجزء ${toWesternDigits(juz)}`,
     freeThisHint: "يبقى في الختمة، ويصبح هذا الجزء بلا قارئ.",
     freeThisHintMe: "تبقى في الختمة، ويصبح هذا الجزء بلا قارئ.",
     stopReading: "لن أقرأ جزءاً",
@@ -902,7 +902,7 @@ export const ar = {
     /** How many more can be ticked: the ajza' with no reader left. */
     savedRoom: (n: number) =>
       n === 0 ? "لم يبقَ جزء بلا قارئ." : `يتّسع ${forPeople(n)}.`,
-    savedAddMany: (n: number) => `أضِف (${toArabicDigits(n)})`,
+    savedAddMany: (n: number) => `أضِف (${toWesternDigits(n)})`,
     savedManyResult: ({
       added,
       noRoom,
@@ -991,11 +991,11 @@ export const ar = {
       summary: "ملخّص اليوم (لي)",
     },
     timeLabel: "الوقت",
-    atDayStart: "عند بداية اليوم (١٢ ص)",
+    atDayStart: "عند بداية اليوم (12 ص)",
     lateTapLabel: "احتساب «أتممت» بعد منتصف الليل",
     lateTapHint:
       "من أتمّ جزء الأمس خلال هذه المدة يُحتسب له، ولا يؤثر ذلك في جزء اليوم.",
-    lateTapMinutes: (minutes: number) => `${toArabicDigits(minutes)} دقيقة`,
+    lateTapMinutes: (minutes: number) => `${toWesternDigits(minutes)} دقيقة`,
     lateTapHours: (hours: number) =>
       hours === 0
         ? "لا يُحتسب"
@@ -1003,7 +1003,7 @@ export const ar = {
           ? "ساعة واحدة"
           : hours === 2
             ? "ساعتان"
-            : `${toArabicDigits(hours)} ${hours <= 10 ? "ساعات" : "ساعة"}`,
+            : `${toWesternDigits(hours)} ${hours <= 10 ? "ساعات" : "ساعة"}`,
     locked: "هذه الرسالة لا يمكن إيقافها.",
     saveTimes: "احفظ الأوقات",
     detailsHeading: "الختمة",
@@ -1079,7 +1079,7 @@ export const ar = {
     savedErrors: {
       not_found: "لم نجد هذا الشخص. أعد تحميل الصفحة.",
     } as Record<string, string>,
-    /** Whole juz' read: `جزءاً واحداً`, `جزأين`, `٤ أجزاء`, `١٢ جزءاً`. */
+    /** Whole juz' read: `جزءاً واحداً`, `جزأين`, `4 أجزاء`, `12 جزءاً`. */
     juzRead: (n: number) =>
       `قرأتَ ${counted(n, {
         one: "جزءاً واحداً",
@@ -1090,7 +1090,7 @@ export const ar = {
     noJuzYet: "لم تُتمّ جزءاً بعد",
     /** Consecutive weeks with a finish, 2 or more. */
     weekStreak: (n: number) => {
-      const digits = toArabicDigits(n);
+      const digits = toWesternDigits(n);
       if (n === 1) return "أسبوع واحد تقرأ فيه";
       if (n === 2) return "أسبوعين متتاليين تقرأ فيهما";
       return n <= 10

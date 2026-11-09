@@ -83,7 +83,7 @@ describe("OrganizersTab", () => {
     const row = screen.getByRole("link", { name: "سارة" }).closest("li")!;
     expect(within(row).getByText(t.organizers.away)).toBeInTheDocument();
     expect(
-      within(row).getByText(t.organizers.totalMembers("٤")),
+      within(row).getByText(t.organizers.totalMembers("4")),
     ).toBeInTheDocument();
     const other = screen.getByRole("link", { name: "علي" }).closest("li")!;
     expect(

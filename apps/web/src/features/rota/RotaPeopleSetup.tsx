@@ -4,7 +4,7 @@ import type { PeopleView as View } from "@convex/lib/rotaOps";
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { Button } from "../../components/Button";
 import { Sheet } from "../../components/Sheet";
 import { t } from "../../i18n/ar";
@@ -321,7 +321,7 @@ export function RotaPeopleSetupContent({
             className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 py-2"
           >
             <span className="w-7 shrink-0 text-center font-semibold text-green-deep">
-              {toArabicDigits(index + 1)}
+              {toWesternDigits(index + 1)}
             </span>
             <span className="min-w-0">
               <span className="block font-medium">

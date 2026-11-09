@@ -1,5 +1,5 @@
 import type { TileView } from "@convex/khatmas";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { t } from "../i18n/ar";
 
 type Props = {
@@ -21,7 +21,7 @@ const chip =
 /** One juz'. Only open tiles can be pressed. The state is always a word; reader names show on "reading" tiles only. */
 export function Tile({ tile, onTake, readOnly = false }: Props) {
   const { juz, name, state, readerName, isMine } = tile;
-  const number = toArabicDigits(juz);
+  const number = toWesternDigits(juz);
   // A done tile never shows a name, whatever the data says.
   const reader = state === "reading" && !isMine ? readerName : null;
 

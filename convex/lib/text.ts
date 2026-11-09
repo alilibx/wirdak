@@ -8,7 +8,7 @@ import { parsePhoneNumberFromString as parseMobile } from "libphonenumber-js/mob
 import { normalizeDigits } from "./digits";
 
 // Re-exported so existing Convex imports keep working; the web app imports ./digits directly.
-export { normalizeDigits, toArabicDigits } from "./digits";
+export { normalizeDigits, toWesternDigits } from "./digits";
 
 const DISPLAY_NAME_MAX = 40;
 /** Raw name input longer than this is refused or cut before cleaning; the cleaned name is far shorter. */

@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import type { PeopleView } from "@convex/lib/rotaOps";
 import { useMutation } from "convex/react";
 import { useId, useState } from "react";
@@ -85,7 +85,7 @@ function JoinRequestCard({
             {choices.map((c) => (
               <option key={c.juz} value={c.juz}>
                 {c.with === null
-                  ? toArabicDigits(c.juz)
+                  ? toWesternDigits(c.juz)
                   : t.rota.shareJuzOption(c.juz, c.with)}
               </option>
             ))}

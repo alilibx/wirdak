@@ -17,7 +17,7 @@ describe("Tile", () => {
         onTake={vi.fn()}
       />,
     );
-    expect(screen.getByRole("button", { name: /الجزء ١٥/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /الجزء 15/ })).toBeDisabled();
     expect(screen.getByText("فاطمة")).toBeInTheDocument();
   });
 
@@ -35,7 +35,7 @@ describe("Tile", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: /الجزء ٣.*يُقرأ/ }),
+      screen.getByRole("button", { name: /الجزء 3.*يُقرأ/ }),
     ).toBeDisabled();
   });
 
@@ -54,7 +54,7 @@ describe("Tile", () => {
     );
     expect(screen.getByText("أنت تقرؤه")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "الجزء ٨، ولو أننا، أنت تقرؤه" }),
+      screen.getByRole("button", { name: "الجزء 8، ولو أننا، أنت تقرؤه" }),
     ).toBeDisabled();
   });
 
@@ -73,7 +73,7 @@ describe("Tile", () => {
     );
     expect(screen.queryByText("خالد")).not.toBeInTheDocument();
     expect(screen.getByText("تمّ ✓")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /الجزء ٢.*تمّ/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /الجزء 2.*تمّ/ })).toBeDisabled();
   });
 
   it("open tile calls onTake with its juz", async () => {
@@ -90,7 +90,7 @@ describe("Tile", () => {
         onTake={onTake}
       />,
     );
-    const button = screen.getByRole("button", { name: /الجزء ١٤.*متاح/ });
+    const button = screen.getByRole("button", { name: /الجزء 14.*متاح/ });
     expect(button).toBeEnabled();
     await userEvent.click(button);
     expect(onTake).toHaveBeenCalledWith(14);
@@ -139,7 +139,7 @@ describe("Tile", () => {
       isMine: false,
     };
     const { rerender } = render(<Tile tile={open} onTake={vi.fn()} />);
-    const tile = () => screen.getByRole("button", { name: /الجزء ٤/ });
+    const tile = () => screen.getByRole("button", { name: /الجزء 4/ });
     expect(tile()).toBeEnabled();
     expect(tile().className).toMatch(/hover:border-green/);
     rerender(<Tile tile={open} onTake={vi.fn()} readOnly />);
