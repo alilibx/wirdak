@@ -87,15 +87,11 @@ export async function addSavedMany(
 
   let added = 0;
   for (const who of batch) {
-    const placed = await placeNewParticipant(
-      ctx,
-      khatma,
-      who,
-      undefined,
-      undefined,
-      { readsToday: args.readsToday },
-      "fill",
-    );
+    const placed = await placeNewParticipant(ctx, khatma, who, undefined, {
+      late: { readsToday: args.readsToday },
+      mode: "fill",
+      actor,
+    });
     if ("error" in placed && placed.error === "no_free_juz") break;
     // The question was asked above, so nothing else can refuse them.
     if ("error" in placed) throw new ConvexError({ code: placed.error });

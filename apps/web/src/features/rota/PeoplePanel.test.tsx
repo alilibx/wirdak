@@ -886,6 +886,94 @@ describe("PeoplePanel", () => {
         await within(sheet).findByText(t.rota.peopleErrors.shared!),
       ).toBeInTheDocument();
     });
+
+    /** Saad owns the khatma and Muna, who is looking, helps run it. */
+    function coRunView(): PeopleView {
+      const view = fullView();
+      view.rows[0] = slot(1, { ...hidden, isOrganizer: true, slots: 1 });
+      view.rows[1] = slot(2, {
+        ...shown,
+        isCoOrganizer: true,
+        isMe: true,
+        slots: 1,
+      });
+      view.participants[0] = { ...hidden, isOrganizer: true, ...held([1]) };
+      view.participants[1] = {
+        ...shown,
+        isCoOrganizer: true,
+        isMe: true,
+        ...held([2]),
+      };
+      return view;
+    }
+
+    it("a co-organizer can't add a second reader to a juz' of someone running the khatma", async () => {
+      m.view = coRunView();
+      const user = userEvent.setup();
+      render(
+        <PeoplePanel
+          inviteCode="CODE"
+          archived={false}
+          viewerIsOwner={false}
+        />,
+      );
+      for (const name of ["سعد", t.rota.me]) {
+        await user.click(
+          screen.getByRole("button", { name: new RegExp(name) }),
+        );
+        const sheet = screen.getByRole("dialog", { name });
+        expect(within(sheet).queryByRole("button", shareButton)).toBeNull();
+        await user.click(
+          within(sheet).getByRole("button", { name: t.sheet.close }),
+        );
+      }
+      // Anyone else's juz' they may share.
+      await user.click(screen.getByRole("button", { name: /قارئ 3(?!\d)/ }));
+      expect(
+        within(screen.getByRole("dialog", { name: "قارئ 3" })).getByRole(
+          "button",
+          shareButton,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("the owner can add a second reader to a co-organizer's juz'", async () => {
+      m.view = coRunView();
+      const user = userEvent.setup();
+      render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
+      await user.click(screen.getByRole("button", { name: /منظّم مساعد/ }));
+      expect(
+        within(screen.getByRole("dialog")).getByRole("button", shareButton),
+      ).toBeInTheDocument();
+    });
+
+    it("says why a share onto someone running the khatma was refused", async () => {
+      // Huda was named a co-organizer since this screen loaded.
+      m.view = fullView();
+      m.fns.addParticipant = vi
+        .fn()
+        .mockResolvedValue({ error: "is_organizer" });
+      const user = userEvent.setup();
+      render(
+        <PeoplePanel
+          inviteCode="CODE"
+          archived={false}
+          viewerIsOwner={false}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: /قارئ 3(?!\d)/ }));
+      await user.click(screen.getByRole("button", shareButton));
+      const sheet = screen.getByRole("dialog", { name: t.rota.shareAction });
+      await user.type(within(sheet).getByLabelText(t.rota.personName), "ليلى");
+      await user.type(
+        within(sheet).getByLabelText(t.rota.personPhone),
+        "+971507654321",
+      );
+      await user.click(within(sheet).getByRole("button", { name: t.rota.add }));
+      expect(
+        await within(sheet).findByText(t.rota.errors.is_organizer!),
+      ).toBeInTheDocument();
+    });
   });
 
   describe("co-organizers", () => {

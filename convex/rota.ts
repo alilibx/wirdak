@@ -875,9 +875,7 @@ export const importMembers = sessionMutation({
           phoneHidden: true,
         },
         undefined,
-        undefined,
-        undefined,
-        "fill",
+        { mode: "fill", actor: { personId: person._id } },
       );
       if ("error" in placed) {
         skipped += candidates.length - index;

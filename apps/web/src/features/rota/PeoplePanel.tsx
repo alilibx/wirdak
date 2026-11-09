@@ -32,8 +32,9 @@ const peopleErrors: Record<string, string> = t.rota.peopleErrors;
  * Only the owner takes out or moves someone who runs the khatma, swaps a juz' into theirs, or frees
  * their own ajza' (co-organizers spec 4.2): a co-organizer looking sees none of it on those rows,
  * their own included.
- * Once every juz' has a reader, a juz' read by one person can take a second (`canShare`). On a juz'
- * two people share, each change says first that the other will read it alone, and a move goes
+ * Once every juz' has a reader, a juz' read by one person can take a second (`canShare`), but a
+ * co-organizer never adds one to a juz' of someone running the khatma (same rule as moving it). On
+ * a juz' two people share, each change says first that the other will read it alone, and a move goes
  * only to a juz' with no reader: a swap never takes a shared juz'.
  */
 function PersonSheet({
@@ -231,7 +232,7 @@ function PersonSheet({
       )}
 
       <div className="mt-5 grid gap-3">
-        {canShare && other === null && (
+        {canShare && canMove && other === null && (
           <Button
             variant="ghost"
             disabled={busy}

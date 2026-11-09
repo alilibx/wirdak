@@ -1691,9 +1691,7 @@ test("a khatma holds 60 readers", async () => {
       (await ctx.db.get(khatmaId))!,
       { name: "الحادي والستون", phone: "+971505559061", personId: null },
       undefined,
-      undefined,
-      undefined,
-      "fill",
+      { mode: "fill" },
     ),
   );
   expect(placed).toEqual({ error: "no_free_juz" });
@@ -1766,4 +1764,116 @@ test("a co-organizer needs People to share", async () => {
   await setPeople(true);
   expect(await coShare()).toMatchObject({ ok: true, juz: 5 });
   expect((await people(t, s))?.rows[4]?.partner?.name).toBe("الثاني");
+});
+
+/**
+ * A co-organizer with People on juz' 2 of a khatma whose 30 ajza' all have a
+ * reader; the owner reads juz' 1.
+ */
+async function fullWithCoOrganizer(t: T) {
+  const s = await setup(t);
+  const co = await person(t);
+  const coPhone = (await t.run((ctx) => ctx.db.get(co.personId)))!.phone;
+  const coP = participantId(await add(t, s, { juz: 2, phone: coPhone }));
+  const ids = await fillAll(t, s, [2]);
+  await t.mutation(api.coOrganizers.set, {
+    sessionToken: s.token,
+    inviteCode: s.inviteCode,
+    candidateId: `p:${coP}`,
+    readings: true,
+    people: true,
+    settings: true,
+  });
+  const coSaved = (name: string, phone: string) =>
+    t.run((ctx) =>
+      ctx.db.insert("rotaContacts", {
+        ownerPersonId: co.personId,
+        name,
+        phone,
+        personId: null,
+        createdAt: NOW,
+      }),
+    );
+  return { s, co, coP, ids, coSaved };
+}
+
+test("a co-organizer can't add a second reader to the owner's juz' or a co-organizer's", async () => {
+  const t = convexTest(schema, modules);
+  const { s, co } = await fullWithCoOrganizer(t);
+  const coShare = (juz: number, phone: string) =>
+    t.mutation(api.rota.addParticipant, {
+      sessionToken: co.token,
+      inviteCode: s.inviteCode,
+      name: "الثاني",
+      phone,
+      juz,
+      share: true,
+    });
+
+  expect(await coShare(1, "+971505559101")).toEqual({ error: "is_organizer" });
+  expect(await coShare(2, "+971505559102")).toEqual({ error: "is_organizer" });
+  let view = await people(t, s);
+  expect(view?.rows[0]?.partner).toBeNull();
+  expect(view?.rows[1]?.partner).toBeNull();
+  expect(view?.participants).toHaveLength(30);
+
+  // Anyone else's juz' they may share, and the owner may share theirs.
+  expect(await coShare(3, "+971505559103")).toMatchObject({ ok: true });
+  expect(await share(t, s, 2)).toMatchObject({ ok: true, juz: 2 });
+  view = await people(t, s);
+  expect(view?.rows[1]?.partner).not.toBeNull();
+  expect(view?.rows[2]?.partner).not.toBeNull();
+});
+
+test("a co-organizer's saved contact or join request can't share the owner's juz'", async () => {
+  const t = convexTest(schema, modules);
+  const { s, co, coSaved } = await fullWithCoOrganizer(t);
+  const contactId = await coSaved("محفوظ", "+971505559111");
+  expect(
+    await t.mutation(api.rota.addSaved, {
+      sessionToken: co.token,
+      inviteCode: s.inviteCode,
+      contactId,
+      juz: 1,
+      share: true,
+    }),
+  ).toEqual({ error: "is_organizer" });
+
+  const requestId = await request(t, s);
+  expect(
+    await t.mutation(api.rota.acceptJoinRequest, {
+      sessionToken: co.token,
+      inviteCode: s.inviteCode,
+      requestId,
+      juz: 2,
+      share: true,
+    }),
+  ).toEqual({ error: "is_organizer" });
+  const view = await people(t, s);
+  expect(view?.requests).toHaveLength(1);
+  expect(view?.rows.every((r) => r.partner === null)).toBe(true);
+});
+
+test("a co-organizer's batch of saved people passes over the ajza' of those running the khatma", async () => {
+  const t = convexTest(schema, modules);
+  const { s, co, coSaved } = await fullWithCoOrganizer(t);
+  const contactIds = [
+    await coSaved("أول", "+971505559121"),
+    await coSaved("ثانٍ", "+971505559122"),
+  ];
+  expect(
+    await t.mutation(api.rota.addSavedMany, {
+      sessionToken: co.token,
+      inviteCode: s.inviteCode,
+      contactIds,
+    }),
+  ).toMatchObject({ ok: true, added: 2, noRoom: 0 });
+  const view = await people(t, s);
+  expect(view?.rows.map((r) => r.partner?.name ?? null).slice(0, 5)).toEqual([
+    null,
+    null,
+    "أول",
+    "ثانٍ",
+    null,
+  ]);
 });

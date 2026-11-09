@@ -647,6 +647,8 @@ export const ar = {
       not_full: "لا تُشارَك الأجزاء إلا بعد أن يكون لكل جزء قارئ.",
       sharing_off: "مشاركة الجزء غير متاحة الآن.",
       already_shared: "لهذا الجزء قارئان.",
+      is_organizer:
+        "يقرأ هذا الجزءَ من يدير الختمة، ولا يضيف إليه قارئاً إلا صاحبها.",
     } as Record<string, string>,
     setupTitle: "من سيقرأ معك؟",
     personName: "الاسم",
