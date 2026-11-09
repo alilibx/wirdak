@@ -49,7 +49,7 @@ describe("SettingField", () => {
     expect(
       screen.getByText(t.settings.help.maxMembers.what),
     ).toBeInTheDocument();
-    expect(screen.getByText("٦٠")).toBeInTheDocument();
+    expect(screen.getByText("60")).toBeInTheDocument();
     expect(screen.queryByText(t.settings.custom)).not.toBeInTheDocument();
   });
 
@@ -63,7 +63,7 @@ describe("SettingField", () => {
         name: `${t.settings.edit} ${t.settings.labels.maxMembers}`,
       }),
     ).toHaveAccessibleDescription(
-      `٤٠ · ${t.settings.custom} ${t.settings.help.maxMembers.what}`,
+      `40 · ${t.settings.custom} ${t.settings.help.maxMembers.what}`,
     );
   });
 
@@ -79,10 +79,10 @@ describe("SettingField", () => {
       within(sheet).getByText(t.settings.help.maxMembers.why),
     ).toBeInTheDocument();
     expect(
-      within(sheet).getByText(`${t.settings.defaultValue}: ٦٠`),
+      within(sheet).getByText(`${t.settings.defaultValue}: 60`),
     ).toBeInTheDocument();
     expect(
-      within(sheet).getByText(t.settings.range("٢", "٥٠٠")),
+      within(sheet).getByText(t.settings.range("2", "500")),
     ).toBeInTheDocument();
   });
 
@@ -186,7 +186,7 @@ describe("SettingField", () => {
       />,
     );
     expect(
-      screen.getByText("٨:٠٠ ص", { selector: "span" }),
+      screen.getByText("8:00 ص", { selector: "span" }),
     ).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole("button", {

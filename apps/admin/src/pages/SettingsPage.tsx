@@ -1,7 +1,7 @@
 import { PageHeader } from "../components/PageHeader";
 import { Input } from "@/components/ui/input";
 import { api } from "@convex/_generated/api";
-import { normalizeDigits, toArabicDigits } from "@convex/lib/digits";
+import { normalizeDigits, toWesternDigits } from "@convex/lib/digits";
 import type { SettingGroup } from "@convex/lib/settingSpecs";
 import { useQuery } from "convex/react";
 import { useEffect, useId, useRef, type KeyboardEvent } from "react";
@@ -213,7 +213,7 @@ export function SettingsPage() {
                 <span
                   className={selected ? "opacity-70" : "text-muted-foreground"}
                 >
-                  {toArabicDigits(count)}
+                  {toWesternDigits(count)}
                 </span>
               </button>
             );

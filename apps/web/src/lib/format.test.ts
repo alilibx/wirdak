@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { t } from "../i18n/ar";
 import { deviceLabel, formatDate } from "./format";
 
@@ -8,15 +8,15 @@ describe("formatDate", () => {
     expect(formatDate(Date.UTC(2026, 9, 30, 12))).toContain("أكتوبر");
   });
 
-  it("always uses Eastern Arabic digits", () => {
-    expect(formatDate(Date.UTC(2026, 9, 30, 12))).toMatch(/٣٠/);
-    expect(formatDate(Date.UTC(2026, 9, 30, 12))).not.toMatch(/[0-9]/);
+  it("always uses Western digits", () => {
+    expect(formatDate(Date.UTC(2026, 9, 30, 12))).toMatch(/30/);
+    expect(formatDate(Date.UTC(2026, 9, 30, 12))).not.toMatch(/[٠-٩]/);
   });
 });
 
 describe("@convex alias", () => {
   it("resolves shared convex helpers", () => {
-    expect(toArabicDigits(12)).toBe("١٢");
+    expect(toWesternDigits(12)).toBe("12");
   });
 });
 

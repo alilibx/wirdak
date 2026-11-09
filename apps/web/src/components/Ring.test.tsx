@@ -14,14 +14,14 @@ describe("Ring", () => {
     render(<Ring tiles={makeTiles(done(17))} />);
     expect(screen.getByRole("img")).toHaveAttribute(
       "aria-label",
-      "تمّ ١٧ من ٣٠ جزءاً",
+      "تمّ 17 من 30 جزءاً",
     );
   });
 
-  it("shows the done count in Eastern Arabic digits at the centre", () => {
+  it("shows the done count in Western digits at the centre", () => {
     render(<Ring tiles={makeTiles(done(17))} />);
-    expect(screen.getByText("١٧")).toBeInTheDocument();
-    expect(screen.getByText("من ٣٠ جزءاً تمّت")).toBeInTheDocument();
+    expect(screen.getByText("17")).toBeInTheDocument();
+    expect(screen.getByText("من 30 جزءاً تمّت")).toBeInTheDocument();
   });
 
   it("draws 30 beads, one per juz", () => {

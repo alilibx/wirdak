@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import type { ReadingDays } from "@convex/lib/rota";
 import { t as webT } from "@web/i18n/ar";
 import { t } from "../i18n/ar";
@@ -18,7 +18,7 @@ export function formatReadingDays(days: ReadingDays): string {
     }
     case "monthly":
       return t.lookup.monthly(
-        days.days.map((d) => toArabicDigits(d)).join(t.lookup.listSeparator),
+        days.days.map((d) => toWesternDigits(d)).join(t.lookup.listSeparator),
       );
   }
 }

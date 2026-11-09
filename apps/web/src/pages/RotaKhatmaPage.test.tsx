@@ -292,11 +292,11 @@ describe("Today", () => {
       screen.getByRole("heading", { name: "ختمة العائلة" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("الختمة ١٢ · الثلاثاء ١٠ نوفمبر"),
+      screen.getByText("الختمة 12 · الثلاثاء 10 نوفمبر"),
     ).toBeInTheDocument();
-    expect(screen.getByText("٢٧ / ٣٠")).toBeInTheDocument();
+    expect(screen.getByText("27 / 30")).toBeInTheDocument();
     expect(
-      screen.getByText("التالي: الختمة ١٣ · غداً ٨:٠٠ ص"),
+      screen.getByText("التالي: الختمة 13 · غداً 8:00 ص"),
     ).toBeInTheDocument();
     expect(screen.queryByText(/الدورة/)).toBeNull();
   });
@@ -313,9 +313,9 @@ describe("Today", () => {
       next: { number: 43, date: "2026-11-17" },
     });
     renderAt();
-    expect(screen.getByText("الدورة ٢")).toBeInTheDocument();
+    expect(screen.getByText("الدورة 2")).toBeInTheDocument();
     expect(
-      screen.getByText("التالي: الختمة ٤٣ · الثلاثاء ١٧ نوفمبر ٨:٠٠ ص"),
+      screen.getByText("التالي: الختمة 43 · الثلاثاء 17 نوفمبر 8:00 ص"),
     ).toBeInTheDocument();
   });
 
@@ -328,7 +328,7 @@ describe("Today", () => {
     expect(named(t.rota.legendDone)).toHaveLength(27);
     expect(named(t.rota.legendUnread)).toHaveLength(2);
     expect(named(t.rota.legendReassigned)).toHaveLength(1);
-    expect(tiles[7]).toHaveAccessibleName("الجزء ٨، لم يُقرأ");
+    expect(tiles[7]).toHaveAccessibleName("الجزء 8، لم يُقرأ");
   });
 
   it("says when the day is complete", () => {
@@ -342,7 +342,7 @@ describe("Today", () => {
       },
     });
     renderAt();
-    expect(screen.getByRole("status")).toHaveTextContent("اكتملت الختمة ١٢");
+    expect(screen.getByRole("status")).toHaveTextContent("اكتملت الختمة 12");
   });
 
   it("shows a banner while paused", () => {
@@ -360,7 +360,7 @@ describe("Today", () => {
     });
     renderAt();
     expect(
-      screen.getByText("تبدأ الختمة ١ يوم الجمعة ٣٠ أكتوبر الساعة ٨:٠٠ ص"),
+      screen.getByText("تبدأ الختمة 1 يوم الجمعة 30 أكتوبر الساعة 8:00 ص"),
     ).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: t.rota.gridLabel })).toBeNull();
   });
@@ -369,9 +369,9 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
-    const sheet = screen.getByRole("dialog", { name: "الجزء ٨ لم يُقرأ بعد" });
+    const sheet = screen.getByRole("dialog", { name: "الجزء 8 لم يُقرأ بعد" });
     expect(within(sheet).getByText("صاحبه اليوم: سارة")).toBeInTheDocument();
     for (const action of [t.rota.assign, t.rota.readMyself, t.rota.markDone]) {
       expect(
@@ -384,7 +384,7 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent(t.rota.answerNone);
     expect(screen.getByRole("dialog")).not.toHaveTextContent(
@@ -392,7 +392,7 @@ describe("Today", () => {
     );
     await user.click(screen.getByRole("button", { name: t.sheet.close }));
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ١٠، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 10، لم يُقرأ" }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent(t.rota.answerNotYet);
   });
@@ -401,7 +401,7 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ١، تمّ" }),
+      within(grid()).getByRole("button", { name: "الجزء 1، تمّ" }),
     );
     expect(screen.getByRole("dialog")).not.toHaveTextContent(t.rota.answerNone);
   });
@@ -415,12 +415,12 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
     expect(screen.getByRole("dialog")).not.toHaveTextContent(t.rota.answerNone);
     await user.click(screen.getByRole("button", { name: t.sheet.close }));
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ١، تمّ" }),
+      within(grid()).getByRole("button", { name: "الجزء 1، تمّ" }),
     );
     expect(screen.getByRole("dialog")).not.toHaveTextContent(t.rota.answerNone);
   });
@@ -429,7 +429,7 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٩، أُسند" }),
+      within(grid()).getByRole("button", { name: "الجزء 9، أُسند" }),
     );
     const sheet = screen.getByRole("dialog");
     expect(within(sheet).getByText("صاحبه اليوم: خالد")).toBeInTheDocument();
@@ -440,11 +440,11 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
     await user.click(screen.getByRole("button", { name: t.rota.assign }));
     const sheet = screen.getByRole("dialog", {
-      name: "من يقرأ الجزء ٨ اليوم؟",
+      name: "من يقرأ الجزء 8 اليوم؟",
     });
     expect(
       within(sheet).getByRole("button", { name: /مريم/ }),
@@ -465,7 +465,7 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
     await user.click(screen.getByRole("button", { name: t.rota.readMyself }));
     expect(m.fns.reassign).toHaveBeenCalledWith({
@@ -479,7 +479,7 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
     await user.click(screen.getByRole("button", { name: t.rota.markDone }));
     expect(m.fns.markDone).toHaveBeenCalledWith({ ...args, readId: "r8" });
@@ -489,9 +489,9 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ١، تمّ" }),
+      within(grid()).getByRole("button", { name: "الجزء 1، تمّ" }),
     );
-    const sheet = screen.getByRole("dialog", { name: "الجزء ١ تمّت قراءته" });
+    const sheet = screen.getByRole("dialog", { name: "الجزء 1 تمّت قراءته" });
     expect(within(sheet).getByText("قرأه: مريم")).toBeInTheDocument();
     await user.click(
       within(sheet).getByRole("button", { name: t.rota.undoDone }),
@@ -509,7 +509,7 @@ describe("Today", () => {
       const user = userEvent.setup();
       renderAt();
       await user.click(
-        within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+        within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
       );
       await user.click(screen.getByRole("button", { name: t.rota.readMyself }));
       expect(await screen.findByRole("alert")).toHaveTextContent(message ?? "");
@@ -521,7 +521,7 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
     m.fns.markDone.mockRejectedValue(new ConvexError({ code: "forbidden" }));
     await user.click(screen.getByRole("button", { name: t.rota.markDone }));
@@ -589,7 +589,7 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     expect(screen.getByText(t.rota.setupNotDone)).toBeInTheDocument();
-    expect(screen.queryByText(/^تبدأ الختمة ١/)).toBeNull();
+    expect(screen.queryByText(/^تبدأ الختمة 1/)).toBeNull();
     await user.click(screen.getByRole("button", { name: t.rota.startKhatma }));
     expect(m.fns.finishSetup).toHaveBeenCalledWith(args);
   });
@@ -599,7 +599,7 @@ describe("Today", () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
     await user.click(screen.getByRole("button", { name: t.rota.markDone }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -714,7 +714,7 @@ describe("page", () => {
     );
     expect(screen.getByRole("list")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "اليوم" }));
-    expect(screen.getByText("٢٧ / ٣٠")).toBeInTheDocument();
+    expect(screen.getByText("27 / 30")).toBeInTheDocument();
   });
 });
 
@@ -730,7 +730,7 @@ describe("a co-organizer", () => {
     expect(grid()).toBeInTheDocument();
     // Today says when the next day starts without the settings.
     expect(
-      screen.getByText("التالي: الختمة ١٣ · غداً ٨:٠٠ ص"),
+      screen.getByText("التالي: الختمة 13 · غداً 8:00 ص"),
     ).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "المشاركون" })).toBeNull();
     // The People screen's 30 rows are an ordered list; Today has none.
@@ -875,7 +875,7 @@ describe("an archived khatma", () => {
     await user.click(screen.getByRole("button", { name: t.archive.restart }));
     const sheet = screen.getByRole("dialog", { name: t.archive.restartTitle });
     // Tuesday the 10th, noon in the khatma's zone: tomorrow is Wednesday the 11th.
-    expect(sheet).toHaveTextContent("غداً، الأربعاء ١١ نوفمبر");
+    expect(sheet).toHaveTextContent("غداً، الأربعاء 11 نوفمبر");
     await user.click(
       within(sheet).getByRole("button", { name: t.archive.restartConfirm }),
     );
@@ -1075,7 +1075,7 @@ describe("People", () => {
     renderAt("/j/CODE?tab=people");
     expect(
       screen.getByText(
-        /الختمة ١٣ يوم الأربعاء ١١ نوفمبر. هذا جزء كل مشارك فيها/,
+        /الختمة 13 يوم الأربعاء 11 نوفمبر. هذا جزء كل مشارك فيها/,
       ),
     ).toBeInTheDocument();
     expect(rows()).toHaveLength(30);
@@ -1084,7 +1084,7 @@ describe("People", () => {
     expect(rows()[2]).toHaveTextContent("مريم");
     expect(rows()[2]).toHaveTextContent(t.rota.secondJuz);
     expect(rows()[1]).not.toHaveTextContent(t.rota.secondJuz);
-    expect(rows()[6]).toHaveTextContent("+ أضف قارئاً للجزء ٧");
+    expect(rows()[6]).toHaveTextContent("+ أضف قارئاً للجزء 7");
   });
 
   it("before the start, says whose juz' khatma 1 holds", () => {
@@ -1095,7 +1095,7 @@ describe("People", () => {
     });
     renderAt("/j/CODE?tab=people");
     expect(
-      screen.getByText("جزء كل مشارك في الختمة ١، يوم الجمعة ٣٠ أكتوبر"),
+      screen.getByText("جزء كل مشارك في الختمة 1، يوم الجمعة 30 أكتوبر"),
     ).toBeInTheDocument();
   });
 
@@ -1108,10 +1108,10 @@ describe("People", () => {
     const user = userEvent.setup();
     renderAt("/j/CODE?tab=people");
     await user.click(rows()[6]?.querySelector("button") as HTMLElement);
-    const sheet = screen.getByRole("dialog", { name: "قارئ الجزء ٧" });
+    const sheet = screen.getByRole("dialog", { name: "قارئ الجزء 7" });
     expect(
       within(sheet).getByText(
-        "يقرأ الجزء ٧ في الختمة ١٣، ثم ٨ في الختمة ١٤، وهكذا.",
+        "يقرأ الجزء 7 في الختمة 13، ثم 8 في الختمة 14، وهكذا.",
       ),
     ).toBeInTheDocument();
     await user.type(within(sheet).getByLabelText(t.rota.personName), "خالد");
@@ -1139,7 +1139,7 @@ describe("People", () => {
     renderAt("/j/CODE?tab=people");
     await user.click(rows()[29]?.querySelector("button") as HTMLElement);
     expect(
-      screen.getByText("يقرأ الجزء ٣٠ في الختمة ٣٠، ثم ١ في الختمة ١، وهكذا."),
+      screen.getByText("يقرأ الجزء 30 في الختمة 30، ثم 1 في الختمة 1، وهكذا."),
     ).toBeInTheDocument();
   });
 
@@ -1302,7 +1302,7 @@ describe("People", () => {
     const user = userEvent.setup();
     renderAt("/j/CODE?tab=people");
     await user.click(rows()[6]?.querySelector("button") as HTMLElement);
-    const sheet = screen.getByRole("dialog", { name: "قارئ الجزء ٧" });
+    const sheet = screen.getByRole("dialog", { name: "قارئ الجزء 7" });
     const existing = within(sheet).getByRole("list", {
       name: t.rota.orGiveTo,
     });
@@ -1549,10 +1549,10 @@ describe("the new layout", () => {
   it("shows the open day as a card above the tabs", () => {
     renderAt();
     const card = screen.getByRole("region", {
-      name: "الختمة ١٢ · الثلاثاء ١٠ نوفمبر",
+      name: "الختمة 12 · الثلاثاء 10 نوفمبر",
     });
-    expect(card).toHaveTextContent("٢٧ / ٣٠");
-    expect(card).toHaveTextContent("التالي: الختمة ١٣ · غداً ٨:٠٠ ص");
+    expect(card).toHaveTextContent("27 / 30");
+    expect(card).toHaveTextContent("التالي: الختمة 13 · غداً 8:00 ص");
     expect(
       card.compareDocumentPosition(screen.getByRole("tablist")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -1566,9 +1566,9 @@ describe("the new layout", () => {
     await openCard(user);
     expect(within(grid()).getAllByRole("button")).toHaveLength(30);
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
-    const sheet = screen.getByRole("dialog", { name: "الجزء ٨ لم يُقرأ بعد" });
+    const sheet = screen.getByRole("dialog", { name: "الجزء 8 لم يُقرأ بعد" });
     expect(within(sheet).getByText("صاحبه اليوم: سارة")).toBeInTheDocument();
     await user.click(
       within(sheet).getByRole("button", { name: t.sheet.close }),
@@ -1581,7 +1581,7 @@ describe("the new layout", () => {
     renderAt();
     await openCard(user);
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
     await user.click(screen.getByRole("button", { name: t.rota.markDone }));
     expect(m.fns.markDone).toHaveBeenCalledWith({ ...args, readId: "r8" });
@@ -1598,7 +1598,7 @@ describe("the new layout", () => {
       },
     });
     renderAt();
-    expect(screen.getByText(/^اكتملت الختمة ١٢/)).toHaveAttribute(
+    expect(screen.getByText(/^اكتملت الختمة 12/)).toHaveAttribute(
       "role",
       "status",
     );
@@ -1613,7 +1613,7 @@ describe("the new layout", () => {
     m.settings = { ...ownerSettings, firstDatePassed: false };
     const user = userEvent.setup();
     renderAt();
-    const start = "تبدأ الختمة ١ يوم الجمعة ٣٠ أكتوبر الساعة ٨:٠٠ ص";
+    const start = "تبدأ الختمة 1 يوم الجمعة 30 أكتوبر الساعة 8:00 ص";
     expect(screen.queryByText(start)).toBeNull();
     expect(screen.queryByRole("button", { name: /افتح الأجزاء/ })).toBeNull();
     await user.click(screen.getByRole("tab", { name: t.rota.tabs.settings }));
@@ -1684,7 +1684,7 @@ describe("the new layout", () => {
     });
     renderAt();
     expect(
-      screen.getByText("تبدأ الختمة ١٣ يوم الثلاثاء ١٧ نوفمبر الساعة ٨:٠٠ ص"),
+      screen.getByText("تبدأ الختمة 13 يوم الثلاثاء 17 نوفمبر الساعة 8:00 ص"),
     ).toBeInTheDocument();
   });
 
@@ -1700,7 +1700,7 @@ describe("the new layout", () => {
     renderAt();
     await openCard(user);
     await user.click(
-      within(grid()).getByRole("button", { name: "الجزء ٨، لم يُقرأ" }),
+      within(grid()).getByRole("button", { name: "الجزء 8، لم يُقرأ" }),
     );
     await user.click(screen.getByRole("button", { name: t.sheet.close }));
     await user.click(screen.getByRole("button", { name: t.sheet.close }));
@@ -1731,7 +1731,7 @@ describe("the new layout", () => {
     renderAt();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(
-      screen.getByText("تبدأ الختمة ١ يوم الجمعة ٣٠ أكتوبر الساعة ٨:٠٠ ص"),
+      screen.getByText("تبدأ الختمة 1 يوم الجمعة 30 أكتوبر الساعة 8:00 ص"),
     ).toBeInTheDocument();
   });
 

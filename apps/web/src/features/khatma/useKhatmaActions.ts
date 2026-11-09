@@ -1,7 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { KhatmaView } from "@convex/khatmas";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import type {
   FinishResult,
   ReleaseResult,
@@ -280,7 +280,7 @@ export function useKhatmaActions(
       posthog.capture("juz_taken", { juz_number: juz });
       if (!mounted.current) return;
       options.onTaken?.(juz);
-      showToast(t.toast.taken(toArabicDigits(juz)));
+      showToast(t.toast.taken(toWesternDigits(juz)));
       return offerPush();
     }
     showToast(takeCopy[result.reason]);
@@ -299,7 +299,7 @@ export function useKhatmaActions(
       showToast(
         held === null
           ? t.errors.generic
-          : t.toast.takenOver(toArabicDigits(held)),
+          : t.toast.takenOver(toWesternDigits(held)),
       );
     } else {
       showToast(finishCopy[result.reason]);

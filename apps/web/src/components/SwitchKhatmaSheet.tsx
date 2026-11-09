@@ -1,5 +1,5 @@
 import type { api } from "@convex/_generated/api";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { JUZ, JUZ_COUNT } from "@convex/lib/juz";
 import type { FunctionReturnType } from "convex/server";
 import { Link } from "react-router";
@@ -107,13 +107,13 @@ function Row({
       <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-ink-soft">
         <span>
           {(khatma.kind === "rota" ? t.rota.cardLine : t.home.doneOf)(
-            toArabicDigits(khatma.done),
-            toArabicDigits(JUZ_COUNT),
+            toWesternDigits(khatma.done),
+            toWesternDigits(JUZ_COUNT),
           )}
         </span>
         {heldName !== null && khatma.holding !== null && (
           <span className="rounded-full bg-saffron-soft px-3 py-0.5 font-semibold text-saffron-ink">
-            {t.home.yours(toArabicDigits(khatma.holding), heldName)}
+            {t.home.yours(toWesternDigits(khatma.holding), heldName)}
           </span>
         )}
         {khatma.hasNote && (

@@ -65,7 +65,7 @@ test("rota on WhatsApp: a member joins and finishes their juz'", async ({
   const juzIn = async (listItem: Locator) =>
     Number(
       normalizeDigits(
-        (await listItem.textContent())?.match(/الجزء\s*([٠-٩]+)/)?.[1] ?? "",
+        (await listItem.textContent())?.match(/الجزء\s*(\d+)/)?.[1] ?? "",
       ),
     );
   const bJuz = await juzIn(row);

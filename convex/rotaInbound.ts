@@ -33,7 +33,7 @@ import {
   thanksText,
   whichKhatmaText,
 } from "./lib/rotaTemplates";
-import { maskPhone, toArabicDigits } from "./lib/text";
+import { maskPhone, toWesternDigits } from "./lib/text";
 import { localDate, localMinutes } from "./lib/wakingTime";
 import { khatmaTitle } from "./lib/whatsappTemplates";
 
@@ -474,7 +474,7 @@ async function declineRequests(
 
 /**
  * Button titles for `titles`, cut to what WhatsApp shows and kept apart:
- * a title equal to an earlier one ends in « ٢», « ٣».
+ * a title equal to an earlier one ends in « 2», « 3».
  */
 function distinctTitles(titles: string[]): string[] {
   const cut = (s: string, max: number) =>
@@ -484,7 +484,7 @@ function distinctTitles(titles: string[]): string[] {
     const base = cut(full, MAX_BUTTON_TITLE);
     let title = base;
     for (let n = 2; used.has(title); n++) {
-      const suffix = ` ${toArabicDigits(n)}`;
+      const suffix = ` ${toWesternDigits(n)}`;
       title = `${cut(base, MAX_BUTTON_TITLE - suffix.length)}${suffix}`;
     }
     used.add(title);

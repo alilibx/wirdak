@@ -1,6 +1,6 @@
 import { PageHeader } from "../components/PageHeader";
 import { api } from "@convex/_generated/api";
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { buttonVariants } from "@/components/ui/button";
 import { formatDate } from "@web/lib/format";
 import { useQuery } from "convex/react";
@@ -34,7 +34,7 @@ function OpenHelpCard({ adminToken }: { adminToken: string }) {
         )}
       </span>
       <span className="rounded-full bg-sidebar-primary px-3 py-1 font-semibold text-sidebar-primary-foreground">
-        {counts.open >= 100 ? t.help.manyOpen : toArabicDigits(counts.open)}
+        {counts.open >= 100 ? t.help.manyOpen : toWesternDigits(counts.open)}
       </span>
     </Link>
   );

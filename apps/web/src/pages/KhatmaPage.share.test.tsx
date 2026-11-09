@@ -146,9 +146,9 @@ describe("KhatmaPage invite and remind", () => {
     expect(screen.getByText("الرسالة لا تذكر أسماء أحد")).toBeVisible();
     const href = decodeURIComponent(link.getAttribute("href") ?? "");
     // 30 ajza', one done and one being read: 28 open, listed without 3 or 14.
-    expect(href).toContain("بقي ٢٨ جزءاً");
-    expect(href).toContain("١، ٢، ٤، ٥");
-    expect(href).not.toContain("١٤،");
+    expect(href).toContain("بقي 28 جزءاً");
+    expect(href).toContain("1، 2، 4، 5");
+    expect(href).not.toContain("14،");
     expect(href).toContain("حتى ");
     expect(href).toContain(`${location.origin}/j/CODE?from=SHARE9`);
     expect(href).not.toContain("سارة");

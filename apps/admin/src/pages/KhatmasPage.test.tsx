@@ -92,8 +92,8 @@ describe("KhatmasPage", () => {
       "href",
       "/people/p1",
     );
-    expect(within(row).getByText("٧")).toBeInTheDocument();
-    expect(within(row).getByText("٤")).toBeInTheDocument();
+    expect(within(row).getByText("7")).toBeInTheDocument();
+    expect(within(row).getByText("4")).toBeInTheDocument();
   });
 
   it("shows today's progress for a rota khatma, and a name for an unnamed one", () => {
@@ -101,7 +101,7 @@ describe("KhatmasPage", () => {
     const row = screen
       .getByRole("link", { name: t.lookup.unnamed })
       .closest("tr")!;
-    expect(within(row).getByText("١٢ / ٣٠")).toBeInTheDocument();
+    expect(within(row).getByText("12 / 30")).toBeInTheDocument();
     expect(
       within(row).getByText(t.khatmas.statuses.paused),
     ).toBeInTheDocument();

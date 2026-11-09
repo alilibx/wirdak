@@ -16,21 +16,21 @@ const duration: SettingSpec = {
 
 describe("formatSetting", () => {
   it("writes durations in the largest whole unit, never raw milliseconds", () => {
-    expect(formatSetting(duration, 3 * DAY)).toBe("٣ أيام");
-    expect(formatSetting(duration, 10 * MINUTE)).toBe("١٠ دقائق");
-    expect(formatSetting(duration, 45 * SECOND)).toBe("٤٥ ثانية");
-    expect(formatSetting(duration, 90 * MINUTE)).toBe("٩٠ دقيقة");
-    expect(formatSetting(duration, 0)).toBe("٠");
+    expect(formatSetting(duration, 3 * DAY)).toBe("3 أيام");
+    expect(formatSetting(duration, 10 * MINUTE)).toBe("10 دقائق");
+    expect(formatSetting(duration, 45 * SECOND)).toBe("45 ثانية");
+    expect(formatSetting(duration, 90 * MINUTE)).toBe("90 دقيقة");
+    expect(formatSetting(duration, 0)).toBe("0");
     expect(formatSetting(duration, 3 * DAY)).not.toContain("259200000");
   });
 
   it("writes a time of day on a twelve-hour clock", () => {
     const time: SettingSpec = { kind: "time", group: "rota" };
-    expect(formatSetting(time, 480)).toBe("٨:٠٠ ص");
-    expect(formatSetting(time, 1260)).toBe("٩:٠٠ م");
-    expect(formatSetting(time, 0)).toBe("١٢:٠٠ ص");
-    expect(formatSetting(time, 720)).toBe("١٢:٠٠ م");
-    expect(formatSetting(time, 1425)).toBe("١١:٤٥ م");
+    expect(formatSetting(time, 480)).toBe("8:00 ص");
+    expect(formatSetting(time, 1260)).toBe("9:00 م");
+    expect(formatSetting(time, 0)).toBe("12:00 ص");
+    expect(formatSetting(time, 720)).toBe("12:00 م");
+    expect(formatSetting(time, 1425)).toBe("11:45 م");
   });
 
   it("writes hours, switches, empty text and numbers", () => {
@@ -51,10 +51,10 @@ describe("formatSetting", () => {
     ).toBe("—");
     expect(
       formatSetting({ kind: "int", min: 2, max: 500, group: "limits" }, 60),
-    ).toBe("٦٠");
+    ).toBe("60");
     expect(
       formatSetting({ kind: "number", min: 1, max: 5, group: "pace" }, 1.5),
-    ).toBe("١٫٥");
+    ).toBe("1.5");
     expect(formatSetting({ kind: "version", group: "switches" }, "0.3.0")).toBe(
       "0.3.0",
     );

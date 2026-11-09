@@ -274,7 +274,7 @@ test("two milestones crossed at once: both marked, only the highest pushed", asy
   ).toEqual([10, 50, 100]);
   const pushes = await scheduledPushes(t);
   expect(pushes).toHaveLength(1);
-  expect(pushes[0]?.body).toContain("١٠٠");
+  expect(pushes[0]?.body).toContain("100");
 
   // A later crossing inside the spacing window waits, unmarked, for the next run.
   await day(t, D - 1, { totalKhatmas: 260, totalMembers: 10 });
@@ -328,7 +328,7 @@ test("the morning summary goes out once, at the summary hour", async () => {
   expect(pushes).toHaveLength(1);
   expect(pushes[0]).toMatchObject({ kind: "summary" });
   expect(pushes[0]?.body).toBe(
-    "أمس: ختمات جديدة ١٢ · أعضاء جدد ١٤٠ · أجزاء مقروءة ٢١٤ · ختمات مكتملة ٣ · طلبات مساعدة مفتوحة ٠",
+    "أمس: ختمات جديدة 12 · أعضاء جدد 140 · أجزاء مقروءة 214 · ختمات مكتملة 3 · طلبات مساعدة مفتوحة 0",
   );
 
   vi.setSystemTime(dayStart(D) + 9 * HOUR + 5 * 60_000);
@@ -388,7 +388,7 @@ test("milestones crossed together are pushed one per run, none lost", async () =
       .sort();
   expect(await sent()).toEqual(["khatmas:10"]);
   expect((await scheduledPushes(t))[0]?.body).toBe(
-    "🎉 وصلنا ١٠ ختمات\n١٥٠ عضواً · ٠ ختمة مكتملة",
+    "🎉 وصلنا 10 ختمات\n150 عضواً · 0 ختمة مكتملة",
   );
   vi.setSystemTime(Date.now() + 2 * 60_000);
   await t.mutation(internal.stats.checkMilestones, {});

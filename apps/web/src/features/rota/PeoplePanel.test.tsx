@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -96,7 +96,7 @@ describe("PeoplePanel", () => {
   it("shows no leftover box when an admin turned it off, and the open rows still invite an add", () => {
     m.view = { ...makeView(), leftoverBox: false };
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
-    expect(screen.queryByText("بقي ٢٨ جزءاً بلا قارئ")).toBeNull();
+    expect(screen.queryByText("بقي 28 جزءاً بلا قارئ")).toBeNull();
     expect(screen.queryByRole("button", { name: t.rota.spread })).toBeNull();
     expect(screen.getByText(t.rota.addReader(3))).toBeInTheDocument();
   });
@@ -107,7 +107,7 @@ describe("PeoplePanel", () => {
       .mockResolvedValue({ ok: true, given: 2, left: 26 });
     const user = userEvent.setup();
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
-    const count = screen.getByText("بقي ٢٨ جزءاً بلا قارئ");
+    const count = screen.getByText("بقي 28 جزءاً بلا قارئ");
     const firstRow = screen.getByRole("button", { name: /سعد/ });
     expect(
       count.compareDocumentPosition(firstRow) &
@@ -147,13 +147,13 @@ describe("PeoplePanel", () => {
     };
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
     // The count still shows: the organizer can add people or free a row.
-    expect(screen.getByText("بقي ٢٨ جزءاً بلا قارئ")).toBeInTheDocument();
+    expect(screen.getByText("بقي 28 جزءاً بلا قارئ")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: t.rota.spread })).toBeNull();
   });
 
   it("has no count or spread once archived", () => {
     render(<PeoplePanel inviteCode="CODE" archived viewerIsOwner />);
-    expect(screen.queryByText("بقي ٢٨ جزءاً بلا قارئ")).toBeNull();
+    expect(screen.queryByText("بقي 28 جزءاً بلا قارئ")).toBeNull();
     expect(screen.queryByRole("button", { name: t.rota.spread })).toBeNull();
   });
 
@@ -171,7 +171,7 @@ describe("PeoplePanel", () => {
     const user = userEvent.setup();
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
     await user.click(
-      screen.getByRole("button", { name: /أضف قارئاً للجزء ٥/ }),
+      screen.getByRole("button", { name: /أضف قارئاً للجزء 5/ }),
     );
     const sheet = screen.getByRole("dialog", { name: t.rota.readerTitle(5) });
     await user.click(
@@ -197,7 +197,7 @@ describe("PeoplePanel", () => {
     const user = userEvent.setup();
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
     await user.click(
-      screen.getByRole("button", { name: /أضف قارئاً للجزء ٥/ }),
+      screen.getByRole("button", { name: /أضف قارئاً للجزء 5/ }),
     );
     const sheet = screen.getByRole("dialog", { name: t.rota.readerTitle(5) });
     await user.type(within(sheet).getByLabelText(t.rota.personName), "ليلى");
@@ -233,7 +233,7 @@ describe("PeoplePanel", () => {
     const user = userEvent.setup();
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
     await user.click(
-      screen.getByRole("button", { name: /أضف قارئاً للجزء ٥/ }),
+      screen.getByRole("button", { name: /أضف قارئاً للجزء 5/ }),
     );
     await user.click(
       within(
@@ -264,7 +264,7 @@ describe("PeoplePanel", () => {
     const user = userEvent.setup();
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
     await user.click(
-      screen.getByRole("button", { name: /أضف قارئاً للجزء ٥/ }),
+      screen.getByRole("button", { name: /أضف قارئاً للجزء 5/ }),
     );
     const sheet = screen.getByRole("dialog", { name: t.rota.readerTitle(5) });
     await user.click(within(sheet).getByRole("button", { name: t.rota.add }));
@@ -359,7 +359,7 @@ describe("PeoplePanel", () => {
     m.saved = [];
     render(<PeoplePanel inviteCode="CODE" archived={false} viewerIsOwner />);
     await user.click(
-      screen.getByRole("button", { name: /أضف قارئاً للجزء ٥/ }),
+      screen.getByRole("button", { name: /أضف قارئاً للجزء 5/ }),
     );
     expect(screen.queryByRole("button", { name: t.rota.savedFrom })).toBeNull();
   });
@@ -420,7 +420,7 @@ describe("PeoplePanel", () => {
       name: new RegExp(t.rota.freeThis(juz)),
     });
     /** A juz' row, not the row of another juz' that starts with the same digit. */
-    const row = (juz: number) => new RegExp(`^${toArabicDigits(juz)}(?![٠-٩])`);
+    const row = (juz: number) => new RegExp(`^${toWesternDigits(juz)}(?!\\d)`);
 
     it("frees the juz' that was pressed for someone who reads two, and keeps them", async () => {
       m.view = twoView();

@@ -340,7 +340,7 @@ describe("SettingsPage", () => {
       m.stats = { paceDays: null, juzRead: 4, weekStreak: null };
       renderPage();
       const block = screen.getByRole("region", { name: t.settings.numbers });
-      expect(block).toHaveTextContent("قرأتَ ٤ أجزاء");
+      expect(block).toHaveTextContent("قرأتَ 4 أجزاء");
       expect(block).not.toHaveTextContent("عادةً تُتمّ الجزء");
       expect(block).not.toHaveTextContent("متتالية");
     });
@@ -349,16 +349,16 @@ describe("SettingsPage", () => {
       m.stats = { paceDays: 3, juzRead: 12, weekStreak: 5 };
       renderPage();
       const block = screen.getByRole("region", { name: t.settings.numbers });
-      expect(block).toHaveTextContent("قرأتَ ١٢ جزءاً");
+      expect(block).toHaveTextContent("قرأتَ 12 جزءاً");
       expect(block).toHaveTextContent(t.card.pace(3));
-      expect(block).toHaveTextContent("٥ أسابيع متتالية تقرأ فيها");
+      expect(block).toHaveTextContent("5 أسابيع متتالية تقرأ فيها");
     });
 
     it.each([
       [1, "قرأتَ جزءاً واحداً"],
       [2, "قرأتَ جزأين"],
-      [10, "قرأتَ ١٠ أجزاء"],
-      [11, "قرأتَ ١١ جزءاً"],
+      [10, "قرأتَ 10 أجزاء"],
+      [11, "قرأتَ 11 جزءاً"],
     ])("agrees the juz' count for %s", (juzRead, text) => {
       m.stats = { paceDays: null, juzRead, weekStreak: null };
       renderPage();
@@ -367,8 +367,8 @@ describe("SettingsPage", () => {
 
     it.each([
       [2, "أسبوعين متتاليين تقرأ فيهما"],
-      [3, "٣ أسابيع متتالية تقرأ فيها"],
-      [11, "١١ أسبوعاً متتالياً تقرأ فيه"],
+      [3, "3 أسابيع متتالية تقرأ فيها"],
+      [11, "11 أسبوعاً متتالياً تقرأ فيه"],
     ])("agrees the streak for %s weeks", (weekStreak, text) => {
       m.stats = { paceDays: null, juzRead: 5, weekStreak };
       renderPage();

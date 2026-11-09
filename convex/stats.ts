@@ -9,7 +9,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { counted, type CountForms } from "./lib/arabicCount";
-import { toArabicDigits } from "./lib/digits";
+import { toWesternDigits } from "./lib/digits";
 import { isArchived } from "./lib/khatma";
 import { milestonesFor, type MilestoneMetric } from "./lib/milestones";
 import { getSetting } from "./lib/settings";
@@ -258,7 +258,7 @@ const NOUN: Record<MilestoneMetric, CountForms> = {
   },
 };
 
-const n = (value: number) => toArabicDigits(value);
+const n = (value: number) => toWesternDigits(value);
 
 /** The three totals now: the newest row's plus today's live counts. */
 async function totals(ctx: QueryCtx): Promise<Record<MilestoneMetric, number>> {

@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import { t } from "../i18n/ar";
 import { Button } from "./Button";
 import { Sheet } from "./Sheet";
@@ -16,7 +16,7 @@ export function ReleaseSheet({ juz, busy, onConfirm, onClose }: Props) {
     <Sheet title={t.release.title} onClose={onClose}>
       {juz !== null && (
         <p className="leading-relaxed text-ink-soft">
-          {t.release.body(toArabicDigits(juz))}
+          {t.release.body(toWesternDigits(juz))}
         </p>
       )}
       <div className="mt-5 grid gap-3">

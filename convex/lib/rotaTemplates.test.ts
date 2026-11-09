@@ -40,11 +40,11 @@ test("the juz' template: title header, khatma number and juz' (nominative), two 
   expect(juzTemplate(khatma, two, 12, payloads)).toEqual({
     name: "wirdak_rota_juz_v2",
     header: "ختمة العائلة",
-    body: ["١٢", "الجزآن ٥ و٦"],
+    body: ["12", "الجزآن 5 و6"],
     quickReplies: [payloads.done, payloads.notYet],
   });
-  expect(body(one)).toEqual(["١٢", "الجزء ٢٦"]);
-  expect(body(three)).toEqual(["١٢", "الأجزاء ٣، ٥ و٦"]);
+  expect(body(one)).toEqual(["12", "الجزء 26"]);
+  expect(body(three)).toEqual(["12", "الأجزاء 3، 5 و6"]);
 });
 
 test("the reminder template: the juz' phrase is genitive, after «قراءة»", () => {
@@ -52,11 +52,11 @@ test("the reminder template: the juz' phrase is genitive, after «قراءة»",
   expect(reminderTemplate(khatma, one, payloads)).toEqual({
     name: "wirdak_rota_reminder",
     header: "ختمة العائلة",
-    body: ["الجزء ٢٦"],
+    body: ["الجزء 26"],
     quickReplies: [payloads.done, payloads.notYet],
   });
-  expect(body(two)).toEqual(["الجزأين ٥ و٦"]);
-  expect(body(three)).toEqual(["الأجزاء ٣، ٥ و٦"]);
+  expect(body(two)).toEqual(["الجزأين 5 و6"]);
+  expect(body(three)).toEqual(["الأجزاء 3، 5 و6"]);
 });
 
 test("the assigned template puts the genitive juz' before the khatma number", () => {
@@ -65,11 +65,11 @@ test("the assigned template puts the genitive juz' before the khatma number", ()
   expect(assignedTemplate(khatma, three, 7, payloads)).toEqual({
     name: "wirdak_rota_assigned_v2",
     header: "ختمة العائلة",
-    body: ["الأجزاء ٣، ٥ و٦", "٧"],
+    body: ["الأجزاء 3، 5 و6", "7"],
     quickReplies: [payloads.done, payloads.notYet],
   });
-  expect(body(one)).toEqual(["الجزء ٢٦", "٧"]);
-  expect(body(two)).toEqual(["الجزأين ٥ و٦", "٧"]);
+  expect(body(one)).toEqual(["الجزء 26", "7"]);
+  expect(body(two)).toEqual(["الجزأين 5 و6", "7"]);
 });
 
 test("the covered template has no buttons", () => {
@@ -77,17 +77,17 @@ test("the covered template has no buttons", () => {
   expect(coveredTemplate(khatma, one)).toEqual({
     name: "wirdak_rota_covered_v2",
     header: "ختمة العائلة",
-    body: ["الجزء ٢٦"],
+    body: ["الجزء 26"],
   });
-  expect(body(two)).toEqual(["الجزأين ٥ و٦"]);
-  expect(body(three)).toEqual(["الأجزاء ٣، ٥ و٦"]);
+  expect(body(two)).toEqual(["الجزأين 5 و6"]);
+  expect(body(three)).toEqual(["الأجزاء 3، 5 و6"]);
 });
 
 test("the complete template carries the dua payload as its one button", () => {
   expect(completeTemplate(khatma, 30, "r1|p|dua|d|x")).toEqual({
     name: "wirdak_rota_complete",
     header: "ختمة العائلة",
-    body: ["٣٠"],
+    body: ["30"],
     quickReplies: ["r1|p|dua|d|x"],
   });
 });
@@ -106,9 +106,9 @@ test("an unnamed khatma gets the untitled-date header", () => {
 
 test("welcome text names the day and time of the next message, if any", () => {
   expect(
-    welcomeText("أحمد", "ختمة العائلة", { weekday: "الخميس", time: "٨:٠٠ ص" }),
+    welcomeText("أحمد", "ختمة العائلة", { weekday: "الخميس", time: "8:00 ص" }),
   ).toBe(
-    "أهلاً أحمد، انضممت إلى ختمة العائلة. تصلك رسالة جزئك يوم الخميس الساعة ٨:٠٠ ص.",
+    "أهلاً أحمد، انضممت إلى ختمة العائلة. تصلك رسالة جزئك يوم الخميس الساعة 8:00 ص.",
   );
   expect(welcomeText("أحمد", "ختمة العائلة", null)).toBe(
     "أهلاً أحمد، انضممت إلى ختمة العائلة.",
@@ -119,24 +119,27 @@ test("welcome text names the day and time of the next message, if any", () => {
   );
 });
 
-test("the free texts use Arabic digits", () => {
-  expect(juzText(3, one)).toBe(
-    "تحديث على قراءتك اليوم في الختمة ٣: المسجَّل لك الجزء ٢٦ من هذه الختمة.",
+test("the free texts use Western digits", () => {
+  expect(juzText(one)).toBe(
+    "السلام عليكم، جزؤكم اليوم هو 26. انقروا «أتممت» بعد القراءة.",
   );
-  expect(juzText(3, two)).toBe(
-    "تحديث على قراءتك اليوم في الختمة ٣: المسجَّل لك الجزآن ٥ و٦ من هذه الختمة.",
+  expect(juzText(two)).toBe(
+    "السلام عليكم، أجزاؤكم اليوم هي 5 و6. انقروا «أتممت» بعد القراءة.",
   );
-  expect(juzText(3, three)).toBe(
-    "تحديث على قراءتك اليوم في الختمة ٣: المسجَّل لك الأجزاء ٣، ٥ و٦ من هذه الختمة.",
+  expect(juzText(three)).toBe(
+    "السلام عليكم، أجزاؤكم اليوم هي 3، 5 و6. انقروا «أتممت» بعد القراءة.",
+  );
+  expect(juzText(one, false)).toBe(
+    "جزؤكم اليوم هو 26. انقروا «أتممت» بعد القراءة.",
   );
   expect(reminderText(two)).toBe(
-    "تذكير بقراءتك اليوم: لم تُسجَّل بعد قراءة الجزأين ٥ و٦ في هذه الختمة.",
+    "تذكير بقراءتك اليوم: لم تُسجَّل بعد قراءة الجزأين 5 و6 في هذه الختمة.",
   );
   expect(assignedText(three, 7)).toBe(
-    "تحديث على قراءتك: سُجِّلت لك قراءة الأجزاء ٣، ٥ و٦ في الختمة ٧ لهذا اليوم.",
+    "تحديث على قراءتك: سُجِّلت لك قراءة الأجزاء 3، 5 و6 في الختمة 7 لهذا اليوم.",
   );
-  expect(thanksText(12)).toBe("تقبّل الله منك. ١٢ من ٣٠ جزءاً تمّت اليوم.");
-  expect(notYetText("٤:٠٠ م")).toBe("لا بأس، نذكّرك الساعة ٤:٠٠ م.");
+  expect(thanksText(12)).toBe("تقبّل الله منك. 12 من 30 جزءاً تمّت اليوم.");
+  expect(notYetText("4:00 م")).toBe("لا بأس، نذكّرك الساعة 4:00 م.");
   expect(notYetText(null)).toBe("لا بأس.");
 });
 
@@ -169,12 +172,12 @@ test("the dua text holds both duas verbatim, with references", () => {
 });
 
 test("clockText reads a time of day in 12 hours with its part of the day", () => {
-  expect(clockText(480)).toBe("٨ صباحاً");
-  expect(clockText(510)).toBe("٨:٣٠ صباحاً");
-  expect(clockText(0)).toBe("١٢ صباحاً");
-  expect(clockText(720)).toBe("١٢ ظهراً");
-  expect(clockText(960)).toBe("٤ عصراً");
-  expect(clockText(1245)).toBe("٨:٤٥ مساءً");
+  expect(clockText(480)).toBe("8 صباحاً");
+  expect(clockText(510)).toBe("8:30 صباحاً");
+  expect(clockText(0)).toBe("12 صباحاً");
+  expect(clockText(720)).toBe("12 ظهراً");
+  expect(clockText(960)).toBe("4 عصراً");
+  expect(clockText(1245)).toBe("8:45 مساءً");
 });
 
 test("weekdayText names the weekday of a date", () => {

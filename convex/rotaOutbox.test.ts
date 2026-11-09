@@ -289,7 +289,7 @@ test("a juz' message inside the window goes as interactive buttons", async () =>
   expect(sent).toEqual([
     {
       to: "971500000002",
-      text: `*ختمة العائلة*\nتحديث على قراءتك اليوم في الختمة ١: المسجَّل لك الجزآن ٢ و٣ من هذه الختمة.\n[أتممت] ${done}\n[ليس بعد] ${notYet}`,
+      text: `*ختمة العائلة*\nالسلام عليكم، أجزاؤكم اليوم هي 2 و3. انقروا «أتممت» بعد القراءة.\n[أتممت] ${done}\n[ليس بعد] ${notYet}`,
     },
   ]);
   expect((await rows(t))[0]?.sentAt).toBeGreaterThanOrEqual(NOW);
@@ -311,7 +311,7 @@ test("a juz' message outside the window goes as the template with payloads", asy
   expect(sent).toEqual([
     {
       to: "971500000002",
-      text: `[wirdak_rota_juz_v2] ختمة العائلة | ١ | الجزآن ٢ و٣ | ${done} | ${notYet}`,
+      text: `[wirdak_rota_juz_v2] ختمة العائلة | 1 | الجزآن 2 و3 | ${done} | ${notYet}`,
     },
   ]);
 });
@@ -353,7 +353,7 @@ test("a completion message inside the window is the completion line, then the du
     },
   ]);
   expect(completeText(1)).toBe(
-    "تحديث على الختمة: اكتملت قراءة الأجزاء الثلاثين في الختمة ١ لهذا اليوم.",
+    "تحديث على الختمة: اكتملت قراءة الأجزاء الثلاثين في الختمة 1 لهذا اليوم.",
   );
 });
 
@@ -370,7 +370,7 @@ test("a completion message outside the window is the template with the dua butto
   expect(sent).toEqual([
     {
       to: "971500000002",
-      text: `[wirdak_rota_complete] ختمة العائلة | ١ | ${dua}`,
+      text: `[wirdak_rota_complete] ختمة العائلة | 1 | ${dua}`,
     },
   ]);
 });
@@ -440,7 +440,7 @@ test("covered and cycle messages go as their template, or as plain text in the w
   );
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   expect(sent.map((s) => s.text)).toEqual([
-    "[wirdak_rota_covered_v2] ختمة العائلة | الجزأين ٢ و٣",
+    "[wirdak_rota_covered_v2] ختمة العائلة | الجزأين 2 و3",
     "[wirdak_rota_cycle] ختمة العائلة",
   ]);
 
@@ -451,7 +451,7 @@ test("covered and cycle messages go as their template, or as plain text in the w
   expect(sent).toEqual([
     {
       to: "971500000002",
-      text: "*ختمة العائلة*\nتحديث على قراءتك: سُجِّلت اليوم قراءة الجزأين ٢ و٣ باسم قارئ آخر في هذه الختمة.",
+      text: "*ختمة العائلة*\nتحديث على قراءتك: سُجِّلت اليوم قراءة الجزأين 2 و3 باسم قارئ آخر في هذه الختمة.",
     },
   ]);
 });
@@ -604,8 +604,8 @@ test("a message names only the ajza' still waiting on the participant, not the o
     });
     await t.finishAllScheduledFunctions(vi.runAllTimers);
     expect(sent).toHaveLength(1);
-    expect(sent[0]?.text).toContain("الجزء ٢");
-    expect(sent[0]?.text).not.toContain("٣");
+    expect(sent[0]?.text).toMatch(/(الجزء|جزؤكم اليوم هو) 2[^\d]/);
+    expect(sent[0]?.text).not.toMatch(/و3|الجزآن|الجزأين|أجزاؤكم/);
   }
 });
 
@@ -622,8 +622,8 @@ test("outside the window the template carries only the ajza' still waiting", asy
   });
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   expect(sent).toHaveLength(1);
-  expect(sent[0]?.text).toContain("٢");
-  expect(sent[0]?.text).not.toContain("٣");
+  expect(sent[0]?.text).toContain("| الجزء 2 |");
+  expect(sent[0]?.text).not.toMatch(/الجزآن|الجزأين|و3/);
 });
 
 test("a stop that lands between plan and markSent stops the send", async () => {
@@ -667,7 +667,7 @@ test("a welcome inside the window goes free-form with today's juz' and the butto
   expect(sent[0]?.to).toBe(PHONE.slice(1));
   expect(text).toContain("*ختمة العائلة*");
   expect(text).toContain("أهلاً سارة");
-  expect(text).toContain(juzText(1, [2, 3]));
+  expect(text).toContain(juzText([2, 3], false));
   expect(text).toContain(`[${ROTA_BUTTONS.done}]`);
   expect(text).toContain(`[${ROTA_BUTTONS.notYet}]`);
   expect((await rows(t))[0]?.sentAt).not.toBeNull();

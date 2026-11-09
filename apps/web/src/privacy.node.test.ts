@@ -43,8 +43,8 @@ describe("privacy policy: help requests", () => {
     for (const words of [
       "صورة الشاشة",
       "تسجيل صوتي",
-      "٣٠ يوماً",
-      "١٨٠ يوماً",
+      "30 يوماً",
+      "180 يوماً",
     ]) {
       expect(ar).toContain(words);
     }

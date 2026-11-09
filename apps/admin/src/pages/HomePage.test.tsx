@@ -65,18 +65,18 @@ describe("dashboard", () => {
     );
   });
 
-  it("shows the six tiles in Arabic digits", () => {
+  it("shows the six tiles in Western digits", () => {
     renderPage();
-    for (const text of ["١٠٤", "١٬٠٣٨", "٢١٤", "٣", "٥", "٤ أيام", "٩٢٪"]) {
+    for (const text of ["104", "1,038", "214", "3", "5", "4 أيام", "92%"]) {
       expect(screen.getAllByText(text).length).toBeGreaterThan(0);
     }
-    expect(screen.getByText(t.stats.newThisWeek("١٤٠"))).toBeInTheDocument();
+    expect(screen.getByText(t.stats.newThisWeek("140"))).toBeInTheDocument();
   });
 
   it("counts the rotating khatma days completed this week", () => {
     renderPage();
     const tile = screen.getByText(t.stats.rotaDaysCompleted).parentElement!;
-    expect(within(tile).getByText("١٧")).toBeInTheDocument();
+    expect(within(tile).getByText("17")).toBeInTheDocument();
     expect(within(tile).getByText(t.stats.thisWeek)).toBeInTheDocument();
   });
 
@@ -121,7 +121,7 @@ describe("days per round", () => {
   it("shows days with one decimal, never hours", () => {
     m.overview = { ...base, daysPerRoundMedian: 29.4 };
     renderPage();
-    expect(screen.getByText("٢٩٫٤ يوم")).toBeInTheDocument();
+    expect(screen.getByText("29.4 يوم")).toBeInTheDocument();
     expect(screen.queryByText(/ساعة/)).not.toBeInTheDocument();
   });
 });

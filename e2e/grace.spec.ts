@@ -71,18 +71,18 @@ test("grace end: juz opens, organizer is told and takes it, reader is thanked", 
   const inviteUrl = await startKhatma(page);
   const code = new URL(inviteUrl).pathname.split("/j/")[1] ?? "";
   expect(code).not.toBe("");
-  const { b, context } = await joinAndTake(browser, inviteUrl, "٥");
+  const { b, context } = await joinAndTake(browser, inviteUrl, "5");
   try {
     await forceGraceEnd(code, 5);
 
     // A: tile 5 reads "open" with no name, and the note offers it.
     await page.reload();
     await page.getByRole("tab", { name: t.nav.tabs.pool }).click();
-    const tile = juzTile(page, "٥");
+    const tile = juzTile(page, "5");
     await expect(tile).toContainText(t.tile.open);
     await expect(tile).not.toContainText(t.tile.reading);
     await page.getByRole("tab", { name: t.nav.tabs.mine }).click();
-    await expect(page.getByText(openNote("٥"))).toBeVisible();
+    await expect(page.getByText(openNote("5"))).toBeVisible();
 
     // A takes it from the note.
     await page.getByRole("button", { name: t.notes.takeJuz }).click();
@@ -121,7 +121,7 @@ test("release: the organizer's note reads the same as for a timeout", async ({
   browser,
 }) => {
   const inviteUrl = await startKhatma(page);
-  const { b, context } = await joinAndTake(browser, inviteUrl, "٦");
+  const { b, context } = await joinAndTake(browser, inviteUrl, "6");
   try {
     await b.getByRole("button", { name: t.card.release }).click();
     await b
@@ -131,9 +131,9 @@ test("release: the organizer's note reads the same as for a timeout", async ({
     await expect(b.getByText(t.card.held)).toBeHidden();
 
     await page.reload();
-    await expect(page.getByText(openNote("٦"))).toBeVisible();
+    await expect(page.getByText(openNote("6"))).toBeVisible();
     await page.getByRole("tab", { name: t.nav.tabs.pool }).click();
-    await expect(juzTile(page, "٦")).toContainText(t.tile.open);
+    await expect(juzTile(page, "6")).toContainText(t.tile.open);
   } finally {
     await context.close();
   }
@@ -142,7 +142,7 @@ test("release: the organizer's note reads the same as for a timeout", async ({
 // A finish that stands reaches the reader still on a juz', in words that name nobody.
 test("a finish cheers the reader still reading", async ({ page, browser }) => {
   const inviteUrl = await startKhatma(page);
-  const { b, context } = await joinAndTake(browser, inviteUrl, "٥");
+  const { b, context } = await joinAndTake(browser, inviteUrl, "5");
   try {
     await page.getByRole("button", { name: t.card.take }).click();
     await page

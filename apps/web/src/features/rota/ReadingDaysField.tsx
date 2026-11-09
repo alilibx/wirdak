@@ -1,4 +1,4 @@
-import { toArabicDigits } from "@convex/lib/digits";
+import { toWesternDigits } from "@convex/lib/digits";
 import type { ReadingDays } from "@convex/lib/rota";
 import { useId } from "react";
 import { t } from "../../i18n/ar";
@@ -128,7 +128,7 @@ export function ReadingDaysField({
                   {MONTH_DAYS.map((day) => (
                     <Chip
                       key={day}
-                      label={toArabicDigits(day)}
+                      label={toWesternDigits(day)}
                       on={value.days.includes(day)}
                       onClick={() =>
                         onChange({ ...value, days: toggled(value.days, day) })

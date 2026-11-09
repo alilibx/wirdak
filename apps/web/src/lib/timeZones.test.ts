@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { timeZoneLabel, timeZoneOptions } from "./timeZones";
 
 describe("timeZoneLabel", () => {
-  it("names a zone in Arabic, with its offset in Arabic digits", () => {
-    expect(timeZoneLabel("Asia/Dubai")).toBe("توقيت الخليج (غرينتش+٤)");
+  it("names a zone in Arabic, with its offset in Western digits", () => {
+    expect(timeZoneLabel("Asia/Dubai")).toBe("توقيت الخليج (غرينتش+4)");
   });
 
   it("gives today's offset, not an old one", () => {
-    expect(timeZoneLabel("Europe/Istanbul")).toContain("(غرينتش+٣)");
+    expect(timeZoneLabel("Europe/Istanbul")).toContain("(غرينتش+3)");
   });
 });
 

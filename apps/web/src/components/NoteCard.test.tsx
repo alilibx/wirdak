@@ -33,7 +33,7 @@ describe("NoteCard", () => {
     render(<NoteCard note={note()} takeJuz={null} {...h} />);
     expect(
       screen.getByText(
-        "مهلة الجزء ١٢ أوشكت على الانتهاء. هل تحتاج وقتاً أطول؟",
+        "مهلة الجزء 12 أوشكت على الانتهاء. هل تحتاج وقتاً أطول؟",
       ),
     ).toBeInTheDocument();
     expect(names()).toEqual([

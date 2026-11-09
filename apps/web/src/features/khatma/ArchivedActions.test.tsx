@@ -146,7 +146,7 @@ describe("ArchivedSection", () => {
     await user.click(screen.getByRole("button", { name: t.archive.restart }));
     const again = sheet(t.archive.restartTitle);
     expect(within(again).getByText(t.archive.restartBody)).toBeInTheDocument();
-    expect(again).toHaveTextContent("غداً، الجمعة ٣٠ أكتوبر");
+    expect(again).toHaveTextContent("غداً، الجمعة 30 أكتوبر");
   });
 
   it("calls startAgain with tomorrow in the khatma's own zone and goes to the setup", async () => {

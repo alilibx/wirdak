@@ -28,7 +28,7 @@ describe("MainCard", () => {
     });
     render(<MainCard view={view} {...handlers()} />);
     expect(
-      screen.getByText("نقترح عليك الجزء ١٩ «وقال الذين»"),
+      screen.getByText("نقترح عليك الجزء 19 «وقال الذين»"),
     ).toBeInTheDocument();
   });
 
@@ -67,7 +67,7 @@ describe("MainCard", () => {
       },
     });
     render(<MainCard view={view} {...h} />);
-    expect(screen.getByText("١٤")).toBeInTheDocument();
+    expect(screen.getByText("14")).toBeInTheDocument();
     expect(screen.getByText("ربما")).toBeInTheDocument();
     expect(screen.getByText("يبدأ من سورة الحجر")).toBeInTheDocument();
     await userEvent.click(
@@ -183,10 +183,10 @@ describe("MainCard", () => {
   it.each([
     [1, "عادةً تُتمّ الجزء في نحو يوم"],
     [2, "عادةً تُتمّ الجزء في نحو يومين"],
-    [3, "عادةً تُتمّ الجزء في نحو ٣ أيام"],
-    [7, "عادةً تُتمّ الجزء في نحو ٧ أيام"],
+    [3, "عادةً تُتمّ الجزء في نحو 3 أيام"],
+    [7, "عادةً تُتمّ الجزء في نحو 7 أيام"],
     // the server decides the number; the client never clamps or rounds it
-    [12, "عادةً تُتمّ الجزء في نحو ١٢ يوماً"],
+    [12, "عادةً تُتمّ الجزء في نحو 12 يوماً"],
   ])("pace of %s days shows its line", (paceDays, text) => {
     render(
       <MainCard

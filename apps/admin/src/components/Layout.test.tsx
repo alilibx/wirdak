@@ -72,7 +72,7 @@ describe("Layout", () => {
   it("shows the open help count", () => {
     m.open = 7;
     renderAt("/");
-    expect(screen.getByText("٧")).toBeInTheDocument();
+    expect(screen.getByText("7")).toBeInTheDocument();
   });
 
   it("caps a large help count", () => {
@@ -83,7 +83,7 @@ describe("Layout", () => {
 
   it("hides the count when nothing is open", () => {
     renderAt("/");
-    expect(screen.queryByText("٠")).not.toBeInTheDocument();
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 
   describe("on a phone", () => {
