@@ -33,7 +33,7 @@ All have header `{{1}}` and quick-reply buttons only.
 
 The juz' text is `الجزء 26` for one juz', `الجزآن 5 و6` for two and `الأجزاء 3، 5 و6` for three or more. It is the subject of `wirdak_rota_juz_v2` only. Everywhere else it follows the noun «قراءة» (the singular feminine subject, so the verb never has to agree with a plural), so it is genitive: the same except `الجزأين 5 و6` for two. This applies to `wirdak_rota_unread` too.
 
-For a juz' two readers share, the juz' phrase may carry a partner note, such as «الجزء ٢٦ (مشترك مع فلان)»; it is still one parameter, so no template changes.
+For a juz' two readers share, the juz' phrase may carry a partner note right after its number, such as «الجزء 26 (مشترك مع فلان)»; it is still one parameter, so no template changes. The free-form juz' text inside the window carries it the same way («جزؤكم اليوم هو 26 (مشترك مع فلان)»), and so would the numbers-only parameter of `wirdak_rota_juz_v3` and `wirdak_rota_juz_many` (`juzList` with partners).
 
 ## Messages to the organizer
 

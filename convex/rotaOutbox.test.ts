@@ -827,6 +827,21 @@ test("a partner's juz' message names the reader, for the ajza' still waiting", a
   expect(sent).toHaveLength(1);
   expect(sent[0]?.to).toBe(PARTNER_PHONE.slice(1));
   expect(sent[0]?.text).toContain(juzText([3], true, new Map([[3, "سارة"]])));
+  expect(sent[0]?.text).toContain(
+    "السلام عليكم، جزؤكم اليوم هو 3 (مشترك مع سارة). انقروا «أتممت» بعد القراءة.",
+  );
+});
+
+test("a partner's reminder inside the window names the reader after its juz'", async () => {
+  const t = convexTest(schema, modules);
+  const ids = await setup(t);
+  const partnerId = await addPartner(t, ids);
+  await queuePartner(t, ids, partnerId, "reminder");
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(sent).toHaveLength(1);
+  expect(sent[0]?.text).toContain(
+    "لم تُسجَّل بعد قراءة الجزأين 2 (مشترك مع سارة) و3 (مشترك مع سارة) في هذه الختمة.",
+  );
 });
 
 test("a queued juz' message to the partner drops once the juz' is done", async () => {
@@ -867,6 +882,7 @@ test("a partner's welcome has today's shared juz', naming the reader", async () 
   const text = sent[0]?.text ?? "";
   expect(text).toContain("أهلاً هدى");
   expect(text).toContain(juzText([3], false, new Map([[3, "سارة"]])));
+  expect(text).toContain("\nجزؤكم اليوم هو 3 (مشترك مع سارة). انقروا");
   expect(text).toContain(`[${ROTA_BUTTONS.done}]`);
 });
 
@@ -885,5 +901,8 @@ test("the reader's welcome names the partner too", async () => {
         [3, "هدى"],
       ]),
     ),
+  );
+  expect(sent[0]?.text).toContain(
+    "أجزاؤكم اليوم هي 2 (مشترك مع هدى) و3 (مشترك مع هدى). انقروا",
   );
 });

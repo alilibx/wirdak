@@ -116,6 +116,12 @@ test("the juz', reminder and assigned messages name each juz' partner", () => {
   expect(juzText(one, true, new Map([[26, "سارة"]]))).toBe(
     "السلام عليكم، جزؤكم اليوم هو 26 (مشترك مع سارة). انقروا «أتممت» بعد القراءة.",
   );
+  expect(juzText(two, false, partners)).toBe(
+    "أجزاؤكم اليوم هي 5 (مشترك مع سارة) و6. انقروا «أتممت» بعد القراءة.",
+  );
+  expect(juzText(three, true, new Map([[6, "سارة"]]))).toBe(
+    "السلام عليكم، أجزاؤكم اليوم هي 3، 5 و6 (مشترك مع سارة). انقروا «أتممت» بعد القراءة.",
+  );
   expect(reminderText(one, new Map([[26, "سارة"]]))).toBe(
     "تذكير بقراءتك اليوم: لم تُسجَّل بعد قراءة الجزء 26 (مشترك مع سارة) في هذه الختمة.",
   );

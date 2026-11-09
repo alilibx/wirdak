@@ -38,7 +38,7 @@ A rotating khatma has 30 slots, so it holds 30 readers at most. Groups bigger th
 
 **Anti-goals** (this fails even if it technically works if...)
 
-- A shared juz' is counted twice in the day's «٢٦ / ٣٠», or a juz' stays undone after one of its readers tapped «أتممت».
+- A shared juz' is counted twice in the day's «26 / 30», or a juz' stays undone after one of its readers tapped «أتممت».
 - A reader of a shared juz' gets a reminder after the juz' is already done.
 - Someone gets messages without tapping the join link themselves (rota design 2).
 - A member other than the organizer sees who didn't read, or who covered whose juz' (rota design 2). Naming the partner in a reader's own juz' message is allowed, because Ali wants both to know they share. Nothing tells a reader whether their partner replied.
@@ -74,7 +74,7 @@ A rotating khatma has 30 slots, so it holds 30 readers at most. Groups bigger th
 - **The other reader** then gets no reminder that day. If they tap «أتممت» afterwards, they get the usual «تقبّل الله منك» reply, with that moment's count, and nothing changes. «ليس بعد» from them after the juz' is done gets the same reply as «أتممت» does once a juz' is done, because there's nothing left to remind them of **[builder's call]**.
 - **Who marked it** is recorded when a reader taps or types it: the reader who tapped first. Only the owner and co-organizers with the Readings permission see it. When an organizer marks it done, no reader is recorded. The "who read it" picker on the organizer's mark is Task 11 of the co-organizers plan, which isn't built and isn't part of this work **[builder's call]**.
 - **Typed replies** (rota design 5.2). A shared juz' that the partner already finished, and that this reader hasn't answered, still counts as an open juz' for this reader's typed «تم», in the order Wirdak uses today: an ended day inside the late-tap window first, then today. The reply is the thanks reply, and nothing changes. So a «تم» meant for that juz' never marks a different juz' or another khatma's juz' done by mistake. If the reader has more than one open juz' across khatmas, the existing reply with one button per khatma applies **[builder's call]**.
-- **Counts and cheers.** The day's «٢٦ / ٣٠» counts the juz' once. The reader who tapped first gets the credit Wirdak gives a finished juz' today, such as cheer notes. The partner doesn't, unless they tap too.
+- **Counts and cheers.** The day's «26 / 30» counts the juz' once. The reader who tapped first gets the credit Wirdak gives a finished juz' today, such as cheer notes. The partner doesn't, unless they tap too.
 - **Late taps** (rota design 3.4) work the same way for both readers.
 
 ### 5.2 Messages
@@ -84,9 +84,9 @@ Each reader is handled separately: only a reader who joined, and who isn't stopp
 | Message | Shared juz' |
 | --- | --- |
 | Welcome with today's juz' | Names the partner. |
-| Juz' message | Names the partner: «المسجَّل لك الجزء ٢٦ (مشترك مع فلان) من هذه الختمة». |
+| Juz' message | Names the partner right after its juz': the template's phrase «الجزء 26 (مشترك مع فلان)», and inside the 24-hour window «جزؤكم اليوم هو 26 (مشترك مع فلان)». With several ajza', each note follows its own number: «أجزاؤكم اليوم هي 5 (مشترك مع فلان) و6». |
 | «ليس بعد» reply | Unchanged. |
-| Reminder | Goes to each joined reader while the juz' isn't done. Names the partner: «لم تُسجَّل بعد قراءة الجزء ٢٦ (مشترك مع فلان) في هذه الختمة». Neither reader gets one once the juz' is done. |
+| Reminder | Goes to each joined reader while the juz' isn't done. Names the partner: «لم تُسجَّل بعد قراءة الجزء 26 (مشترك مع فلان) في هذه الختمة». Neither reader gets one once the juz' is done. |
 | Reassigned to them | Unchanged. The person a juz' is reassigned to reads it alone that day. |
 | «أتممت» reply | Unchanged, for both the first tap and a later tap. |
 | Reassigned to someone else | Both readers get "your juz' was read for you" (rota design 5.1). |
@@ -94,7 +94,7 @@ Each reader is handled separately: only a reader who joined, and who isn't stopp
 | End-of-cycle note | Unchanged. A reader of a shared juz' read the whole juz', so the note's words are true for them too **[builder's call]**. |
 
 - The partner's name is the name the organizer gave them, the same name the organizer sees. If a reader holds more than one slot, each juz' names its own partner, and a juz' with no partner names nobody.
-- **No new templates.** The juz' phrase is already a template parameter (`juzPhrase`, `juzPhraseGenitive`), and the approved bodies place it mid-sentence (`docs/whatsapp-rota-templates.md`). The partner goes into the phrase as a bracketed note right after the juz' it belongs to, «الجزء ٢٦ (مشترك مع فلان)», so the sentence around it still reads correctly. Two slots read «الجزآن ٥ (مشترك مع فلان) و٦». The builder checks every body that takes the phrase (`wirdak_rota_juz_v2`, `wirdak_rota_reminder`, `wirdak_rota_assigned_v2`, and the welcome) still reads as correct Arabic, with no newlines and within Meta's parameter limit **[builder's call]**. If a template needs new wording after all, that's a Linear task for Ali, and it blocks shipping.
+- **No new templates.** The juz' phrase is already a template parameter (`juzPhrase`, `juzPhraseGenitive`), and the approved bodies place it mid-sentence (`docs/whatsapp-rota-templates.md`). The partner goes into the phrase as a bracketed note right after the juz' it belongs to, «الجزء 26 (مشترك مع فلان)», so the sentence around it still reads correctly. Two slots read «الجزآن 5 (مشترك مع فلان) و6». The builder checks every body that takes the phrase (`wirdak_rota_juz_v2`, `wirdak_rota_reminder`, `wirdak_rota_assigned_v2`, and the welcome) still reads as correct Arabic, with no newlines and within Meta's parameter limit **[builder's call]**. If a template needs new wording after all, that's a Linear task for Ali, and it blocks shipping.
 - The partner is named whether or not they joined. "Sharing with" tells the reader who else is on the juz', not who replied **[builder's call]**.
 
 ### 5.3 Silence
@@ -111,9 +111,9 @@ The silence rule (rota design 5.3) counts replies, as today. A reader whose part
 ## 6. The participants page
 
 - Nothing about sharing shows while any slot is empty.
-- Once all 30 slots have a reader, a whole row's sheet gets «أضف قارئاً يشاركه الجزء». It picks a new or saved person the way the add sheet does, and refuses someone already in the khatma (section 4). It spells out what follows: «يقرأ فلان وفلانة الجزء ٧ في الختمة ١٢، ثم الجزء ٨ في الختمة ١٣. أيّهما سجّل أنه أتمّه يُحسب الجزء مقروءاً».
+- Once all 30 slots have a reader, a whole row's sheet gets «أضف قارئاً يشاركه الجزء». It picks a new or saved person the way the add sheet does, and refuses someone already in the khatma (section 4). It spells out what follows: «يقرأ فلان وفلانة الجزء 7 في الختمة 12، ثم الجزء 8 في الختمة 13. أيّهما سجّل أنه أتمّه يُحسب الجزء مقروءاً».
 - A shared row shows both names, and whether each has joined.
-- A short line above the list says how many readers there are when it's over 30: «٤٢ قارئاً، ١٢ جزءاً مشتركاً» **[builder's call]**.
+- A short line above the list says how many readers there are when it's over 30: «42 قارئاً، 12 جزءاً مشتركاً» **[builder's call]**.
 - **Join requests** from numbers not on the khatma can be accepted onto a shared slot only when all 30 have a reader. Until then, they're accepted onto an empty slot, as today.
 - **The saved list and «أضف أعضاء <khatma>»** fill empty slots first. Once all 30 have a reader, they share slots in order from the lowest-numbered slot with one reader.
 - **"Start again from this"** copies shared slots as they are. If the copy has an empty slot, existing shares stay, and the rule in 4.1 applies from then on.

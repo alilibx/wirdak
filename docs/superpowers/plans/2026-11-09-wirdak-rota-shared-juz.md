@@ -18,10 +18,10 @@
 - A second reader may be added only while every one of the 30 slots of the target day (`targetDay`) has a first reader, and only when `rotaSharedSlotsOn` is on. The server checks this on every path. The website hides the action when the view says so.
 - The second reader must be new to the khatma: not an active participant already.
 - Done once: the first «أتممت» or typed «تم» from either reader, or an organizer's mark, sets `doneAt`. Neither reader gets a reminder after that.
-- The partner is named in the reader's juz' phrase as «الجزء ٢٦ (مشترك مع فلان)». No new WhatsApp templates.
+- The partner is named in the reader's juz' phrase as «الجزء 26 (مشترك مع فلان)». No new WhatsApp templates.
 - `rotaHalfCountsAsSlot` keeps its key, and its meaning becomes: a shared slot counts toward `rotaMaxSlotsPerPerson` for each of its readers. Fix its comment in `convex/lib/settings.ts` and its admin label so neither says "half".
 - No AI attribution in commits or PR text (`CLAUDE.md`).
-- Arabic copy lives in `apps/web/src/i18n/ar.ts` for the website and `convex/lib/noteText.ts` / `convex/lib/rotaTemplates.ts` for WhatsApp. Digits in Arabic copy use `toArabicDigits`.
+- Arabic copy lives in `apps/web/src/i18n/ar.ts` for the website and `convex/lib/noteText.ts` / `convex/lib/rotaTemplates.ts` for WhatsApp. Digits in Arabic copy are Western (123) through `toWesternDigits` (`convex/lib/digits.ts`).
 - Each task ends with `bun run typecheck && bun run lint && bun run test` passing.
 
 ## Review Focus
@@ -30,7 +30,7 @@
 2. **A reassigned shared juz'.** The partner must stop getting reminders, stop counting as reading, and get "read for you". A late «أتممت» from them must still count, as a holder's does today (rota design 6.2). Tasks 3 and 4 test this.
 3. **Typed «تم» from the partner after the juz' is done** must not mark another khatma's or another day's juz' done. Task 3 tests it with two khatmas, and in the late window.
 4. **The rule breaks between screen and server.** A slot empties after the organizer opened the share sheet, so the server must refuse with `not_full` and the website must show it in Arabic. Tasks 2 and 5 test it.
-5. **Cheers and the day count with two readers.** «٢٦ / ٣٠» counts the juz' once, and the cheer's "still reading" set includes an unread partner. Task 3 tests it.
+5. **Cheers and the day count with two readers.** «26 / 30» counts the juz' once, and the cheer's "still reading" set includes an unread partner. Task 3 tests it.
 
 ---
 
@@ -119,7 +119,7 @@
 ### Task 3: The reading day on WhatsApp: both readers, done once
 
 **Files:**
-- Modify: `convex/lib/noteText.ts` (`juzPhrase` :66, `juzPhraseGenitive` :77, and the text builders that call them: `juzText`, `reminderText`, `assignedText`)
+- Modify: `convex/lib/noteText.ts` (`juzPhrase` :66, `juzPhraseGenitive` :77, and the text builders that call them: `juzText`, `reminderText`, `assignedText`; `juzText` uses `juzList`, so `juzList` takes `partners` too)
 - Modify: `convex/lib/rotaTemplates.ts` (`juzTemplate`, `reminderTemplate`, `assignedTemplate` take `partners`)
 - Modify: `convex/rotaOutbox.ts` (`enqueue` :113 takes `partners`, `compose` :378 passes them, `plan` :458 counts a partner's reads as waiting, `welcomeMessage` :323 includes partner reads)
 - Modify: `convex/rotaDays.ts` (`sendJuzMessages` :158, `sendReminders` :281, `countSilentDay` :327, `sendCycleMessages` :388)
@@ -130,7 +130,7 @@
 **Interfaces:**
 - Consumes: `readsFor`, the schema fields (Task 1).
 - Produces:
-  - `juzPhrase(juz: readonly number[], partners?: ReadonlyMap<number, string>): string`, and `juzPhraseGenitive` the same way. A juz' with a partner reads `الجزء ٢٦ (مشترك مع فلان)`. In a list, the note follows its own number: `الجزآن ٥ (مشترك مع فلان) و٦`. Without `partners`, the output is byte-for-byte unchanged.
+  - `juzPhrase(juz: readonly number[], partners?: ReadonlyMap<number, string>): string`, and `juzPhraseGenitive` the same way. A juz' with a partner reads `الجزء 26 (مشترك مع فلان)`. In a list, the note follows its own number: `الجزآن 5 (مشترك مع فلان) و6`. Without `partners`, the output is byte-for-byte unchanged.
   - `partnersOf(read, participantId, names: Map<Id, string>): string | null` in `convex/lib/rota.ts`: for the reader, the partner's name; for the partner, the reader's name; null when the read isn't shared or `reassignedAt` is set.
   - `enqueue` row gains `partners?: { juz: number; name: string }[]`. `sendJuzMessages`, `sendReminders`, and `welcomeMessage` fill it.
 - Behavior:
@@ -146,7 +146,7 @@
   - `sendCycleMessages`' `holdsOn` includes `partnerId`.
   - Cheers: the "still reading" and "held back" sets include `partnerId` where `readsFor`. `notYetAt` or `partnerNotYetAt` holds back the matching reader.
 - [ ] **Step 1: Write the failing tests**
-  - `noteText.test.ts` › `"juzPhrase names a partner after its own juz'"`: `juzPhrase([26], new Map([[26, "سارة"]]))` is `الجزء ٢٦ (مشترك مع سارة)`, and `juzPhrase([5, 6], new Map([[5, "سارة"]]))` is `الجزآن ٥ (مشترك مع سارة) و٦`. Also `"juzPhrase without partners is unchanged"`.
+  - `noteText.test.ts` › `"juzPhrase names a partner after its own juz'"`: `juzPhrase([26], new Map([[26, "سارة"]]))` is `الجزء 26 (مشترك مع سارة)`, and `juzPhrase([5, 6], new Map([[5, "سارة"]]))` is `الجزآن 5 (مشترك مع سارة) و6`. Also `"juzPhrase without partners is unchanged"`.
   - `rotaTemplates.test.ts` › `"the longest juz' phrase with partners fits a template parameter"`: three ajza', each with a 60-character name, stays under 1024 characters and has no newline.
   - `rotaDays.test.ts` › `"both joined readers get the juz' message naming each other"`.
   - `rotaDays.test.ts` › `"a reader who hasn't joined gets nothing, and the joined partner does"`.
