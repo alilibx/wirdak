@@ -46,7 +46,7 @@ export function DateLine({
             min={min}
             value={inputValue}
             onChange={(event) => onPick(event.target.value || null)}
-            className="min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
+            className="min-h-14 w-full rounded-ui border-2 border-field-line bg-field px-4 text-ink"
           />
           {clearLabel && inputValue !== "" && (
             <button

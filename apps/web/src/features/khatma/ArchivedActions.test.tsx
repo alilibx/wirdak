@@ -360,7 +360,7 @@ describe("ArchivedSection", () => {
   it("the delete button is red", () => {
     renderIn(<ArchivedSection inviteCode="CODE" restart={null} />);
     expect(screen.getByRole("button", { name: t.archive.delete })).toHaveClass(
-      "text-[#8A2B1E]",
+      "text-danger",
     );
   });
 });

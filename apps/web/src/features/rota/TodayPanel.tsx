@@ -19,8 +19,8 @@ const todayErrors: Record<string, string> = t.rota.todayErrors;
 const swatch = "me-1.5 inline-block size-3 rounded-full align-[-1px]";
 
 const LOOK: Record<Tile["state"], string> = {
-  done: "border-green bg-green text-[#F4EEDD]",
-  unread: "border-dashed border-[#8A7D62] bg-card text-ink",
+  done: "border-green-fill bg-green-fill text-on-green",
+  unread: "border-dashed border-dash bg-card text-ink",
   reassigned: "border-saffron bg-saffron-soft text-ink",
 };
 
@@ -299,7 +299,7 @@ export function PausedBanner({ className = "" }: { className?: string }) {
   return (
     <p
       role="note"
-      className={`rounded-ui border-2 border-gold bg-[#FBF1D9] p-3 font-medium ${className}`}
+      className={`rounded-ui border-2 border-gold bg-notice p-3 font-medium ${className}`}
     >
       {t.rota.pausedBanner}
     </p>
@@ -335,7 +335,7 @@ export function DayGrid({
     <section aria-label={t.rota.gridLabel} className={className}>
       <ul className="mb-3 flex flex-wrap gap-3 px-0.5 text-base text-ink-soft">
         <li>
-          <i className={`${swatch} border-2 border-dashed border-[#8A7D62]`} />
+          <i className={`${swatch} border-2 border-dashed border-dash`} />
           {t.rota.legendUnread}
         </li>
         <li>
@@ -343,7 +343,7 @@ export function DayGrid({
           {t.rota.legendReassigned}
         </li>
         <li>
-          <i className={`${swatch} bg-green`} />
+          <i className={`${swatch} bg-green-fill`} />
           {t.rota.legendDone}
         </li>
       </ul>

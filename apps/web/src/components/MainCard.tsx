@@ -38,7 +38,7 @@ export function MainCard({
     const juz = JUZ.find((j) => j.number === holding);
     return (
       <div
-        className={`${card} border-2 border-saffron bg-linear-to-br from-[#FFF6E0] to-saffron-soft`}
+        className={`${card} border-2 border-saffron bg-linear-to-br from-note-from to-saffron-soft`}
       >
         <div className="text-base font-semibold text-saffron-ink">
           {t.card.held}

@@ -43,7 +43,7 @@ export function TimeField({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-1 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink disabled:opacity-50"
+        className="mt-1 min-h-14 w-full rounded-ui border-2 border-field-line bg-field px-4 text-ink disabled:opacity-50"
       >
         {dayStart && value !== DAY_START && (
           <option value={DAY_START}>{t.rota.atDayStart}</option>

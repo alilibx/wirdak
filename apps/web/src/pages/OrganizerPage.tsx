@@ -25,7 +25,7 @@ import { RotaSettingsPage } from "./RotaSettingsPage";
 
 const headingClass = "mb-3 text-xl font-semibold";
 const sectionClass = "mt-8";
-const errorText = "mt-3 font-medium text-[#8A2B1E]";
+const errorText = "mt-3 font-medium text-danger";
 const rowButton =
   "min-h-14 rounded-ui border-2 border-line px-4 font-medium text-green-deep disabled:opacity-50";
 const organizerErrors: Record<string, string> = t.organizer.errors;
@@ -285,7 +285,7 @@ function OrganizerContent({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder={t.create.namePlaceholder(formatDate(Date.now()))}
-                className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
+                className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-field-line bg-field px-4 text-ink"
               />
               <SaveButton
                 disabled={busy || !nameChanged}
@@ -304,7 +304,7 @@ function OrganizerContent({
                 {SCHEDULES.map((value) => (
                   <label
                     key={value}
-                    className="flex min-h-14 cursor-pointer items-center gap-3 rounded-ui border-2 border-line bg-card px-4 py-3 has-[:checked]:border-green has-[:checked]:bg-[#E7F5EC] has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-green"
+                    className="flex min-h-14 cursor-pointer items-center gap-3 rounded-ui border-2 border-line bg-card px-4 py-3 has-[:checked]:border-green has-[:checked]:bg-chosen has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-green"
                   >
                     <input
                       type="radio"

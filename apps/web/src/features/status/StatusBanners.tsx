@@ -47,7 +47,7 @@ export function StatusBanners() {
       {settings.maintenanceMode && (
         <div
           role="status"
-          className="rounded-ui bg-green px-4 py-3 text-center text-sm text-white"
+          className="rounded-ui bg-green-fill px-4 py-3 text-center text-sm text-on-green"
         >
           {settings.maintenanceMessage ?? t.status.maintenanceDefault}
         </div>
@@ -72,7 +72,7 @@ export function StatusBanners() {
           <p className="flex-1">{t.status.updateNeeded}</p>
           <button
             type="button"
-            className="shrink-0 rounded-full bg-green px-3 py-1 font-semibold text-white"
+            className="shrink-0 rounded-full bg-green-fill px-3 py-1 font-semibold text-on-green"
             onClick={reloadPage}
           >
             {t.status.updateButton}

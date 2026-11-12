@@ -40,7 +40,7 @@ export function CelebrationPage({
   }));
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(120%_70%_at_50%_30%,#23674F,var(--green-deep)_70%)] text-center text-[#F6EEDB]">
+    <main className="min-h-screen bg-[radial-gradient(120%_70%_at_50%_30%,#23674F,#133A2D_70%)] text-center text-[#F6EEDB]">
       <div className="mx-auto max-w-xl p-5 pb-10">
         <Ring tiles={done} gold />
         <h1 className="mt-1.5 font-display text-5xl leading-tight text-gold">

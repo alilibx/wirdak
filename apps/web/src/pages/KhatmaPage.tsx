@@ -336,7 +336,7 @@ function VisitorContent({
       {!view.archived && (
         <p
           role="note"
-          className="mb-3.5 rounded-ui border border-[#BFE0CB] bg-[#E7F5EC] p-3 text-ink"
+          className="mb-3.5 rounded-ui border border-chosen-line bg-chosen p-3 text-ink"
         >
           {view.inviterName
             ? t.khatma.invited(view.inviterName)

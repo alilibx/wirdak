@@ -43,8 +43,8 @@ function Chip({
       onClick={onClick}
       className={`min-h-12 min-w-12 rounded-ui border-2 px-3 font-medium ${
         on
-          ? "border-green bg-green text-[#fbf6ea]"
-          : "border-line bg-white text-ink"
+          ? "border-green-fill bg-green-fill text-on-green"
+          : "border-field-line bg-field text-ink"
       }`}
     >
       {label}
@@ -71,7 +71,7 @@ export function ReadingDaysField({
             <div
               key={kind}
               className={`rounded-ui border-2 px-4 py-3 ${
-                chosen ? "border-green bg-[#E7F5EC]" : "border-line bg-card"
+                chosen ? "border-green bg-chosen" : "border-line bg-card"
               }`}
             >
               <label className="flex min-h-14 cursor-pointer items-center gap-3 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-green">

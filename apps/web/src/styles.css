@@ -14,9 +14,75 @@
   --saffron-ink: #5e4108;
   --gold: #d9a93f;
   --wa: #17834a;
+  /* Fills that carry light text: buttons, done tiles, banners. */
+  --green-fill: #1f5a45;
+  --on-green: #fbf6ea;
+  --on-green-chip: rgb(255 255 255 / 0.15);
+  --green-shadow: #133a2d;
+  --on-gold: #2b1f05;
+  --gold-shadow: #a57a1e;
+  --wa-shadow: #0f5e34;
+  --danger: #8a2b1e;
+  /* Dashed edge of an open juz' or reading day. */
+  --dash: #8a7d62;
+  /* A box that asks for attention (gold edge), and a chosen option (green edge). */
+  --notice: #fbf1d9;
+  --chosen: #e7f5ec;
+  --chosen-line: #bfe0cb;
+  --note-from: #fff6e0;
+  --chip-warm: #fff8e6;
+  /* Text inputs. */
+  --field: #ffffff;
+  --field-line: #d8ccb4;
+  --scrim: rgb(20 28 25 / 0.45);
+  --toast: #133a2d;
+  --thread: #cdbf9f;
+  --saffron-stroke: #a06a0e;
   --radius: 18px;
+  color-scheme: light;
   /* 8-point star lattice, from the prototype. */
   --pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='88' viewBox='0 0 88 88'%3E%3Cg fill='none' stroke='%231F5A45' stroke-opacity='.075' stroke-width='1.2'%3E%3Crect x='24' y='24' width='40' height='40'/%3E%3Crect x='24' y='24' width='40' height='40' transform='rotate(45 44 44)'/%3E%3Ccircle cx='44' cy='44' r='9'/%3E%3Cpath d='M0 0L24 24M88 0L64 24M0 88L24 64M88 88L64 64'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/*
+ * Dark theme. index.html sets data-theme before the first paint, from the saved choice or the
+ * system setting (see lib/theme.ts). Every text colour here keeps at least 4.5:1 against the
+ * surfaces it sits on, and borders that mark a control keep 3:1.
+ */
+:root[data-theme="dark"] {
+  --paper: #0f1714;
+  --paper-2: #202c27;
+  --card: #18221e;
+  --ink: #eee7d8;
+  --ink-soft: #b7c0ba;
+  --line: #3a4a43;
+  /* Green and saffron as text or edges: lighter, so they read on the dark surfaces. */
+  --green: #7fcca7;
+  --green-deep: #a8e0c5;
+  --saffron: #e2a647;
+  --saffron-soft: #3a2d14;
+  --saffron-ink: #f2cf8a;
+  --gold: #d9a93f;
+  --wa: #17834a;
+  --green-fill: #2a7458;
+  --on-green: #f7f1e3;
+  --on-green-chip: rgb(0 0 0 / 0.22);
+  --green-shadow: #12352a;
+  --danger: #ff9d8c;
+  --dash: #7f8f87;
+  --notice: #2b2412;
+  --chosen: #163428;
+  --chosen-line: #2f6a52;
+  --note-from: #45351a;
+  --chip-warm: #4b3a18;
+  --field: #111a16;
+  --field-line: #5f7068;
+  --scrim: rgb(0 0 0 / 0.6);
+  --toast: #1d4a3a;
+  --thread: #45554e;
+  --saffron-stroke: #b27a1c;
+  color-scheme: dark;
+  --pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='88' viewBox='0 0 88 88'%3E%3Cg fill='none' stroke='%237FCCA7' stroke-opacity='.045' stroke-width='1.2'%3E%3Crect x='24' y='24' width='40' height='40'/%3E%3Crect x='24' y='24' width='40' height='40' transform='rotate(45 44 44)'/%3E%3Ccircle cx='44' cy='44' r='9'/%3E%3Cpath d='M0 0L24 24M88 0L64 24M0 88L24 64M88 88L64 64'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 @theme inline {
@@ -33,6 +99,21 @@
   --color-saffron-ink: var(--saffron-ink);
   --color-gold: var(--gold);
   --color-wa: var(--wa);
+  --color-green-fill: var(--green-fill);
+  --color-on-green: var(--on-green);
+  --color-on-green-chip: var(--on-green-chip);
+  --color-on-gold: var(--on-gold);
+  --color-danger: var(--danger);
+  --color-dash: var(--dash);
+  --color-notice: var(--notice);
+  --color-chosen: var(--chosen);
+  --color-chosen-line: var(--chosen-line);
+  --color-note-from: var(--note-from);
+  --color-chip-warm: var(--chip-warm);
+  --color-field: var(--field);
+  --color-field-line: var(--field-line);
+  --color-scrim: var(--scrim);
+  --color-toast: var(--toast);
   --radius-ui: var(--radius);
   --font-sans: "Readex Pro", system-ui, sans-serif;
   --font-display: "Aref Ruqaa", serif;

@@ -40,7 +40,7 @@ type Message = "reminder" | "unread" | "summary";
 const rotaErrors: Record<string, string> = t.rota.errors;
 const MESSAGES: Message[] = ["reminder", "unread", "summary"];
 const fieldClass =
-  "mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink";
+  "mt-1.5 min-h-14 w-full rounded-ui border-2 border-field-line bg-field px-4 text-ink";
 
 const khatmaPath = (inviteCode: string) =>
   `/j/${encodeURIComponent(inviteCode)}`;
@@ -65,7 +65,7 @@ function Section({
       <h2 className="mb-3 text-xl font-semibold">{heading}</h2>
       {children}
       {own?.kind === "error" && (
-        <p role="alert" className="mt-3 font-medium text-[#8A2B1E]">
+        <p role="alert" className="mt-3 font-medium text-danger">
           {own.text}
         </p>
       )}

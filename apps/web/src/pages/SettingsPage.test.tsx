@@ -209,6 +209,20 @@ describe("SettingsPage", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
+  it("signed out too: picks dark, and it applies at once", async () => {
+    const user = userEvent.setup();
+    m.token = undefined;
+    m.me = null;
+    m.list = [];
+    renderPage();
+    const group = screen.getByRole("group", { name: t.settings.themeHint });
+    expect(within(group).getByRole("radio", { name: /تلقائي/ })).toBeChecked();
+    await user.click(within(group).getByRole("radio", { name: "داكن" }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(localStorage.getItem("wirdak.theme")).toBe("dark");
+    localStorage.clear();
+  });
+
   it("saves the display name", async () => {
     const user = userEvent.setup();
     renderPage();

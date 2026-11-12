@@ -18,7 +18,7 @@ function TodayQuestion({
     <div
       role="group"
       aria-labelledby={id}
-      className="mt-4 rounded-ui border-2 border-gold bg-[#FBF1D9] p-4"
+      className="mt-4 rounded-ui border-2 border-gold bg-notice p-4"
     >
       <p id={id} className="font-medium">
         {t.rota.todayQuestion}

@@ -89,7 +89,7 @@ export function GraceField({ value, schedule, onChange }: Props) {
               unit: shown.unit,
             });
           }}
-          className="min-h-14 w-24 rounded-ui border-2 border-line bg-white px-4 text-center text-ink"
+          className="min-h-14 w-24 rounded-ui border-2 border-field-line bg-field px-4 text-center text-ink"
         />
         <div
           role="group"
@@ -107,7 +107,7 @@ export function GraceField({ value, schedule, onChange }: Props) {
                 if (unit === shown.unit && amount === shown.value) return;
                 onChange({ value: amount, unit });
               }}
-              className="min-h-14 flex-1 rounded-ui border-2 border-line bg-card px-3 font-medium aria-pressed:border-green aria-pressed:bg-[#E7F5EC] aria-pressed:text-green-deep"
+              className="min-h-14 flex-1 rounded-ui border-2 border-line bg-card px-3 font-medium aria-pressed:border-green aria-pressed:bg-chosen aria-pressed:text-green-deep"
             >
               {t.grace.units[unit]}
             </button>
@@ -115,11 +115,7 @@ export function GraceField({ value, schedule, onChange }: Props) {
         </div>
       </div>
       {invalid && (
-        <p
-          id={errorId}
-          role="alert"
-          className="mt-3 font-medium text-[#8A2B1E]"
-        >
+        <p id={errorId} role="alert" className="mt-3 font-medium text-danger">
           {t.grace.range}
         </p>
       )}

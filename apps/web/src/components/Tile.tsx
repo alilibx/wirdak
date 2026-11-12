@@ -41,17 +41,17 @@ export function Tile({ tile, onTake, readOnly = false }: Props) {
   const look =
     state === "open"
       ? readOnly
-        ? "border-dashed border-[#8A7D62] bg-card text-ink"
-        : "border-dashed border-[#8A7D62] bg-card text-ink hover:border-green focus-visible:border-green"
+        ? "border-dashed border-dash bg-card text-ink"
+        : "border-dashed border-dash bg-card text-ink hover:border-green focus-visible:border-green"
       : state === "reading"
         ? "border-saffron bg-saffron-soft text-ink"
-        : "border-green bg-green text-[#F4EEDD]";
+        : "border-green-fill bg-green-fill text-on-green";
   const chipLook =
     state === "open"
       ? "bg-paper-2 text-ink-soft"
       : state === "reading"
-        ? "bg-[#fff8e6] text-saffron-ink"
-        : "bg-white/15 text-[#F4EEDD]";
+        ? "bg-chip-warm text-saffron-ink"
+        : "bg-on-green-chip text-on-green";
   const mine = isMine
     ? "shadow-[0_0_0_3px_var(--card),0_0_0_5px_var(--saffron)]"
     : "";

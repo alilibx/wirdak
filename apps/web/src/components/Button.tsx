@@ -8,10 +8,10 @@ const base =
 
 const variants: Record<Variant, string> = {
   primary:
-    "min-h-[62px] bg-green text-[#fbf6ea] text-[1.15rem] font-semibold shadow-[0_6px_0_var(--green-deep),0_10px_24px_rgba(19,58,45,0.25)] active:translate-y-1 active:shadow-[0_2px_0_var(--green-deep)]",
-  gold: "min-h-14 bg-gold text-[#2b1f05] text-[1.15rem] font-semibold shadow-[0_6px_0_#a57a1e]",
+    "min-h-[62px] bg-green-fill text-on-green text-[1.15rem] font-semibold shadow-[0_6px_0_var(--green-shadow),0_10px_24px_rgba(19,58,45,0.25)] active:translate-y-1 active:shadow-[0_2px_0_var(--green-shadow)]",
+  gold: "min-h-14 bg-gold text-on-gold text-[1.15rem] font-semibold shadow-[0_6px_0_var(--gold-shadow)]",
   whatsapp:
-    "min-h-14 bg-wa text-white text-[1.15rem] font-semibold shadow-[0_5px_0_#0f5e34]",
+    "min-h-14 bg-wa text-white text-[1.15rem] font-semibold shadow-[0_5px_0_var(--wa-shadow)]",
   ghost:
     "min-h-14 border-2 border-line bg-transparent text-ink-soft text-base font-medium",
 };

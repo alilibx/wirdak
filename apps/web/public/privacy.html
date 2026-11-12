@@ -38,6 +38,21 @@
         --line: #d8ccb4;
         --green: #1f5a45;
         --green-deep: #133a2d;
+        color-scheme: light;
+      }
+      /* Same dark colours as the app (src/styles.css). No script on this page, so it follows the
+         system setting rather than the app's saved choice. */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --paper: #0f1714;
+          --paper-2: #202c27;
+          --ink: #eee7d8;
+          --ink-soft: #b7c0ba;
+          --line: #3a4a43;
+          --green: #7fcca7;
+          --green-deep: #a8e0c5;
+          color-scheme: dark;
+        }
       }
       * {
         box-sizing: border-box;

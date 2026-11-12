@@ -128,7 +128,7 @@ function BringPeopleInList({
             type="button"
             disabled={busy}
             onClick={() => onBringIn?.(pool.inviteCode)}
-            className="min-h-14 w-full rounded-ui border-2 border-gold bg-[#FBF1D9] px-4 py-3 text-start disabled:opacity-50"
+            className="min-h-14 w-full rounded-ui border-2 border-gold bg-notice px-4 py-3 text-start disabled:opacity-50"
           >
             <span className="block font-medium">
               {t.rota.importTitle(pool.title)}
@@ -293,7 +293,7 @@ export function RotaPeopleSetupContent({
           <button
             type="button"
             onClick={() => setGiving(true)}
-            className="block min-h-14 w-full rounded-ui border-2 border-gold bg-[#FBF1D9] px-4 py-3 text-start"
+            className="block min-h-14 w-full rounded-ui border-2 border-gold bg-notice px-4 py-3 text-start"
           >
             <span className="block font-medium">
               {t.rota.leftover(view.freeJuz)}

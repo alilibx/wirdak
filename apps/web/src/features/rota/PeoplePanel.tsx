@@ -537,7 +537,7 @@ export function PeoplePanel({
       {/* Above the 30 rows, so the organizer sees what is left without scrolling. An admin
           can turn the box off; the open rows still invite an add. */}
       {!archived && view.leftoverBox && view.freeJuz.length > 0 && (
-        <section className="mt-4 grid gap-3 rounded-ui border-2 border-gold bg-[#FBF1D9] p-4">
+        <section className="mt-4 grid gap-3 rounded-ui border-2 border-gold bg-notice p-4">
           <p className="font-medium">{t.rota.leftover(view.freeJuz)}</p>
           <SpreadFreeJuz
             inviteCode={inviteCode}
@@ -582,7 +582,7 @@ export function PeoplePanel({
             `flex min-h-14 min-w-[12rem] flex-1 items-center gap-3 rounded-ui border-2 px-4 py-2 text-start ${
               held
                 ? "border-line bg-card"
-                : "border-dashed border-[#8A7D62] bg-transparent text-ink-soft"
+                : "border-dashed border-dash bg-transparent text-ink-soft"
             }`;
           const number = (
             <span className="w-7 shrink-0 text-center font-semibold text-green-deep">
