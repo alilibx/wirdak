@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/alilibx/wirdak/compare/v0.13.0...v0.14.0) (2026-11-12)
+
+
+### Features
+
+* **web:** dark mode, following the phone's setting ([#77](https://github.com/alilibx/wirdak/issues/77)) ([4ce0ae6](https://github.com/alilibx/wirdak/commit/4ce0ae674c070d6092081cff000f856ea25a467c))
+
 ## [0.13.0](https://github.com/alilibx/wirdak/compare/v0.12.0...v0.13.0) (2026-11-09)
 
 
