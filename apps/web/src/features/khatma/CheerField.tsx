@@ -9,7 +9,7 @@ const DAY = 24 * HOUR;
 const GAPS = [0, 6 * HOUR, DAY, 3 * DAY, 7 * DAY];
 
 const selectClass =
-  "mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink";
+  "mt-1.5 min-h-14 w-full rounded-ui border-2 border-field-line bg-field px-4 text-ink";
 
 type Props = {
   setting: CheerSetting;

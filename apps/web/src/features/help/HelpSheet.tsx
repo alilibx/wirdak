@@ -256,7 +256,7 @@ function Composer({
         rows={3}
         placeholder={t.help.placeholder}
         onChange={(e) => setText(e.target.value)}
-        className="w-full rounded-ui border-2 border-line bg-white p-3"
+        className="w-full rounded-ui border-2 border-field-line bg-field p-3"
       />
       <div className="flex items-stretch gap-2">
         {shotUrl && (
@@ -277,7 +277,7 @@ function Composer({
               type="button"
               aria-label={t.help.removeScreenshot}
               onClick={() => setScreenshot(null)}
-              className="absolute -start-2 -top-2 flex size-6 items-center justify-center rounded-full bg-ink text-sm text-white"
+              className="absolute -start-2 -top-2 flex size-6 items-center justify-center rounded-full bg-ink text-sm text-paper"
             >
               ×
             </button>
@@ -328,7 +328,7 @@ function Composer({
         {busy ? t.help.sending : t.help.send}
       </Button>
       {enlarged && shotUrl && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-ink/90 p-4">
+        <div className="fixed inset-0 z-50 flex flex-col bg-[rgb(28_41_36/0.92)] p-4">
           <button
             type="button"
             onClick={() => setEnlarged(false)}

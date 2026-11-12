@@ -134,7 +134,7 @@ export function SignOutPage() {
         </p>
       ) : failed ? (
         <>
-          <p role="alert" className="text-xl font-medium text-[#8A2B1E]">
+          <p role="alert" className="text-xl font-medium text-danger">
             {t.signOut.error}
           </p>
           {token && key && (

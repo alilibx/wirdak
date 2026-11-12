@@ -41,7 +41,7 @@ function MessageSheet({
         <p className="mt-3 text-ink-soft">{t.share.preparing}</p>
       )}
       {failed && (
-        <p role="alert" className="mt-3 font-medium text-[#8A2B1E]">
+        <p role="alert" className="mt-3 font-medium text-danger">
           {t.share.error}
         </p>
       )}

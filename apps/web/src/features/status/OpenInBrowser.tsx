@@ -47,7 +47,7 @@ export function OpenInBrowser() {
   }
 
   const action =
-    "shrink-0 rounded-full bg-green px-3 py-1.5 font-semibold text-white";
+    "shrink-0 rounded-full bg-green-fill px-3 py-1.5 font-semibold text-on-green";
   return (
     <div className="mx-auto max-w-xl px-4 pt-3">
       <div

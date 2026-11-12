@@ -179,7 +179,7 @@ export function Toast({ toast, busy, onUndo, onDismiss }: Props) {
           ? 0
           : 1 - Math.min(0.5, Math.hypot(offset.x, offset.y) / 240),
       }}
-      className={`fixed inset-x-4 bottom-[calc(1.25rem+var(--nav-h,0px))] z-30 mx-auto flex max-w-xl animate-sheet-up touch-none items-center justify-between gap-3 overflow-hidden rounded-[18px] bg-green-deep px-4 py-3.5 text-[#F7F1E3] shadow-[0_12px_30px_rgba(0,0,0,0.3)] select-none ${dragging ? "" : "transition-[translate,opacity] duration-200 ease-out motion-reduce:transition-none"}`}
+      className={`fixed inset-x-4 bottom-[calc(1.25rem+var(--nav-h,0px))] z-30 mx-auto flex max-w-xl animate-sheet-up touch-none items-center justify-between gap-3 overflow-hidden rounded-[18px] bg-toast px-4 py-3.5 text-[#F7F1E3] shadow-[0_12px_30px_rgba(0,0,0,0.3)] select-none ${dragging ? "" : "transition-[translate,opacity] duration-200 ease-out motion-reduce:transition-none"}`}
     >
       <span className="py-1.5 text-lg font-medium">{toast.text}</span>
       {canUndo && (

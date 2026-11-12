@@ -97,7 +97,7 @@ export function RotaCreateForm({
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder={t.rota.namePlaceholder}
-          className="mt-2 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
+          className="mt-2 min-h-14 w-full rounded-ui border-2 border-field-line bg-field px-4 text-ink"
         />
 
         <div className="mt-6">
@@ -144,7 +144,7 @@ export function RotaCreateForm({
         </div>
 
         {error && (
-          <p role="alert" className="mt-4 font-medium text-[#8A2B1E]">
+          <p role="alert" className="mt-4 font-medium text-danger">
             {error}
           </p>
         )}

@@ -8,9 +8,11 @@ import { App } from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { linkPageManifest } from "./lib/handoff";
 import { initializePostHogLogging } from "./lib/posthogLogs";
+import { followSystemTheme } from "./lib/theme";
 import "./styles.css";
 
 linkPageManifest();
+followSystemTheme();
 initializePostHogLogging();
 
 const root = createRoot(document.getElementById("root")!);

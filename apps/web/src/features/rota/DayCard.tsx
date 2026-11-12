@@ -7,9 +7,9 @@ import { formatIsoDate } from "./format";
 import { DayGrid, nextLine, TileSheet, type Tile } from "./TodayPanel";
 
 const STRIP: Record<Tile["state"], string> = {
-  done: "bg-green",
+  done: "bg-green-fill",
   reassigned: "bg-saffron",
-  unread: "border-[1.5px] border-dashed border-[#8A7D62] bg-card",
+  unread: "border-[1.5px] border-dashed border-dash bg-card",
 };
 
 /**

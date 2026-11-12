@@ -24,7 +24,7 @@ import {
 const errors: Record<string, string> = t.rota.errors;
 
 /** The red ghost button for anything that can't be undone. */
-const dangerClass = "border-[#8A2B1E] text-[#8A2B1E]";
+const dangerClass = "border-danger text-danger";
 
 /** «هذه الختمة مؤرشفة»: at the top of an archived khatma's page, which is read-only. */
 export function ArchivedBanner() {

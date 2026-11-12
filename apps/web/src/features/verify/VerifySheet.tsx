@@ -26,7 +26,7 @@ const heading = "text-xl font-semibold outline-none";
 const STEP_HEADING = "data-step-heading";
 const stepHeading = { tabIndex: -1, [STEP_HEADING]: "" } as const;
 const hint = "mt-1.5 leading-relaxed text-ink-soft";
-const errorText = "mt-2 font-medium text-[#8A2B1E]";
+const errorText = "mt-2 font-medium text-danger";
 
 export function VerifySheet({ title, intent, onVerified, onClose }: Props) {
   const v = useVerification(intent);
@@ -180,7 +180,7 @@ function ConfirmStep({ v }: StepProps) {
       <div className="text-center">
         <div
           aria-hidden="true"
-          className="mx-auto mt-2 flex size-14 items-center justify-center rounded-full bg-green text-3xl text-white"
+          className="mx-auto mt-2 flex size-14 items-center justify-center rounded-full bg-green-fill text-3xl text-on-green"
         >
           ✓
         </div>
@@ -209,7 +209,7 @@ function ConfirmStep({ v }: StepProps) {
         placeholder={t.verify.namePlaceholder}
         aria-invalid={nameError}
         aria-describedby={nameError ? "verify-name-error" : undefined}
-        className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
+        className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-field-line bg-field px-4 text-ink"
       />
       {v.error && (
         <p
@@ -315,10 +315,10 @@ function PinStep({ v }: StepProps) {
           <span
             key={i}
             aria-hidden="true"
-            className={`flex h-16 w-12 items-center justify-center rounded-ui border-2 bg-white text-3xl font-bold ${
+            className={`flex h-16 w-12 items-center justify-center rounded-ui border-2 bg-field text-3xl font-bold ${
               focused && i === Math.min(pin.length, PIN_LENGTH - 1)
                 ? "border-green"
-                : "border-line"
+                : "border-field-line"
             }`}
           >
             {pin[i] ? toWesternDigits(pin[i]) : ""}

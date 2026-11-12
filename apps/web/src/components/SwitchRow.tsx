@@ -31,7 +31,7 @@ export function SwitchRow({
         {on ? t.khatmaSettings.on : t.khatmaSettings.off}
         <span
           aria-hidden="true"
-          className={`flex h-7 w-12 items-center rounded-full p-1 transition-colors ${on ? "bg-green" : "bg-line"}`}
+          className={`flex h-7 w-12 items-center rounded-full p-1 transition-colors ${on ? "bg-green-fill" : "bg-line"}`}
         >
           <span
             className={`size-5 rounded-full bg-white transition-[margin] ${on ? "ms-auto" : "me-auto"}`}

@@ -163,7 +163,7 @@ export function CreatePage() {
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder={t.create.namePlaceholder(formatDate(Date.now()))}
-            className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
+            className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-field-line bg-field px-4 text-ink"
           />
 
           <fieldset className="mt-5">
@@ -174,7 +174,7 @@ export function CreatePage() {
                 return (
                   <label
                     key={value}
-                    className="flex min-h-14 cursor-pointer items-center gap-3 rounded-ui border-2 border-line bg-card px-4 py-3 has-[:checked]:border-green has-[:checked]:bg-[#E7F5EC] has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-green"
+                    className="flex min-h-14 cursor-pointer items-center gap-3 rounded-ui border-2 border-line bg-card px-4 py-3 has-[:checked]:border-green has-[:checked]:bg-chosen has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-green"
                   >
                     <input
                       type="radio"
@@ -207,7 +207,7 @@ export function CreatePage() {
           />
 
           {error && (
-            <p role="alert" className="mt-4 font-medium text-[#8A2B1E]">
+            <p role="alert" className="mt-4 font-medium text-danger">
               {error}
             </p>
           )}

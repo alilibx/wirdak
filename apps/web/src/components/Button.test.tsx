@@ -3,12 +3,11 @@ import { buttonClass } from "./Button";
 
 describe("buttonClass", () => {
   it("lets a passed colour replace the variant's own", () => {
-    const classes = buttonClass(
-      "ghost",
-      "border-[#8A2B1E] text-[#8A2B1E]",
-    ).split(" ");
-    expect(classes).toContain("text-[#8A2B1E]");
-    expect(classes).toContain("border-[#8A2B1E]");
+    const classes = buttonClass("ghost", "border-danger text-danger").split(
+      " ",
+    );
+    expect(classes).toContain("text-danger");
+    expect(classes).toContain("border-danger");
     expect(classes).not.toContain("text-ink-soft");
     expect(classes).not.toContain("border-line");
   });

@@ -51,7 +51,7 @@ function JoinRequestCard({
     name.trim() === (request.name ?? "") ? {} : { name: name.trim() };
 
   return (
-    <li className="rounded-ui border-2 border-gold bg-[#FBF1D9] p-4">
+    <li className="rounded-ui border-2 border-gold bg-notice p-4">
       <p className="font-medium">
         {t.rota.requestLine(request.name, request.phoneMasked)}
       </p>

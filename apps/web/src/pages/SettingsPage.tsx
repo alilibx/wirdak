@@ -25,6 +25,7 @@ import {
   getSessionToken,
   useSessionToken,
 } from "../lib/session";
+import { type ThemeChoice, useThemeChoice } from "../lib/theme";
 import { useClearDeadToken } from "../lib/useClearDeadToken";
 
 const headingClass = "mt-8 mb-3 text-xl font-semibold";
@@ -98,7 +99,55 @@ function SettingsContent({
           whatsappNotes={me.whatsappNotes}
         />
       )}
+      <ThemeSection />
     </main>
+  );
+}
+
+const THEMES: ThemeChoice[] = ["system", "light", "dark"];
+
+/** Light, dark, or the phone's setting. Kept on this device, so it works signed out too. */
+function ThemeSection() {
+  const [choice, setChoice] = useThemeChoice();
+  return (
+    <section aria-labelledby="theme-heading">
+      <h2 id="theme-heading" className={headingClass}>
+        {t.settings.themeHeading}
+      </h2>
+      <fieldset>
+        <legend className="text-ink-soft">{t.settings.themeHint}</legend>
+        <div className="mt-2 grid gap-2.5">
+          {THEMES.map((value) => {
+            const subtitle = t.settings.themeSubtitles[value];
+            return (
+              <label
+                key={value}
+                className="flex min-h-14 cursor-pointer items-center gap-3 rounded-ui border-2 border-line bg-card px-4 py-3 has-[:checked]:border-green has-[:checked]:bg-chosen has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-green"
+              >
+                <input
+                  type="radio"
+                  name="theme"
+                  value={value}
+                  checked={choice === value}
+                  onChange={() => setChoice(value)}
+                  className="size-5 shrink-0 accent-green"
+                />
+                <span>
+                  <span className="font-medium">
+                    {t.settings.themes[value]}
+                  </span>
+                  {subtitle && (
+                    <span className="block text-base text-ink-soft">
+                      {subtitle}
+                    </span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+    </section>
   );
 }
 
@@ -305,7 +354,7 @@ function WhatsAppNotes({ on }: { on: boolean }) {
         onChange={(next) => void change(next)}
       />
       {error && (
-        <p role="alert" className="mt-3 font-medium text-[#8A2B1E]">
+        <p role="alert" className="mt-3 font-medium text-danger">
           {error}
         </p>
       )}
@@ -400,7 +449,7 @@ function PushSwitch() {
         onChange={(next) => void change(next)}
       />
       {error && (
-        <p role="alert" className="mt-3 font-medium text-[#8A2B1E]">
+        <p role="alert" className="mt-3 font-medium text-danger">
           {error}
         </p>
       )}
@@ -459,10 +508,10 @@ function NameForm({ initial }: { initial: string }) {
           setSaved(false);
         }}
         aria-invalid={error !== null}
-        className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-line bg-white px-4 text-ink"
+        className="mt-1.5 min-h-14 w-full rounded-ui border-2 border-field-line bg-field px-4 text-ink"
       />
       {error && (
-        <p role="alert" className="mt-2 font-medium text-[#8A2B1E]">
+        <p role="alert" className="mt-2 font-medium text-danger">
           {error}
         </p>
       )}
@@ -560,7 +609,7 @@ function Devices() {
         ))}
       </ul>
       {error && (
-        <p role="alert" className="mt-3 font-medium text-[#8A2B1E]">
+        <p role="alert" className="mt-3 font-medium text-danger">
           {error}
         </p>
       )}

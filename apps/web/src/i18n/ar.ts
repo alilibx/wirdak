@@ -1060,6 +1060,16 @@ export const ar = {
     retry: "حاول مرة أخرى",
   },
   settings: {
+    themeHeading: "المظهر",
+    themeHint: "يُحفظ على هذا الجهاز فقط.",
+    themes: {
+      system: "تلقائي",
+      light: "فاتح",
+      dark: "داكن",
+    },
+    themeSubtitles: {
+      system: "يتبع إعداد جهازك",
+    } as Record<string, string>,
     nameLabel: "اسمك",
     save: "احفظ الاسم",
     saving: "جارٍ الحفظ",

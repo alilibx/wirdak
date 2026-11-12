@@ -62,7 +62,7 @@ export function Sheet({ title, onClose, children }: Props) {
 
   return (
     <div className="fixed inset-0 z-20">
-      <div className="animate-sheet-fade absolute inset-0 bg-[rgba(20,28,25,0.45)]" />
+      <div className="animate-sheet-fade absolute inset-0 bg-scrim" />
       <div
         ref={panel}
         role="dialog"

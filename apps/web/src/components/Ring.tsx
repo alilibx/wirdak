@@ -11,9 +11,11 @@ type Props = { tiles: TileView[]; gold?: boolean };
 /** Misbaha ring: one bead per juz', green when done, saffron when being read, dashed when open. */
 export function Ring({ tiles, gold = false }: Props) {
   const done = tiles.filter((x) => x.state === "done").length;
-  const thread = gold ? "rgba(217,169,63,.5)" : "#CDBF9F";
-  const tassel = gold ? "#D9A93F" : "#1F5A45";
-  const doneFill = gold ? "#D9A93F" : "#1F5A45";
+  // CSS variables, so the ring follows the theme. They go in `style`: SVG attributes don't
+  // take var().
+  const thread = gold ? "rgba(217,169,63,.5)" : "var(--thread)";
+  const tassel = gold ? "#D9A93F" : "var(--green-fill)";
+  const doneFill = tassel;
 
   return (
     <div
@@ -34,14 +36,18 @@ export function Ring({ tiles, gold = false }: Props) {
           cy={CENTER}
           r={RADIUS}
           fill="none"
-          stroke={thread}
+          style={{ stroke: thread }}
           strokeWidth="2"
         />
-        <path d="M125 233 L125 252" stroke={thread} strokeWidth="2" />
-        <circle cx="125" cy="258" r="7" fill={tassel} />
+        <path
+          d="M125 233 L125 252"
+          style={{ stroke: thread }}
+          strokeWidth="2"
+        />
+        <circle cx="125" cy="258" r="7" style={{ fill: tassel }} />
         <path
           d="M119 266 L114 288 M122 266 L120 289 M125 266 L125 290 M128 266 L130 289 M131 266 L136 288"
-          stroke={tassel}
+          style={{ stroke: tassel }}
           strokeWidth="2"
           strokeLinecap="round"
         />
@@ -51,15 +57,15 @@ export function Ring({ tiles, gold = false }: Props) {
             cx: (CENTER + RADIUS * Math.cos(angle)).toFixed(1),
             cy: (CENTER + RADIUS * Math.sin(angle)).toFixed(1),
           };
-          let fill = "#FBF8F1";
-          let stroke = "#8A7D62";
+          let fill = "var(--card)";
+          let stroke = "var(--dash)";
           let dash: string | undefined = "3 2";
           if (tile.state === "done") {
             fill = stroke = doneFill;
             dash = undefined;
           } else if (tile.state === "reading") {
-            fill = "#C98A1E";
-            stroke = "#A06A0E";
+            fill = "var(--saffron)";
+            stroke = "var(--saffron-stroke)";
             dash = undefined;
           }
           return (
@@ -68,8 +74,7 @@ export function Ring({ tiles, gold = false }: Props) {
               data-bead={tile.juz}
               {...base}
               r="9.5"
-              fill={fill}
-              stroke={stroke}
+              style={{ fill, stroke }}
               strokeWidth="2"
               strokeDasharray={dash}
             />

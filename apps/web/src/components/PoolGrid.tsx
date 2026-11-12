@@ -27,7 +27,7 @@ export function PoolGrid({ tiles, onTake, readOnly = false }: Props) {
       </div>
       <ul className="mb-3 flex flex-wrap gap-3 px-0.5 text-base text-ink-soft">
         <li>
-          <i className={`${swatch} border-2 border-dashed border-[#8A7D62]`} />
+          <i className={`${swatch} border-2 border-dashed border-dash`} />
           {t.legend.open}
         </li>
         <li>
@@ -35,7 +35,7 @@ export function PoolGrid({ tiles, onTake, readOnly = false }: Props) {
           {t.legend.reading}
         </li>
         <li>
-          <i className={`${swatch} bg-green`} />
+          <i className={`${swatch} bg-green-fill`} />
           {t.legend.done}
         </li>
       </ul>

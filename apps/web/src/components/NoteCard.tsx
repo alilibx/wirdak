@@ -58,7 +58,7 @@ export function NoteCard({
     );
 
   return (
-    <div className="rounded-3xl border-2 border-saffron bg-linear-to-br from-[#FFF6E0] to-saffron-soft p-4.5">
+    <div className="rounded-3xl border-2 border-saffron bg-linear-to-br from-note-from to-saffron-soft p-4.5">
       <p className="text-lg leading-relaxed text-ink">{t.notes.text(note)}</p>
       <div className="mt-3 grid gap-3">
         {note.kind === "almostUp" && (
